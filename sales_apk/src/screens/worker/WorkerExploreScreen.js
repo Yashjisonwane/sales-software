@@ -17,10 +17,11 @@ import {
 import { WebView } from 'react-native-webview';
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { ScrollView as GestureHandlerScrollView } from 'react-native-gesture-handler';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SHADOWS, SIZES } from '../../constants/theme';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+import { COLORS, SHADOWS, SIZES, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
+import { getAvailableLeads, acceptLead } from '../../api/apiService';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -114,12 +115,13 @@ const ProgressBar = ({ label, value, progress, color }) => (
 
 export default function WorkerExploreScreen({ navigation, route }) {
     const [activeTab, setActiveTab] = useState('Overview');
+    const [selectedPin, setSelectedPin] = useState(null);
     const [quoteFilter, setQuoteFilter] = useState('All');
     const [invoiceFilter, setInvoiceFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     // Clean 'Silver' style Map URL matching the screenshot
-    const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin&hl=en&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9');
+    const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin&hl=en&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0xf5f5f5&style:feature:water|element:geometry|color:0xc9c9c9');
     const bottomSheetRef = useRef(null);
     const snapPoints = useMemo(() => ['18%', '40%', '92%'], []);
     const insets = useSafeAreaInsets();
@@ -192,7 +194,6 @@ export default function WorkerExploreScreen({ navigation, route }) {
 
     const [leads, setLeads] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const { getAvailableLeads, acceptLead } = require('../../api/apiService');
 
     const fetchLeads = async () => {
         setIsLoading(true);
@@ -216,6 +217,73 @@ export default function WorkerExploreScreen({ navigation, route }) {
             alert(res.message || 'Failed to accept lead');
         }
     };
+
+    const renderOverview = () => (
+        <View style={styles.tabScrollContent}>
+            <View style={styles.overviewMainCard}>
+                <Text style={styles.overviewTitle}>Good Morning, David!</Text>
+                <Text style={styles.overviewSub}>Here's what's happening today.</Text>
+                
+                <View style={styles.statsGrid}>
+                    <StatCard 
+                        icon="briefcase" 
+                        label="Active Jobs" 
+                        value="12" 
+                        change="+2 this week" 
+                        color="#3B82F6" 
+                    />
+                    <StatCard 
+                        icon="people" 
+                        label="New Leads" 
+                        value={leads.length.toString()} 
+                        change="Live update" 
+                        color="#F59E0B" 
+                    />
+                    <StatCard 
+                        icon="trending-up" 
+                        label="Revenue" 
+                        value="$4.2k" 
+                        change="+15% surge" 
+                        color="#10B981" 
+                    />
+                    <StatCard 
+                        icon="star" 
+                        label="Rating" 
+                        value="4.9" 
+                        change="Top Rated" 
+                        color="#8B5CF6" 
+                    />
+                </View>
+            </View>
+
+            <Text style={styles.sectionTitle}>Performance Goals</Text>
+            <ProgressBar label="Weekly Target" value="$5,000 / $7,500" progress={0.65} color="#3B82F6" />
+            <ProgressBar label="Jobs Completed" value="18 / 25" progress={0.72} color="#10B981" />
+            
+            <View style={{ height: 20 }} />
+            <Text style={styles.sectionTitle}>Recent Updates</Text>
+            <View style={styles.updatesList}>
+                <View style={styles.updateItem}>
+                    <View style={[styles.updateIcon, { backgroundColor: '#DBEAFE' }]}>
+                        <Ionicons name="notifications" size={20} color="#3B82F6" />
+                    </View>
+                    <View style={styles.updateContent}>
+                        <Text style={styles.updateText}>New Lead assigned in Boulder</Text>
+                        <Text style={styles.updateMeta}>2 mins ago • High Priority</Text>
+                    </View>
+                </View>
+                <View style={styles.updateItem}>
+                    <View style={[styles.updateIcon, { backgroundColor: '#DCFCE7' }]}>
+                        <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                    </View>
+                    <View style={styles.updateContent}>
+                        <Text style={styles.updateText}>Job #1024 marked as Completed</Text>
+                        <Text style={styles.updateMeta}>1 hour ago • $1,200.00</Text>
+                    </View>
+                </View>
+            </View>
+        </View>
+    );
 
     const renderJobPinModal = () => (
         <Modal
@@ -562,8 +630,20 @@ export default function WorkerExploreScreen({ navigation, route }) {
 
                 {/* All Map Pins - fade out when sheet scrolls up */}
                 <Animated.View style={[StyleSheet.absoluteFill, pinsAnimatedStyle]} pointerEvents="box-none">
-                    {/* Job Location Pins */}
-                    {!selectedPin && PINS_WORKER.map(pin => (
+                    {/* Job Location Pins - Mix of Mock and Live Leads */}
+                    {!selectedPin && [
+                        ...PINS_WORKER,
+                        ...leads.map((lead, index) => ({
+                            id: lead.id,
+                            type: 'lead',
+                            color: '#F59E0B',
+                            top: `${30 + (index * 12) % 40}%`,
+                            left: `${20 + (index * 15) % 65}%`,
+                            customer: lead.customer,
+                            location: lead.location,
+                            category: lead.category
+                        }))
+                    ].map(pin => (
                         <TouchableOpacity
                             key={pin.id}
                             style={[styles.pin, { top: pin.top, left: pin.left }]}

@@ -1,23 +1,31 @@
 const jwt = require('jsonwebtoken');
+const prisma = require('../config/db');
 
-// Protect routes - requires a valid JWT token
+// @desc    Protect routes - verify token
 const protect = async (req, res, next) => {
     let token;
 
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
-            // Get token from header
+            // 1. Get token
             token = req.headers.authorization.split(' ')[1];
 
-            // Verify token
+            // 2. Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
 
-            // Attach user data to request object (id and role)
-            req.user = decoded;
-            
+            // 3. Get user from db
+            req.user = await prisma.user.findUnique({
+                where: { id: decoded.id },
+                select: { id: true, name: true, email: true, role: true }
+            });
+
+            if (!req.user) {
+                return res.status(401).json({ success: false, message: 'User not found' });
+            }
+
             next();
         } catch (error) {
-            console.error('Not authorized, token failed:', error);
+            console.error("Auth Middleware Error:", error);
             res.status(401).json({ success: false, message: 'Not authorized, token failed' });
         }
     }
@@ -27,17 +35,20 @@ const protect = async (req, res, next) => {
     }
 };
 
-// Authorize roles (e.g., allow only 'ADMIN' or 'WORKER')
+// @desc    Authorize specific roles
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ 
-                success: false, 
-                message: `User role ${req.user.role} is not authorized to access this route`
+            return res.status(403).json({
+                success: false,
+                message: `User role ${req.user.role} is not authorized`
             });
         }
         next();
     };
 };
 
-module.exports = { protect, authorize };
+module.exports = {
+    protect,
+    authorize
+};

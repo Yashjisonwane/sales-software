@@ -2,7 +2,12 @@ let AsyncStorage;
 const isWeb = typeof localStorage !== 'undefined';
 
 if (!isWeb) {
-  AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  try {
+    AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  } catch (e) {
+    console.warn('AsyncStorage focus failed, falling back to mock');
+    AsyncStorage = { getItem: async () => null, setItem: async () => null, removeItem: async () => null };
+  }
 }
 
 /**
@@ -26,9 +31,9 @@ export const setItem = async (key, value) => {
   try {
     if (isWeb) {
       localStorage.setItem(key, value);
-      return true;
+    } else {
+      await AsyncStorage.setItem(key, value);
     }
-    await AsyncStorage.setItem(key, value);
     return true;
   } catch (error) {
     console.warn(`Storage Error (setItem): ${key}`, error);
@@ -40,9 +45,9 @@ export const removeItem = async (key) => {
   try {
     if (isWeb) {
       localStorage.removeItem(key);
-      return true;
+    } else {
+      await AsyncStorage.removeItem(key);
     }
-    await AsyncStorage.removeItem(key);
     return true;
   } catch (error) {
     console.warn(`Storage Error (removeItem): ${key}`, error);

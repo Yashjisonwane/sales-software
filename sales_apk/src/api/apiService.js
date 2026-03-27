@@ -18,48 +18,28 @@ export const loginWorker = async (email, password) => {
 };
 
 /**
- * SERVICE: Fetch Available Leads for Worker
+ * SERVICE: Leads Management
  */
 export const getAvailableLeads = async () => {
     try {
         const response = await apiClient.get('/leads');
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to fetch leads' };
+        return { success: false, message: 'Could not fetch leads' };
     }
 };
 
-/**
- * SERVICE: Accept a Lead (Converts to Job)
- */
 export const acceptLead = async (leadId) => {
     try {
-        const response = await apiClient.patch(`/leads/${leadId}/assign`, {
-            // Worker is identified by token in header
-        });
+        const response = await apiClient.patch(`/leads/${leadId}/assign`);
         return response.data;
     } catch (error) {
-        return { success: false, message: error.response?.data?.message || 'Failed to accept lead' };
-    }
-};
-
-/**
- * SERVICE: Update Job Workflow (Photos, Inspection, etc.)
- * Used by the worker app during the 5-step process
- */
-export const updateJobStatus = async (jobId, stepData, stepType) => {
-    // stepType: 'photos', 'inspection', 'estimate', etc.
-    try {
-        const response = await apiClient.post(`/jobs/${jobId}/${stepType}`, stepData);
-        return response.data;
-    } catch (error) {
-        return { success: false, message: error.response?.data?.message || 'Update failed' };
+        return { success: false, message: 'Could not accept lead' };
     }
 };
 
 export default {
     loginWorker,
     getAvailableLeads,
-    acceptLead,
-    updateJobStatus
+    acceptLead
 };

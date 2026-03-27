@@ -1,13 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { getWorkers } = require('../controllers/userController');
-const { protect, authorize } = require('../middlewares/authMiddleware');
-
-// ----------------------------------------------------
-// Base URL for these routes: /api/v1/users
-// ----------------------------------------------------
+const { getProfessionals } = require('../controllers/userController');
+const { protect } = require('../middlewares/authMiddleware');
 
 // @route   GET /api/v1/users/workers
-router.get('/workers', protect, authorize('ADMIN'), getWorkers);
+router.get('/workers', protect, getProfessionals);
 
 module.exports = router;

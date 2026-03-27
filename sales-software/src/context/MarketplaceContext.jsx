@@ -38,7 +38,7 @@ export const MarketplaceProvider = ({ children }) => {
     const login = async (email, password) => {
         const res = await apiService.loginAdmin(email, password);
         if (res.success) {
-            localStorage.setItem('token', res.data.token);
+            localStorage.setItem('userToken', res.data.token);
             setCurrentUser(res.data.user);
             setIsAuthenticated(true);
             showToast('Login successful!', 'success');
@@ -51,7 +51,7 @@ export const MarketplaceProvider = ({ children }) => {
     };
 
     const logout = () => {
-        localStorage.removeItem('token');
+        localStorage.removeItem('userToken');
         setCurrentUser(null);
         setIsAuthenticated(false);
         setLeads([]);
@@ -60,7 +60,7 @@ export const MarketplaceProvider = ({ children }) => {
 
     // Auto-login check (Assuming valid token in local storage matches a session - Simplified for MVP)
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('userToken');
         if (token) {
             // Ideally we'd hit a '/me' endpoint here to re-validate token and get user role
             // For now, we simulate success if token exists

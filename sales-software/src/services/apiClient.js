@@ -1,40 +1,27 @@
 import axios from 'axios';
-import { API_BASE_URL } from './apiConfig';
+
+// The Backend is on Port 4000
+const API_BASE_URL = 'http://localhost:4000/api/v1';
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
+    baseURL: API_BASE_URL,
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
-// REQUEST INTERCEPTOR: Automatically attach the token to every request!
+// Request interceptor for adding auth token
 apiClient.interceptors.request.use(
-  (config) => {
-    // Check localStorage for token (Assumes user is logged in)
-    const token = localStorage.getItem('token'); 
-    
-    // Automatically inject Bearer token into Authorization header
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    (config) => {
+        const token = localStorage.getItem('userToken');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
     }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// RESPONSE INTERCEPTOR: Global Error Handling (like expired tokens)
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.error('Unauthorized - Token expired or invalid. Please Log in again.');
-      // Optional: Redirect to login or logout user
-    }
-    return Promise.reject(error);
-  }
 );
 
 export default apiClient;

@@ -1,27 +1,23 @@
 import axios from 'axios';
-import { API_BASE_URL, ENDPOINTS } from './apiConfig';
 
-const apiClient = axios.create({
-    baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    }
-});
+const API_BASE_URL = 'http://localhost:4000/api/v1';
 
-/**
- * Submit a lead from the website
- */
 export const createLead = async (leadData) => {
     try {
-        const response = await apiClient.post(ENDPOINTS.CREATE_LEAD, leadData);
-        return { success: true, data: response.data };
+        const response = await axios.post(`${API_BASE_URL}/leads`, leadData);
+        return response.data;
     } catch (error) {
-        console.error('API Error:', error);
-        return { 
-            success: false, 
-            error: error.response?.data?.message || 'Server error occurred' 
-        };
+        console.error("API Error:", error);
+        throw error;
     }
 };
 
-export default apiClient;
+export const getCategories = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/leads/categories`);
+        return response.data;
+    } catch (error) {
+        console.error("API Error:", error);
+        throw error;
+    }
+};
