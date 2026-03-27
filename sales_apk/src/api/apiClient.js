@@ -1,10 +1,8 @@
 import axios from 'axios';
-
-// Change this to your actual backend URL
-const BASE_URL = 'https://api.hinesq.com/v1';
+import { API_BASE_URL } from './apiConfig';
 
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
