@@ -99,17 +99,18 @@ export const distributeNewLead = async (formData) => {
         photos,
     };
 
-    leads.push(newLead);
-    console.log(`[LEAD SERVICE] New lead created: ${newLead.id} — ${newLead.serviceCategory}`);
-
     // ── Step 2: Category matching ────────────────────────────
     const categoryMatches = getProfessionalsByCategory(newLead.serviceCategory);
     console.log(`[LEAD SERVICE] Step 2 — Category matches: ${categoryMatches.length}`);
 
     if (categoryMatches.length === 0) {
         console.warn(`[LEAD SERVICE] No professionals found for category: ${newLead.serviceCategory}`);
-        return { lead: newLead, assignments: [], notified: 0, error: 'No professionals available for this service.' };
+        // Return without pushing to 'leads' array to prevent orphan entries
+        return { success: false, error: 'No professionals available for this service category.' };
     }
+
+    leads.push(newLead);
+    console.log(`[LEAD SERVICE] New lead created and distribution started: ${newLead.id}`);
 
     // ── Step 3: Proximity filter ─────────────────────────────
     const nearbyProfessionals = filterByProximity(categoryMatches, newLead.latitude, newLead.longitude);
@@ -188,31 +189,40 @@ export const getAssignmentsForLead = (leadId) =>
  * If accepted, update the lead status and set assignedTo.
  */
 export const respondToLead = (assignmentId, professionalId, decision) => {
-    setAssignments(prev => prev.map(a => {
+    const updatedStatus = decision === 'accept' ? 'Accepted' : 'Rejected';
+    
+    // 1. Update the specific assignment
+    assignments = assignments.map(a => {
         if (a.id === assignmentId && a.professionalId === professionalId) {
-            const updatedStatus = decision === 'accept' ? 'Accepted' : 'Rejected';
-            // If accepted, update lead status and assign professional, and reject other assignments
-            if (decision === 'accept') {
-                // Update main lead status and assignedTo
-                updateLead(a.leadId, { status: 'Assigned', assignedTo: professionalId });
-                // Reject other assignments for this lead
-                setAssignments(prevAssignments => prevAssignments.map(other => {
-                    if (other.leadId === a.leadId && other.id !== assignmentId) {
-                        return { ...other, status: 'Rejected' };
-                    }
-                    return other;
-                }));
-            } else {
-                // For reject, just update assignment status
-                // Note: The original instruction had `updateLead(a.leadId, { status: 'Rejected' });` here.
-                // This would set the lead status to 'Rejected' even if other professionals might still accept.
-                // Keeping it as is to faithfully follow the instruction, but it might be a logical flaw.
-                updateLead(a.leadId, { status: 'Rejected' });
-            }
             return { ...a, status: updatedStatus, responseAt: new Date().toISOString() };
         }
         return a;
-    }));
+    });
+
+    // 2. If accepted, update lead and reject other pros
+    if (decision === 'accept') {
+        const assignment = assignments.find(a => a.id === assignmentId);
+        if (assignment) {
+            // Update main lead status and assignedTo
+            leads = leads.map(l => 
+                l.id === assignment.leadId 
+                ? { ...l, status: 'Assigned', assignedTo: professionalId } 
+                : l
+            );
+
+            // Reject other pending assignments for this specific lead
+            assignments = assignments.map(other => {
+                if (other.leadId === assignment.leadId && other.id !== assignmentId && other.status === 'Sent') {
+                    return { ...other, status: 'Rejected' };
+                }
+                return other;
+            });
+        }
+    } 
+    // NOTE: If decision is 'reject', we do NOT update the lead status. 
+    // Other professionals might still accept it.
+    
+    return { success: true, assignmentStatus: updatedStatus };
 };
 
 /**

@@ -33,6 +33,40 @@ const JobDetail = () => {
         }
     };
 
+    // Workflow State (Simulated for this mockup)
+    const [stepData, setStepData] = React.useState({
+        photosUploaded: false,
+        inspectionDone: false,
+        estimateCreated: false
+    });
+
+    const isStepCompleted = (label) => {
+        if (label === 'Add Photos') return stepData.photosUploaded;
+        if (label === 'Inspection') return stepData.inspectionDone;
+        if (label === 'Create Estimate') return stepData.estimateCreated;
+        return true;
+    };
+
+    const handleAction = (label) => {
+        if (label === 'Add Photos') setStepData(prev => ({ ...prev, photosUploaded: true }));
+        if (label === 'Inspection') setStepData(prev => ({ ...prev, inspectionDone: true }));
+        if (label === 'Create Estimate') {
+            if (!stepData.photosUploaded || !stepData.inspectionDone) {
+                alert('CRITICAL: Please upload photos and complete inspection before creating an estimate.');
+                return;
+            }
+            setStepData(prev => ({ ...prev, estimateCreated: true }));
+        }
+        if (label === 'Create Invoice') {
+            if (!stepData.estimateCreated) {
+                alert('WORKFLOW BREAK: You must create an Estimate before generating an Invoice.');
+                return;
+            }
+            // Logic for opening Invoice Modal would go here
+            console.log("Generating Invoice...");
+        }
+    };
+
     const actionTools = [
         { icon: Camera, label: 'Add Photos', color: 'text-rose-600 bg-rose-50' },
         { icon: ClipboardCheck, label: 'Inspection', color: 'text-amber-600 bg-amber-50' },
@@ -75,20 +109,29 @@ const JobDetail = () => {
                 </div>
             </div>
 
-            {/* Action Buttons (CRITICAL) */}
+            {/* Action Buttons (WITH WORKFLOW GUARDS) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {actionTools.map((tool, idx) => (
-                    <button 
-                        key={idx}
-                        className="p-6 bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group text-left"
-                    >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${tool.color}`}>
-                            <tool.icon size={22} />
-                        </div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Action Step</p>
-                        <h4 className="text-sm font-black text-gray-900">{tool.label}</h4>
-                    </button>
-                ))}
+                {actionTools.map((tool, idx) => {
+                    const active = isStepCompleted(tool.label);
+                    return (
+                        <button 
+                            key={idx}
+                            onClick={() => handleAction(tool.label)}
+                            className={`p-6 bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group text-left ${!active && tool.label === 'Create Invoice' ? 'opacity-50' : ''}`}
+                        >
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${tool.color} ${active ? 'ring-2 ring-offset-2 ring-green-500' : ''}`}>
+                                <tool.icon size={22} />
+                                {active && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                         <ClipboardCheck size={8} className="text-white" />
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Action Step</p>
+                            <h4 className="text-sm font-black text-gray-900">{tool.label}</h4>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Content Section */}

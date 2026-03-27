@@ -373,6 +373,16 @@ export const MarketplaceProvider = ({ children }) => {
 
 
 
+    const deleteJob = (jobId) => {
+        setJobs(prev => prev.filter(j => j.id !== jobId));
+        showToast('Job deleted successfully', 'info');
+    };
+
+    const updateJob = (jobId, updates) => {
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, ...updates } : j));
+        showToast('Job updated successfully', 'success');
+    };
+
     const updateProfile = (updates) => {
         setCurrentUser(prev => ({ ...prev, ...updates }));
         setProfessionals(prev => prev.map(p => p.id === currentUser.id ? { ...p, ...updates } : p));
@@ -471,7 +481,9 @@ export const MarketplaceProvider = ({ children }) => {
             updateProfessionalStatus,
             toggleTrackingSetting,
             jobs,
-            addJob
+            addJob,
+            deleteJob,
+            updateJob
         }}>
             {children}
         </MarketplaceContext.Provider>

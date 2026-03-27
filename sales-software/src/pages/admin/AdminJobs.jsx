@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Clock, ChevronRight, X, Briefcase, Tag, Map } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Clock, ChevronRight, X, Briefcase, Tag, Map, Eye, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
 
 const AdminJobs = () => {
     const navigate = useNavigate();
-    const { jobs, professionals, addJob } = useMarketplace();
+    const { jobs, professionals, addJob, deleteJob, updateJob } = useMarketplace();
     const [searchTerm, setSearchTerm] = useState('');
     const [showForm, setShowForm] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [isViewing, setIsViewing] = useState(false);
+    const [currentJobId, setCurrentJobId] = useState(null);
+    const [viewData, setViewData] = useState(null);
     
     const [formData, setFormData] = useState({
         customerName: '',
@@ -17,20 +21,61 @@ const AdminJobs = () => {
         time: '',
         professionalId: '',
         location: '',
-        description: ''
+        description: '',
+        status: 'Scheduled'
     });
 
     const filteredJobs = jobs.filter(job => 
-        job.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.category.toLowerCase().includes(searchTerm.toLowerCase())
+        job?.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job?.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        job?.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        addJob(formData);
+        if (isEditing) {
+            updateJob(currentJobId, formData);
+        } else {
+            addJob({ ...formData, id: `JOB-${1000 + jobs.length + 1}` });
+        }
+        closeModal();
+    };
+
+    const closeModal = () => {
         setShowForm(false);
-        setFormData({ customerName: '', phone: '', category: '', date: '', time: '', professionalId: '', location: '', description: '' });
+        setIsEditing(false);
+        setIsViewing(false);
+        setCurrentJobId(null);
+        setViewData(null);
+        setFormData({ customerName: '', phone: '', category: '', date: '', time: '', professionalId: '', location: '', description: '', status: 'Scheduled' });
+    };
+
+    const handleView = (job) => {
+        setViewData(job);
+        setIsViewing(true);
+    };
+
+    const handleEdit = (job) => {
+        setFormData({
+            customerName: job.customerName,
+            phone: job.phone,
+            category: job.category,
+            date: job.date,
+            time: job.time,
+            professionalId: job.professionalId || '',
+            location: job.location,
+            description: job.description,
+            status: job.status || 'Scheduled'
+        });
+        setCurrentJobId(job.id);
+        setIsEditing(true);
+        setShowForm(true);
+    };
+
+    const handleDelete = (id) => {
+        if (window.confirm('CRITICAL: Are you sure you want to delete this job record? This cannot be undone.')) {
+            deleteJob(id);
+        }
     };
 
     const getStatusColor = (status) => {
@@ -100,49 +145,82 @@ const AdminJobs = () => {
                             {filteredJobs.map(job => (
                                 <tr 
                                     key={job.id} 
-                                    onClick={() => navigate(`/admin/jobs/${job.id}`)}
-                                    className="group hover:bg-blue-50/20 cursor-pointer transition-colors"
+                                    className="group hover:bg-blue-50/20 transition-colors border-b border-gray-50 last:border-0"
                                 >
                                     <td className="px-6 py-4">
-                                        <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2 py-1 rounded-md">{job.id}</span>
+                                        <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200">{job.id}</span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
-                                                {job.customerName.charAt(0)}
+                                            <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm shrink-0 border border-blue-100 shadow-sm">
+                                                {job.customerName?.charAt(0)}
                                             </div>
                                             <div className="space-y-0.5">
-                                                <p className="text-sm font-medium text-gray-700">{job.customerName}</p>
-                                                <p className="text-xs text-gray-400 flex items-center gap-1">
-                                                    {job.phone}
+                                                <p className="text-sm font-bold text-gray-700">{job.customerName}</p>
+                                                <p className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                                                    <Phone size={10} className="text-blue-400" /> {job.phone}
                                                 </p>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="text-sm text-gray-600">{job.category}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px]">
-                                                {job.professionalName.charAt(0)}
-                                            </div>
-                                            <span className="text-sm font-bold text-gray-900">{job.professionalName}</span>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                                            <span className="text-sm font-semibold text-gray-600">{job.category}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm">
-                                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${getStatusColor(job.status)}`}>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="h-7 w-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-[10px] border border-slate-200">
+                                                {job.professionalName?.charAt(0) || '?'}
+                                            </div>
+                                            <div className="space-y-0.5">
+                                                <p className="text-sm font-bold text-gray-800">{job.professionalName}</p>
+                                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-tighter">Assigned Expert</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusColor(job.status)}`}>
                                             {job.status}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="space-y-0.5">
-                                            <p className="text-sm text-gray-700 font-medium">{job.date}</p>
-                                            <p className="text-xs text-gray-400">{job.time || '10:00 AM'}</p>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-1.5 text-gray-700">
+                                                <Calendar size={12} className="text-gray-400" />
+                                                <p className="text-xs font-bold">{job.date}</p>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-gray-400">
+                                                <Clock size={12} />
+                                                <p className="text-[11px] font-medium">{job.time || '10:00 AM'}</p>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-right text-gray-400">
-                                        <ChevronRight size={18} className="inline group-hover:translate-x-1 transition-transform" />
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleView(job); }}
+                                                className="h-10 w-10 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/50 rounded-xl transition-all shadow-sm flex items-center justify-center group/btn"
+                                                title="Quick View"
+                                            >
+                                                <Eye size={16} className="group-hover/btn:scale-110 transition-transform" />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleEdit(job); }}
+                                                className="h-10 w-10 bg-white border border-gray-100 text-gray-400 hover:text-amber-600 hover:border-amber-100 hover:bg-amber-50/50 rounded-xl transition-all shadow-sm flex items-center justify-center group/btn"
+                                                title="Edit Job"
+                                            >
+                                                <Edit2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDelete(job.id); }}
+                                                className="h-10 w-10 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50/50 rounded-xl transition-all shadow-sm flex items-center justify-center group/btn"
+                                                title="Delete Job"
+                                            >
+                                                <Trash2 size={16} className="group-hover/btn:scale-110 transition-transform" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -168,9 +246,9 @@ const AdminJobs = () => {
                         <div className="flex items-center justify-between px-8 pt-8 pb-2">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
-                                    <Briefcase size={22} />
+                                    {isEditing ? <Edit2 size={22} /> : <Briefcase size={22} />}
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-800">Create New Job</h2>
+                                <h2 className="text-xl font-bold text-gray-800">{isEditing ? 'Modify Job Order' : 'Create New Job'}</h2>
                             </div>
                             <button 
                                 onClick={() => setShowForm(false)}
@@ -273,6 +351,22 @@ const AdminJobs = () => {
                             </div>
 
                             <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Job Status</label>
+                                <select 
+                                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer"
+                                    value={formData.status}
+                                    onChange={e => setFormData({...formData, status: e.target.value})}
+                                    required
+                                >
+                                    <option value="Scheduled">Scheduled</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Estimated">Estimated</option>
+                                    <option value="Invoiced">Invoiced</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                            </div>
+
+                            <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Job Description</label>
                                 <textarea 
                                     className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
@@ -293,13 +387,126 @@ const AdminJobs = () => {
                                 </button>
                                 <button 
                                     type="submit"
-                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-200"
+                                    className={`flex-1 px-6 py-3 ${isEditing ? 'bg-amber-600' : 'bg-blue-600'} text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-200`}
                                 >
-                                    <Plus size={16} />
-                                    <span>Create Job</span>
+                                    {isEditing ? <CheckCircle2 size={16} /> : <Plus size={16} />}
+                                    <span>{isEditing ? 'Save Changes' : 'Create Job'}</span>
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* View Detail Modal - Matches Edit UI Style */}
+            {isViewing && viewData && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" onClick={closeModal}></div>
+                    
+                    <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                        <div className="flex items-center justify-between px-8 pt-8 pb-2">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
+                                    <Eye size={22} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-800">Review Job Record</h2>
+                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{viewData.id}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={closeModal}
+                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="px-8 pb-8 pt-4 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Customer Name</label>
+                                    <div className="flex items-center gap-2">
+                                        <User size={14} className="text-gray-400" />
+                                        <p className="text-sm font-bold text-gray-800">{viewData.customerName}</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Phone Number</label>
+                                    <div className="flex items-center gap-2">
+                                        <Phone size={14} className="text-gray-400" />
+                                        <p className="text-sm font-bold text-gray-800">{viewData.phone}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Service Category</label>
+                                    <div className="flex items-center gap-2">
+                                        <Tag size={14} className="text-gray-400" />
+                                        <p className="text-sm font-bold text-gray-800">{viewData.category}</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Assigned Professional</label>
+                                    <div className="flex items-center gap-2">
+                                        <Briefcase size={14} className="text-gray-400" />
+                                        <p className="text-sm font-bold text-gray-800">{viewData.professionalName}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Scheduled Date</label>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar size={14} className="text-gray-400" />
+                                        <p className="text-sm font-bold text-gray-800">{viewData.date}</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Current Status</label>
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 size={14} className="text-gray-400" />
+                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${getStatusColor(viewData.status)}`}>
+                                            {viewData.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Work Location</label>
+                                <div className="flex items-center gap-2">
+                                    <MapPin size={14} className="text-gray-400" />
+                                    <p className="text-sm font-bold text-gray-800">{viewData.location}</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Job Description</label>
+                                <p className="text-sm text-gray-600 leading-relaxed italic">
+                                    "{viewData.description || 'No specific description provided.'}"
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button 
+                                    onClick={closeModal}
+                                    className="flex-1 px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm"
+                                >
+                                    Close View
+                                </button>
+                                <button 
+                                    onClick={() => navigate(`/admin/jobs/${viewData.id}`)}
+                                    className="flex-1 px-6 py-3 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md"
+                                >
+                                    <span>Manage Job</span>
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
