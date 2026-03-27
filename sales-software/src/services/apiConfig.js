@@ -1,7 +1,7 @@
 // Centralized API Configuration
 // This ensures that both the APK and Software use the same versioning and paths.
 
-export const API_BASE_URL = 'https://api.hinesq.com/v1';
+export const API_BASE_URL = 'http://localhost:4000/api/v1';
 
 export const ENDPOINTS = {
     LEADS: '/leads',

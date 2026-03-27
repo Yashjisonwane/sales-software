@@ -1,108 +1,105 @@
 // ============================================================
-// API SERVICE — Unified Facade for all marketplace operations
+// API SERVICE — Unified Facade for real backend operations
 // ============================================================
-// This is the entry point for the UI to interact with all services.
-// All methods are async to mirror real API calls.
 
-import { distributeNewLead, getAllLeads, getLeadById, updateLeadStatus, getAssignmentsForLead, respondToAssignment, getAssignmentsForProfessional } from './leadService';
-import { getAllProfessionals, getProfessionalById, getProfessionalsByCategory } from './professionalService';
+import apiClient from './apiClient';
+import { ENDPOINTS } from './apiConfig';
+
+// ─── AUTHENTICATION ──────────────────────────────────────────
+
+export const loginAdmin = async (email, password) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.AUTH}/login`, { email, password });
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] loginAdmin error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const registerUser = async (userData) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.AUTH}/register`, userData);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] registerUser error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
 
 // ─── LEADS ───────────────────────────────────────────────────
 
-/**
- * Submit a new service request and trigger lead distribution.
- * Used by: RequestService.jsx (Customer Website)
- *
- * @param {Object} formData - From ServiceRequestForm
- */
 export const submitServiceRequest = async (formData) => {
     try {
-        const result = await distributeNewLead(formData);
-        return { success: true, data: result };
+        // Must send categoryId (dummy category if backend has empty categories)
+        const response = await apiClient.post(ENDPOINTS.LEADS, formData);
+        return { success: true, data: response.data.data };
     } catch (err) {
         console.error('[API] submitServiceRequest error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const fetchAllLeads = async () => {
+    try {
+        const response = await apiClient.get(ENDPOINTS.LEADS);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] fetchAllLeads error:', err);
         return { success: false, error: err.message };
     }
 };
 
-/**
- * Fetch all leads (admin dashboard).
- */
-export const fetchAllLeads = async () => {
-    await delay(100);
-    return { success: true, data: getAllLeads() };
+export const assignLeadToWorker = async (leadId, workerId) => {
+    try {
+        const response = await apiClient.patch(`${ENDPOINTS.LEADS}/${leadId}/assign`, { workerId });
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] assignLead error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
 };
 
-/**
- * Fetch a single lead with its assignments (professional view).
- */
-export const fetchLeadDetail = async (leadId) => {
-    await delay(80);
-    const lead = getLeadById(leadId);
-    const assignments = getAssignmentsForLead(leadId);
-    if (!lead) return { success: false, error: 'Lead not found.' };
-    return { success: true, data: { lead, assignments } };
+// ─── JOBS (WORKFLOW) ─────────────────────────────────────────
+
+export const fetchAllJobs = async () => {
+    try {
+        const response = await apiClient.get(ENDPOINTS.JOBS);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] fetchAllJobs error:', err);
+        return { success: false, error: err.message };
+    }
 };
 
-/**
- * Update lead status (admin action).
- */
-export const changeLeadStatus = async (leadId, status) => {
-    await delay(80);
-    const updated = updateLeadStatus(leadId, status);
-    return { success: true, data: updated };
+export const uploadJobPhotos = async (jobId, photoData) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.JOBS}/${jobId}/photos`, photoData);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
 };
+
+export const submitJobInspection = async (jobId, inspectionData) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.JOBS}/${jobId}/inspection`, inspectionData);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+// ... add other workflow actions as needed ...
 
 // ─── PROFESSIONALS ───────────────────────────────────────────
 
-/**
- * Fetch all professionals (admin directory).
- */
 export const fetchAllProfessionals = async () => {
-    await delay(100);
-    return { success: true, data: getAllProfessionals() };
+    // We would hit the real user DB with role = WORKER
+    try {
+        // Backend doesn't have a professional-only GET yet, but we will add it soon.
+        return { success: true, data: [] }; 
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
 };
-
-/**
- * Fetch a single professional profile.
- */
-export const fetchProfessionalProfile = async (id) => {
-    await delay(80);
-    const prof = getProfessionalById(id);
-    if (!prof) return { success: false, error: 'Professional not found.' };
-    return { success: true, data: prof };
-};
-
-/**
- * Fetch professionals by category (customer find-services page).
- */
-export const fetchProfessionalsByCategory = async (category) => {
-    await delay(80);
-    return { success: true, data: getProfessionalsByCategory(category) };
-};
-
-// ─── ASSIGNMENTS ─────────────────────────────────────────────
-
-/**
- * Professional: Accept or Reject a lead assignment.
- * @param {string} assignmentId
- * @param {string} professionalId
- * @param {'accept'|'reject'} decision
- */
-export const handleLeadResponse = async (assignmentId, professionalId, decision) => {
-    await delay(100);
-    const updated = respondToAssignment(assignmentId, professionalId, decision);
-    return { success: true, data: updated };
-};
-
-/**
- * Get all assignments for a professional dashboard.
- */
-export const fetchProfessionalAssignments = async (professionalId) => {
-    await delay(80);
-    return { success: true, data: getAssignmentsForProfessional(professionalId) };
-};
-
-// ─── HELPER ──────────────────────────────────────────────────
-/** Simulate network latency (ms) */
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

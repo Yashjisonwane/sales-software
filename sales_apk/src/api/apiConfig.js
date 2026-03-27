@@ -1,7 +1,7 @@
 // Centralized API Configuration for APK Professionals
 // Aligned with Website and Software versions
 
-export const API_BASE_URL = 'https://api.hinesq.com/v1';
+export const API_BASE_URL = 'http://localhost:4000/api/v1';
 
 export const ENDPOINTS = {
     PROFILE: '/professionals/profile',

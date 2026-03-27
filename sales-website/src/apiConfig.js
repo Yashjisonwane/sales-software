@@ -1,7 +1,7 @@
 // Website API Configuration
 // Unified with APK and Software
 
-export const API_BASE_URL = 'https://api.hinesq.com/v1';
+export const API_BASE_URL = 'http://localhost:4000/api/v1';
 
 export const ENDPOINTS = {
     CREATE_LEAD: '/leads',
