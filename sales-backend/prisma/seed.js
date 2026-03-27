@@ -14,6 +14,22 @@ async function main() {
         { name: 'Handyman' }
     ];
 
+    // 2. WORKER (Professional)
+    const workerPassword = await bcrypt.hash('123', 10);
+    const worker = await prisma.user.upsert({
+        where: { email: 'worker@gmail.com' },
+        update: {
+            password: workerPassword
+        },
+        create: {
+            name: 'Professional Worker',
+            email: 'worker@gmail.com',
+            phone: '9876543210',
+            password: workerPassword,
+            role: 'WORKER'
+        }
+    });
+
     for (const cat of categories) {
         await prisma.category.upsert({
             where: { name: cat.name },

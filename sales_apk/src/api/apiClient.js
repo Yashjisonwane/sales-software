@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_BASE_URL } from './apiConfig';
+import storage from './storage';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -10,11 +11,13 @@ const apiClient = axios.create({
   },
 });
 
-// REQUEST INTERCEPTOR: Add Auth Token automatically
+// REQUEST INTERCEPTOR: Add Auth Token automatically from Universal Storage
 apiClient.interceptors.request.use(
   async (config) => {
-    // const token = await AsyncStorage.getItem('userToken'); // Example
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
+    const token = await storage.getItem('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -25,8 +28,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Logic for Logout or Refresh Token
-      console.log('Unauthorized - Logging out...');
+      console.log('Unauthorized - Token expired or invalid.');
     }
     return Promise.reject(error);
   }

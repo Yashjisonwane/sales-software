@@ -190,14 +190,32 @@ export default function WorkerExploreScreen({ navigation, route }) {
         }
     }, [route.params?.activeTab]);
 
-    const [location, setLocation] = useState(null);
-    const [errorMsg, setErrorMsg] = useState(null);
+    const [leads, setLeads] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const { getAvailableLeads, acceptLead } = require('../../api/apiService');
 
-    const [selectedPin, setSelectedPin] = useState(null);
-    const [showAllJobs, setShowAllJobs] = useState(false);
-    const [activeFilter, setActiveFilter] = useState('All');
+    const fetchLeads = async () => {
+        setIsLoading(true);
+        const res = await getAvailableLeads();
+        if (res.success) {
+            setLeads(res.data || []);
+        }
+        setIsLoading(false);
+    };
 
+    useEffect(() => {
+        fetchLeads();
+    }, []);
 
+    const handleAcceptLead = async (leadId) => {
+        const res = await acceptLead(leadId);
+        if (res.success) {
+            alert('Lead Accepted! A new job has been created for you.');
+            fetchLeads(); // Refresh list
+        } else {
+            alert(res.message || 'Failed to accept lead');
+        }
+    };
 
     const renderJobPinModal = () => (
         <Modal
@@ -229,15 +247,10 @@ export default function WorkerExploreScreen({ navigation, route }) {
                         <View style={styles.cardHeaderRow}>
                             <View style={{ flex: 1 }}>
                                 <View style={styles.cardNameLine}>
-                                    <Text style={styles.cardName}>Alistair Hughes</Text>
-                                    <View style={styles.upcomingBadge}><Text style={styles.upcomingText}>Upcoming</Text></View>
+                                    <Text style={styles.cardName}>{selectedPin?.customer?.name || 'Customer'}</Text>
+                                    <View style={styles.upcomingBadge}><Text style={styles.upcomingText}>Lead</Text></View>
                                 </View>
-                                <Text style={styles.cardAddr}>123 E Market St Boulder, CO 80304,USA</Text>
-                                <View style={styles.cardDistRow}>
-                                    <Text style={styles.cardDistText}>4.5 mi</Text>
-                                    <View style={styles.cardDistDot} />
-                                    <Text style={styles.cardDistText}>12 m</Text>
-                                </View>
+                                <Text style={styles.cardAddr}>{selectedPin?.location || 'Location'}</Text>
                             </View>
                             <View style={styles.cardPriceBox}>
                                 <Text style={styles.cardPriceText}>$43 <Text style={styles.cardPerHr}>per hour</Text></Text>
@@ -245,22 +258,11 @@ export default function WorkerExploreScreen({ navigation, route }) {
                         </View>
 
                         <View style={styles.cardActions}>
-                            <TouchableOpacity style={styles.blueActionBtnLight}>
-                                <View style={styles.directionsIconContainer}>
-                                    <Ionicons name="navigate" size={14} color="#FFF" />
-                                </View>
-                                <Text style={styles.blueActionTextLight}>Directions</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.blueActionBtnLight}>
-                                <Ionicons name="call" size={18} color="#0062E1" />
-                                <Text style={styles.blueActionTextLight}>Call</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.blueActionBtnLight}>
-                                <Ionicons name="bookmark" size={18} color="#0062E1" />
-                                <Text style={styles.blueActionTextLight}>Save</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.shareBtnSmall}>
-                                <Ionicons name="share-outline" size={20} color="#0062E1" />
+                            <TouchableOpacity 
+                                style={[styles.loginBtn, { height: 40, marginTop: 10, backgroundColor: '#10B981' }]}
+                                onPress={() => handleAcceptLead(selectedPin.id)}
+                            >
+                                <Text style={styles.loginBtnText}>Accept Lead</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -269,268 +271,48 @@ export default function WorkerExploreScreen({ navigation, route }) {
         </Modal>
     );
 
-
-
-    const renderOverview = () => (
+    const renderJobs = () => (
         <View style={styles.tabScrollContent}>
-            {/* Filter Chips (Time) */}
-            <View style={styles.filterRow}>
-                {['All', 'Weekly', 'Monthly', 'Yearly'].map(filter => (
-                    <TouchableOpacity
-                        key={filter}
-                        style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
-                        onPress={() => setActiveFilter(filter)}
-                    >
-                        <Text style={[styles.filterText, activeFilter === filter && styles.filterTextActive]}>{filter}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-
-            {/* Quick Snapshot Card */}
-            {/* Quick Snapshot Card */}
-            <View style={styles.overviewMainCard}>
-                <Text style={styles.overviewTitle}>Overview</Text>
-                <Text style={styles.overviewSub}>A quick snapshot of your jobs, revenue, and performance.</Text>
-
-                <View style={styles.statsGrid}>
-                    <View style={styles.statBox}>
-                        <View style={styles.statIconCircle}><Ionicons name="clipboard-outline" size={20} color="#0062E1" /></View>
-                        <Text style={styles.statLabelSmall}>Overall Jobs</Text>
-                        <Text style={styles.statValueBig}>1,284</Text>
-                        <Text style={styles.statTrendGreen}>+12% <Text style={styles.statTrendLabel}>vs last month</Text></Text>
-                    </View>
-                    <View style={styles.statBox}>
-                        <View style={styles.statIconCircle}><MaterialCommunityIcons name="sack" size={20} color="#0062E1" /></View>
-                        <Text style={styles.statLabelSmall}>Total Revenue</Text>
-                        <Text style={styles.statValueBig}>$148,500</Text>
-                        <Text style={styles.statTrendGreen}>+5% <Text style={styles.statTrendLabel}>vs last month</Text></Text>
-                    </View>
-                    <View style={styles.statBox}>
-                        <View style={styles.statIconCircle}><Ionicons name="calendar-outline" size={20} color="#0062E1" /></View>
-                        <Text style={styles.statLabelSmall}>Total Jobs</Text>
-                        <Text style={styles.statValueBig}>186</Text>
-                        <Text style={styles.statTrendGreen}>24 <Text style={styles.statTrendLabel}>completed today</Text></Text>
-                    </View>
-                    <View style={styles.statBox}>
-                        <View style={styles.statIconCircle}><Ionicons name="trending-up-outline" size={20} color="#0062E1" /></View>
-                        <Text style={styles.statLabelSmall}>Profit Margin</Text>
-                        <Text style={styles.statValueBig}>32%</Text>
-                        <Text style={styles.statTrendGreen}>+$4,200 <Text style={styles.statTrendLabel}>net</Text></Text>
-                    </View>
+            <Text style={styles.jobSectionHeader}>Available Leads</Text>
+            {isLoading ? (
+                <Text style={{ textAlign: 'center', padding: 20 }}>Loading leads...</Text>
+            ) : leads.length === 0 ? (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Ionicons name="document-text-outline" size={60} color="#CBD5E0" />
+                    <Text style={{ color: '#718096', marginTop: 10 }}>No leads available right now.</Text>
                 </View>
-            </View>
-
-            {/* Recent Updates */}
-            <Text style={styles.sectionTitle}>Recent Updates</Text>
-            <View style={styles.updatesList}>
-                <View style={styles.updateItem}>
-                    <View style={[styles.updateIcon, { backgroundColor: '#EFF6FF' }]}><Ionicons name="build-outline" size={20} color="#0062E1" /></View>
-                    <View style={styles.updateContent}>
-                        <Text style={styles.updateText}>New job assigned to Zain</Text>
-                        <Text style={styles.updateMeta}>Job ID #1025  •  Today, 9:30 AM</Text>
-                    </View>
-                </View>
-                <View style={styles.updateItem}>
-                    <View style={[styles.updateIcon, { backgroundColor: '#F0FDF4' }]}><Ionicons name="checkmark" size={22} color="#16A34A" /></View>
-                    <View style={styles.updateContent}>
-                        <Text style={styles.updateText}>John completed Bathroom Plumbing Repair</Text>
-                        <Text style={styles.updateMeta}>Job ID #1023  •  10 mins ago</Text>
-                    </View>
-                </View>
-                <View style={styles.updateItem}>
-                    <View style={[styles.updateIcon, { backgroundColor: '#FEF2F2' }]}><Ionicons name="warning-outline" size={20} color="#EF4444" /></View>
-                    <View style={styles.updateContent}>
-                        <Text style={styles.updateText}>Sam has been inactive for 3 days</Text>
-                        <Text style={styles.updateMeta}>Job ID #1024  •  2 hours ago</Text>
-                    </View>
-                </View>
-                <View style={styles.updateItem}>
-                    <View style={[styles.updateIcon, { backgroundColor: '#EFF6FF' }]}><Ionicons name="construct-outline" size={18} color="#0062E1" /></View>
-                    <View style={styles.updateContent}>
-                        <Text style={styles.updateText}>Carpentry Job delayed due to material issue</Text>
-                        <Text style={styles.updateMeta}>Job ID #1019  •  Yesterday</Text>
-                    </View>
-                </View>
-            </View>
+            ) : (
+                <GestureHandlerScrollView 
+                    horizontal 
+                    showsHorizontalScrollIndicator={false} 
+                    contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+                >
+                    {leads.map(lead => (
+                        <TouchableOpacity
+                            key={lead.id}
+                            style={styles.horizontalJobCard}
+                            onPress={() => setSelectedPin(lead)}
+                            activeOpacity={0.9}
+                        >
+                            <Image source={require('../../assets/images/wood_flooring_job.png')} style={styles.horizJobImg} />
+                            <View style={styles.horizJobBottom}>
+                                <View style={styles.horizInfoRow}>
+                                    <View style={styles.horizNameLine}>
+                                        <Text style={styles.horizJobName}>{lead.customer?.name || 'Customer'}</Text>
+                                        <View style={[styles.miniBadge, { backgroundColor: '#F0F9FF', borderBottomWidth: 1, borderBottomColor: '#BBDDFB' }]}>
+                                            <Text style={[styles.miniBadgeText, { color: '#0062E1' }]}>LEAD</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                                <Text style={styles.horizJobAddr} numberOfLines={1}>{lead.location}</Text>
+                                <Text style={styles.horizJobDist}>{lead.category?.name || 'Service'}</Text>
+                            </View>
+                        </TouchableOpacity>
+                    ))}
+                </GestureHandlerScrollView>
+            )}
         </View>
     );
-
-
-
-    const renderJobs = () => {
-        if (showAllJobs) {
-            return (
-                <View style={styles.tabScrollContent}>
-                    <View style={styles.detailedHeaderRow}>
-                        <TouchableOpacity onPress={() => setShowAllJobs(false)} style={styles.backButtonMini}>
-                            <Ionicons name="chevron-back" size={24} color="#1A202C" />
-                        </TouchableOpacity>
-                        <Text style={styles.jobSectionHeaderMain}>Jobs in Downtown</Text>
-                    </View>
-
-                    {[1, 2, 3, 4, 5].map((item, index) => {
-                        const job = JOBS_DATA[index % JOBS_DATA.length];
-                        const jobImages = [
-                            require('../../assets/images/wood_flooring_job.png'),
-                            require('../../assets/images/modern_kitchen_flooring.png'),
-                            require('../../assets/images/construction_site_overview.png'),
-                            require('../../assets/images/flooring_worker_action.png')
-                        ];
-
-                        return (
-                            <View key={index} style={styles.detailedVerticalCard}>
-                                <GestureHandlerScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={{ gap: 10, paddingRight: 20 }}
-                                    snapToInterval={150} // 140 (img width) + 10 (gap)
-                                    decelerationRate="fast"
-                                    snapToAlignment="start"
-                                    disallowInterruption={true}
-                                >
-                                    {jobImages.map((imgSource, imgIndex) => (
-                                        <TouchableOpacity 
-                                            key={imgIndex} 
-                                            onPress={() => navigation.navigate('JobOfferDetail')}
-                                            activeOpacity={0.9}
-                                        >
-                                            <Image source={imgSource} style={styles.carouselImg} />
-                                        </TouchableOpacity>
-                                    ))}
-                                </GestureHandlerScrollView>
-
-                                <View style={styles.detailedCardInfo}>
-                                    <View style={styles.cardHeaderRow}>
-                                        <View style={{ flex: 1 }}>
-                                            <View style={styles.cardNameLine}>
-                                                <Text style={styles.cardName}>{job.name}</Text>
-                                                <View style={index % 2 === 0 ? styles.upcomingBadge : styles.subcontractBadge}>
-                                                    <Text style={index % 2 === 0 ? styles.upcomingText : styles.subcontractText}>
-                                                        {index % 2 === 0 ? 'Lead' : 'Subcontract'}
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                            <Text style={styles.cardAddr}>123 E Market St Boulder, CO 80304,USA</Text>
-                                            <View style={styles.cardDistRow}>
-                                                <Text style={styles.cardDistText}>4.5 mi</Text>
-                                                <View style={styles.cardDistDot} />
-                                                <Text style={styles.cardDistText}>12 m</Text>
-                                            </View>
-                                        </View>
-                                        <View style={styles.cardPriceBox}>
-                                            <Text style={styles.cardPriceText}>$43 <Text style={styles.cardPerHr}>per hour</Text></Text>
-                                        </View>
-                                    </View>
-
-                                    <View style={styles.cardActions}>
-                                        <TouchableOpacity style={styles.blueActionBtnLight}>
-                                            <View style={styles.directionsIconContainer}>
-                                                <Ionicons name="navigate" size={14} color="#FFF" />
-                                            </View>
-                                            <Text style={styles.blueActionTextLight}>Directions</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.blueActionBtnLight}>
-                                            <Ionicons name="call" size={18} color="#0062E1" />
-                                            <Text style={styles.blueActionTextLight}>Call</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.blueActionBtnLight}>
-                                            <Ionicons name="bookmark" size={18} color="#0062E1" />
-                                            <Text style={styles.blueActionTextLight}>Save</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.blueActionBtnLight}>
-                                            <Ionicons name="share-outline" size={20} color="#0062E1" />
-                                            <Text style={styles.blueActionTextLight}>Share</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
-                        );
-                    })}
-                </View>
-            );
-        }
-
-        return (
-            <View style={styles.tabScrollContent}>
-                {/* Section 1 */}
-                <Text style={styles.jobSectionHeader}>Jobs in Downtown</Text>
-                <GestureHandlerScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false} 
-                    contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                    snapToInterval={windowWidth * 0.8 + 12}
-                    decelerationRate="fast"
-                    snapToAlignment="start"
-                    disallowInterruption={true}
-                >
-                    {JOBS_DATA.map(job => (
-                        <TouchableOpacity
-                            key={'sec1-' + job.id}
-                            style={styles.horizontalJobCard}
-                            onPress={() => navigation.navigate('JobOfferDetail')}
-                            activeOpacity={0.9}
-                        >
-                            <Image source={getImgSource(job.image)} style={styles.horizJobImg} />
-                            <View style={styles.horizJobBottom}>
-                                <View style={styles.horizInfoRow}>
-                                    <View style={styles.horizNameLine}>
-                                        <Text style={styles.horizJobName}>{job.name}</Text>
-                                        <View style={[styles.miniBadge, { backgroundColor: '#F0F9FF', borderBottomWidth: 1, borderBottomColor: '#BBDDFB' }]}>
-                                            <Text style={[styles.miniBadgeText, { color: '#0062E1' }]}>{job.role}</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={styles.horizJobPrice}>{job.price} <Text style={styles.horizPerHr}>per hour</Text></Text>
-                                </View>
-                                <Text style={styles.horizJobAddr}>123 E Market St Boulder, CO 80304,USA</Text>
-                                <Text style={styles.horizJobDist}>{job.distance}  •  {job.time}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </GestureHandlerScrollView>
-
-                <TouchableOpacity style={styles.seeMoreBtn} onPress={() => setShowAllJobs(true)}>
-                    <Text style={styles.seeMoreText}>See more</Text>
-                    <Ionicons name="chevron-forward" size={16} color="#4A5568" />
-                </TouchableOpacity>
-
-                {/* Section 2 */}
-                <Text style={[styles.jobSectionHeader, { marginTop: 20 }]}>Available Nearby</Text>
-                <GestureHandlerScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false} 
-                    contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                    snapToInterval={windowWidth * 0.8 + 12}
-                    decelerationRate="fast"
-                    snapToAlignment="start"
-                    disallowInterruption={true}
-                >
-                    {JOBS_DATA.slice().reverse().map(job => (
-                        <TouchableOpacity
-                            key={'sec2-' + job.id}
-                            style={styles.horizontalJobCard}
-                            onPress={() => navigation.navigate('JobOfferDetail')}
-                            activeOpacity={0.9}
-                        >
-                            <Image source={getImgSource(job.image)} style={styles.horizJobImg} />
-                            <View style={styles.horizJobBottom}>
-                                <View style={styles.horizInfoRow}>
-                                    <View style={styles.horizNameLine}>
-                                        <Text style={styles.horizJobName}>{job.name}</Text>
-                                        <View style={[styles.miniBadge, { backgroundColor: '#F0F9FF', borderBottomWidth: 1, borderBottomColor: '#BBDDFB' }]}>
-                                            <Text style={[styles.miniBadgeText, { color: '#0062E1' }]}>{job.role}</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={styles.horizJobPrice}>{job.price} <Text style={styles.horizPerHr}>per hour</Text></Text>
-                                </View>
-                                <Text style={styles.horizJobAddr}>123 E Market St Boulder, CO 80304,USA</Text>
-                                <Text style={styles.horizJobDist}>{job.distance}  •  {job.time}</Text>
-                            </View>
-                        </TouchableOpacity>
-                    ))}
-                </GestureHandlerScrollView>
-            </View>
-        );
-    };
 
     const renderInvoice = () => (
         <View style={styles.tabScrollContent}>

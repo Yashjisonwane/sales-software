@@ -5,6 +5,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/authRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const jobRoutes = require('./routes/jobRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json()); // Parses incoming JSON requests
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/leads', leadRoutes);
 app.use('/api/v1/jobs', jobRoutes);
+app.use('/api/v1/users', userRoutes);
 
 // Health Check Route
 app.get('/api/v1/health', (req, res) => {

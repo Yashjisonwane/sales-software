@@ -14,12 +14,32 @@ import {
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { loginWorker } from '../../api/apiService';
 
 export default function WorkerLoginScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+    setError('');
+    setIsLoading(true);
+    const result = await loginWorker(email, password);
+    setIsLoading(false);
+    
+    if (result.success) {
+      navigation.replace('WorkerTabs');
+    } else {
+      setError(result.message || 'Login failed. Please check your credentials.');
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -81,11 +101,14 @@ export default function WorkerLoginScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
+          {error ? <Text style={{ color: 'red', fontSize: 13, textAlign: 'center' }}>{error}</Text> : null}
+
           <TouchableOpacity
-            style={styles.loginBtn}
-            onPress={() => navigation.replace('WorkerTabs')}
+            style={[styles.loginBtn, isLoading && { opacity: 0.7 }]}
+            onPress={handleLogin}
+            disabled={isLoading}
           >
-            <Text style={styles.loginBtnText}>Log In</Text>
+            <Text style={styles.loginBtnText}>{isLoading ? 'Logging In...' : 'Log In'}</Text>
           </TouchableOpacity>
         </View>
 

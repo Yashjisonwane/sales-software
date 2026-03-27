@@ -75,10 +75,31 @@ export const MarketplaceProvider = ({ children }) => {
     const loadInitialData = async () => {
         try {
             const leadsRes = await apiService.fetchAllLeads();
-            if (leadsRes.success) setLeads(leadsRes.data);
+            if (leadsRes.success) {
+                // Flatten the data for easier UI consumption
+                const flattenedLeads = (leadsRes.data || []).map(l => ({
+                    ...l,
+                    customerName: l.customer?.name || 'Unknown Customer',
+                    customerPhone: l.customer?.phone || '',
+                    serviceCategory: l.category?.name || 'General Service',
+                    dateRequested: l.createdAt
+                }));
+                setLeads(flattenedLeads);
+            }
 
             const jobsRes = await apiService.fetchAllJobs();
-            if (jobsRes.success) setJobs(jobsRes.data);
+            if (jobsRes.success) {
+                // Flatten Jobs data for consume (Job -> lead -> customer)
+                const flattenedJobs = (jobsRes.data || []).map(j => ({
+                    ...j,
+                    customerName: j.customer?.name || 'Customer',
+                    category: j.categoryName || 'General',
+                    date: j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString() : 'Today',
+                    time: j.scheduledTime || 'TBD',
+                    workerName: j.worker?.name || 'Assigned Worker'
+                }));
+                setJobs(flattenedJobs);
+            }
 
             const profRes = await apiService.fetchAllProfessionals();
             if (profRes.success) setProfessionals(profRes.data);

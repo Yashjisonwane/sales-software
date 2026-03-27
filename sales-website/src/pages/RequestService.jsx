@@ -201,14 +201,12 @@ const RequestService = () => {
                                         className="block w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white appearance-none cursor-pointer"
                                     >
                                         <option value="">Choose a service category...</option>
-                                        {categories.map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                        {categories.length === 0 && (
-                                            <>
-                                                <option value="plumbing-id">Plumbing Repair & Installation</option>
-                                                <option value="electrical-id">Electrical Troubleshooting</option>
-                                            </>
+                                        {categories.length > 0 ? (
+                                            categories.map(c => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))
+                                        ) : (
+                                            <option disabled>Loading services from database...</option>
                                         )}
                                     </select>
                                 </div>

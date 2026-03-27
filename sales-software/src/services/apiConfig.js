@@ -5,7 +5,7 @@ export const API_BASE_URL = 'http://localhost:4000/api/v1';
 
 export const ENDPOINTS = {
     LEADS: '/leads',
-    PROFESSIONALS: '/professionals',
+    PROFESSIONALS: '/users/workers',
     ASSIGNMENTS: '/assignments',
     JOBS: '/jobs',
     CHATS: '/chats',

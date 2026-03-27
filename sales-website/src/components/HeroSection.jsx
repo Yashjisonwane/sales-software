@@ -132,7 +132,7 @@ const HeroSection = () => {
 
         {/* CTA Button */}
         <Link
-          to="/job-details"
+          to="/request-service"
           className="btn-black"
           style={{
             padding: '14px 44px',
@@ -141,7 +141,7 @@ const HeroSection = () => {
             marginTop: 4,
           }}
         >
-          Try Now
+          Request Service
         </Link>
       </div>
     </section>

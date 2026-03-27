@@ -95,11 +95,11 @@ export const submitJobInspection = async (jobId, inspectionData) => {
 // ─── PROFESSIONALS ───────────────────────────────────────────
 
 export const fetchAllProfessionals = async () => {
-    // We would hit the real user DB with role = WORKER
     try {
-        // Backend doesn't have a professional-only GET yet, but we will add it soon.
-        return { success: true, data: [] }; 
+        const response = await apiClient.get(ENDPOINTS.PROFESSIONALS);
+        return { success: true, data: response.data.data }; 
     } catch (err) {
+        console.error('[API] fetchAllProfessionals error:', err);
         return { success: false, error: err.message };
     }
 };
