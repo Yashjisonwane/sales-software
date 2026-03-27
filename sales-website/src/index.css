@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-primary-blue: #2563EB;
+  --color-primary-purple: #7C3AED;
+  --color-primary-green: #166534;
+  --color-logo-green: #15803d;
+  --color-brand-black: #1a1a1a;
+  --color-text-gray: #6B7280;
+  --color-text-light: #9CA3AF;
+  --color-bg-light: #F3F4F6;
+  --color-bg-lighter: #F9FAFB;
+  --color-card-border: #E5E7EB;
+
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-slide-up: slide-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fade-in 0.6s ease-out forwards;
+  --animate-pulse-slow: pulse-slow 2s ease-in-out infinite;
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes pulse-slow {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
+
+  @keyframes text-rotate {
+    0%, 20% { content: "Job"; }
+    25%, 45% { content: "Worker"; }
+    50%, 70% { content: "Lead"; }
+    75%, 95% { content: "Contract"; }
+  }
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply antialiased text-brand-black bg-white;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    overflow-x: hidden;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  img {
+    @apply max-w-full h-auto;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold text-brand-black;
+    line-height: 1.2;
+  }
+
+  p {
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  .btn-black {
+    @apply bg-brand-black text-white font-semibold rounded-xl transition-all duration-300;
+    padding: 14px 40px;
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-black:hover {
+    @apply bg-gray-800 shadow-lg;
+    transform: scale(1.03);
+  }
+
+  .btn-black:active {
+    transform: scale(0.97);
+  }
+
+  .btn-blue {
+    @apply bg-primary-blue text-white font-semibold rounded-full transition-all duration-300;
+    padding: 12px 28px;
+    font-size: 15px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-blue:hover {
+    background: #1d4ed8;
+    transform: scale(1.03);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+  }
+
+  .section-padding {
+    padding: 80px 24px;
+  }
+
+  .container-max {
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* Scroll animation base */
+  .scroll-animate {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  }
+
+  .scroll-animate.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f9fafb;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
