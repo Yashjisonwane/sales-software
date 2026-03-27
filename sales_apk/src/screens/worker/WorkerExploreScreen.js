@@ -91,13 +91,13 @@ const AGENDA_DATA = [
 ];
 
 const StatCard = ({ icon, label, value, change, color }) => (
-    <View style={styles.statCard}>
-        <View style={[styles.statIconContainer, { backgroundColor: color + '10' }]}>
+    <View style={styles.statBox}>
+        <View style={[styles.statIconCircle, { backgroundColor: color + '10' }]}>
             <Ionicons name={icon} size={20} color={color} />
         </View>
-        <Text style={styles.statLabel}>{label}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={[styles.statChange, { color: change.includes('+') ? '#10B981' : '#718096' }]}>{change}</Text>
+        <Text style={styles.statLabelSmall}>{label}</Text>
+        <Text style={styles.statValueBig}>{value}</Text>
+        <Text style={styles.statTrendGreen}>{change}</Text>
     </View>
 );
 
@@ -341,7 +341,13 @@ export default function WorkerExploreScreen({ navigation, route }) {
 
     const renderJobs = () => (
         <View style={styles.tabScrollContent}>
-            <Text style={styles.jobSectionHeader}>Available Leads</Text>
+            <View style={styles.detailedSearchRow}>
+                <View style={styles.detailedSearchBox}>
+                    <Text style={styles.detailedSearchText}>Available Leads</Text>
+                    <Ionicons name="search" size={20} color="#718096" />
+                </View>
+            </View>
+
             {isLoading ? (
                 <Text style={{ textAlign: 'center', padding: 20 }}>Loading leads...</Text>
             ) : leads.length === 0 ? (
@@ -350,34 +356,41 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     <Text style={{ color: '#718096', marginTop: 10 }}>No leads available right now.</Text>
                 </View>
             ) : (
-                <GestureHandlerScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false} 
-                    contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-                >
+                <View style={{ gap: 20 }}>
                     {leads.map(lead => (
                         <TouchableOpacity
                             key={lead.id}
-                            style={styles.horizontalJobCard}
-                            onPress={() => setSelectedPin(lead)}
+                            style={styles.detailedVerticalCard}
+                            onPress={() => navigation.navigate('JobOfferDetail', { lead, state: 'pending' })}
                             activeOpacity={0.9}
                         >
-                            <Image source={require('../../assets/images/wood_flooring_job.png')} style={styles.horizJobImg} />
-                            <View style={styles.horizJobBottom}>
-                                <View style={styles.horizInfoRow}>
-                                    <View style={styles.horizNameLine}>
-                                        <Text style={styles.horizJobName}>{lead.customer?.name || 'Customer'}</Text>
-                                        <View style={[styles.miniBadge, { backgroundColor: '#F0F9FF', borderBottomWidth: 1, borderBottomColor: '#BBDDFB' }]}>
-                                            <Text style={[styles.miniBadgeText, { color: '#0062E1' }]}>LEAD</Text>
-                                        </View>
+                            <Image 
+                                source={require('../../assets/images/wood_flooring_job.png')} 
+                                style={[styles.horizJobImg, { height: 160 }]} 
+                            />
+                            <View style={styles.detailedCardInfo}>
+                                <View style={styles.detailedHeader}>
+                                    <View>
+                                        <Text style={styles.jobName}>{lead.customer?.name || 'Customer'}</Text>
+                                        <Text style={styles.jobAddr}>{lead.location}</Text>
+                                    </View>
+                                    <View style={styles.subcontractBadge}>
+                                        <Text style={styles.subcontractText}>{lead.category?.name || 'LEAD'}</Text>
                                     </View>
                                 </View>
-                                <Text style={styles.horizJobAddr} numberOfLines={1}>{lead.location}</Text>
-                                <Text style={styles.horizJobDist}>{lead.category?.name || 'Service'}</Text>
+                                <View style={styles.cardFooter}>
+                                    <Text style={styles.jobPrice}>$43 <Text style={styles.priceUnit}>/hr</Text></Text>
+                                    <TouchableOpacity 
+                                        style={[styles.actionBtn, { maxWidth: 120 }]}
+                                        onPress={() => handleAcceptLead(lead.id)}
+                                    >
+                                        <Text style={styles.actionText}>Accept Now</Text>
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         </TouchableOpacity>
                     ))}
-                </GestureHandlerScrollView>
+                </View>
             )}
         </View>
     );
@@ -641,13 +654,24 @@ export default function WorkerExploreScreen({ navigation, route }) {
                             left: `${20 + (index * 15) % 65}%`,
                             customer: lead.customer,
                             location: lead.location,
-                            category: lead.category
+                            category: lead.category,
+                            isRealLead: true
                         }))
                     ].map(pin => (
                         <TouchableOpacity
                             key={pin.id}
                             style={[styles.pin, { top: pin.top, left: pin.left }]}
-                            onPress={() => setSelectedPin(pin)}
+                            onPress={() => {
+                                if (pin.isRealLead) {
+                                    navigation.navigate('JobOfferDetail', { lead: pin, state: 'pending' });
+                                } else {
+                                    // Mock fallback
+                                    navigation.navigate('JobOfferDetail', { 
+                                        lead: { customer: { name: pin.name }, location: 'Mock Address', category: { name: pin.status } }, 
+                                        state: 'pending' 
+                                    });
+                                }
+                            }}
                         >
                             <LocationPin color={pin.color} />
                         </TouchableOpacity>
@@ -1146,5 +1170,23 @@ const styles = StyleSheet.create({
     activePill: { backgroundColor: '#DBEAFE', paddingHorizontal: 22, paddingVertical: 6, borderRadius: 20, marginBottom: 4 },
     activeText: { color: '#0E56D0', fontSize: 11, fontWeight: '700' },
     dot: { position: 'absolute', top: -1, right: -1, width: 8, height: 8, backgroundColor: '#EF4444', borderRadius: 4, borderWidth: 1.5, borderColor: '#FFF' },
-    navTxt: { color: '#64748B', fontSize: 11, fontWeight: '500', marginTop: 4 },
+    statCard: {
+        width: (windowWidth - 48 - 12) / 2, // Adjusted for grid
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+        ...SHADOWS.small
+    },
+    statIconContainer: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+    statLabel: { fontSize: 11, color: '#718096', marginBottom: 4 },
+    statValue: { fontSize: 18, fontWeight: '800', color: '#1A202C', marginBottom: 4 },
+    statChange: { fontSize: 11, fontWeight: '700' },
+    progressContainer: { marginTop: 10, marginBottom: 20 },
+    progressHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    progressLabel: { fontSize: 13, fontWeight: '600', color: '#4A5568' },
+    progressValue: { fontSize: 13, fontWeight: '700' },
+    progressBg: { height: 8, backgroundColor: '#EDF2F7', borderRadius: 4, overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: 4 },
 });

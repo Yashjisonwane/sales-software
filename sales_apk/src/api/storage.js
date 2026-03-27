@@ -1,57 +1,59 @@
 let AsyncStorage;
 const isWeb = typeof localStorage !== 'undefined';
+let memoryStorage = {}; // FINAL FALLBACK: For In-Memory storage if both others fail
 
 if (!isWeb) {
   try {
     AsyncStorage = require('@react-native-async-storage/async-storage').default;
   } catch (e) {
-    console.warn('AsyncStorage focus failed, falling back to mock');
-    AsyncStorage = { getItem: async () => null, setItem: async () => null, removeItem: async () => null };
+    console.warn('Native AsyncStorage not found, using memory fallback');
   }
 }
 
 /**
  * Universal Storage Utility
- * Handles both Native (Mobile) and Web environments gracefully.
+ * 1. Tries LocalStorage (Web)
+ * 2. Tries AsyncStorage (Native Mobile)
+ * 3. Tries MemoryStorage (Fallback)
  */
 
 export const getItem = async (key) => {
   try {
-    if (isWeb) {
-      return localStorage.getItem(key);
-    }
-    return await AsyncStorage.getItem(key);
+    if (isWeb) return localStorage.getItem(key);
+    if (AsyncStorage) return await AsyncStorage.getItem(key);
+    return memoryStorage[key] || null;
   } catch (error) {
-    console.warn(`Storage Error (getItem): ${key}`, error);
-    return null;
+    return memoryStorage[key] || null;
   }
 };
 
 export const setItem = async (key, value) => {
   try {
+    memoryStorage[key] = value; // Always save in memory as mirror
     if (isWeb) {
       localStorage.setItem(key, value);
-    } else {
+    } else if (AsyncStorage) {
       await AsyncStorage.setItem(key, value);
     }
     return true;
   } catch (error) {
-    console.warn(`Storage Error (setItem): ${key}`, error);
-    return false;
+    memoryStorage[key] = value; 
+    return true;
   }
 };
 
 export const removeItem = async (key) => {
   try {
+    delete memoryStorage[key];
     if (isWeb) {
       localStorage.removeItem(key);
-    } else {
+    } else if (AsyncStorage) {
       await AsyncStorage.removeItem(key);
     }
     return true;
   } catch (error) {
-    console.warn(`Storage Error (removeItem): ${key}`, error);
-    return false;
+    delete memoryStorage[key];
+    return true;
   }
 };
 

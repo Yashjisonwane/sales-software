@@ -54,10 +54,10 @@ const JobOfferDetailScreen = ({ navigation, route }) => {
           <View style={styles.namePriceRow}>
             <View style={{ flex: 1 }}>
               <View style={styles.nameLine}>
-                <Text style={styles.workerName}>Alistair Hughes</Text>
-                <View style={styles.leadBadge}><Text style={styles.leadBadgeText}>Lead</Text></View>
+                <Text style={styles.workerName}>{route.params?.lead?.customer?.name || 'Customer Name'}</Text>
+                <View style={styles.leadBadge}><Text style={styles.leadBadgeText}>{route.params?.lead?.category?.name || 'LEAD'}</Text></View>
               </View>
-              <Text style={styles.address}>123 E Market St Boulder, CO 80304,USA</Text>
+              <Text style={styles.address}>{route.params?.lead?.location || 'Location Address'}</Text>
               <View style={styles.distRow}>
                 <Text style={styles.distText}>4.5 mi</Text>
                 <View style={styles.distDot} />
@@ -168,7 +168,15 @@ const JobOfferDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.acceptBtn}
-              onPress={() => navigation.navigate('Pricing')}
+              onPress={() => {
+                const leadId = route.params?.lead?.id;
+                if (leadId) {
+                  // This will eventually call the API, but for now it flow matches navigation
+                  navigation.navigate('Pricing', { leadId });
+                } else {
+                  navigation.navigate('Pricing');
+                }
+              }}
             >
               <Text style={styles.acceptBtnText}>Accept Lead</Text>
             </TouchableOpacity>

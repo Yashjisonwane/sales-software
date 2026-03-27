@@ -8,8 +8,8 @@ export const loginWorker = async (email, password) => {
     try {
         const response = await apiClient.post('/auth/login', { email, password });
         if (response.data.success) {
-            await storage.setItem('userToken', response.data.token);
-            await storage.setItem('userData', JSON.stringify(response.data.user));
+            await storage.setItem('userToken', response.data.data.token);
+            await storage.setItem('userData', JSON.stringify(response.data.data.user));
         }
         return response.data;
     } catch (error) {
