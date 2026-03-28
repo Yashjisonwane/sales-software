@@ -41,9 +41,15 @@ const registerUser = async (req, res) => {
         });
 
         // 4. Generate JWT Token
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+            console.error("JWT_SECRET NOT DEFINED IN ENV");
+            return res.status(500).json({ success: false, message: "Server Configuration Error" });
+        }
+
         const token = jwt.sign(
             { id: newUser.id, role: newUser.role },
-            process.env.JWT_SECRET || 'fallback_secret',
+            secret,
             { expiresIn: '30d' }
         );
 
@@ -89,9 +95,15 @@ const loginUser = async (req, res) => {
         }
 
         // 3. Generate JWT
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+            console.error("JWT_SECRET NOT DEFINED IN ENV");
+            return res.status(500).json({ success: false, message: "Server Configuration Error" });
+        }
+
         const token = jwt.sign(
             { id: user.id, role: user.role },
-            process.env.JWT_SECRET || 'fallback_secret',
+            secret,
             { expiresIn: '30d' }
         );
 

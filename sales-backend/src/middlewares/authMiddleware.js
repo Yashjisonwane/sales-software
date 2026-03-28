@@ -11,7 +11,13 @@ const protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
 
             // 2. Verify token
-            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+            const secret = process.env.JWT_SECRET;
+            if (!secret) {
+                console.error("JWT_SECRET is not defined in environment variables!");
+                return res.status(500).json({ success: false, message: 'Server configuration error' });
+            }
+
+            const decoded = jwt.verify(token, secret);
 
             // 3. Get user from db
             req.user = await prisma.user.findUnique({
@@ -25,8 +31,8 @@ const protect = async (req, res, next) => {
 
             next();
         } catch (error) {
-            console.error("Auth Middleware Error:", error);
-            res.status(401).json({ success: false, message: 'Not authorized, token failed' });
+            console.error("Auth Middleware Error:", error.message);
+            return res.status(401).json({ success: false, message: 'Not authorized, token failed' });
         }
     }
 
