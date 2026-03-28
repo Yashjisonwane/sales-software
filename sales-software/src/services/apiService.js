@@ -7,12 +7,12 @@ import { ENDPOINTS } from './apiConfig';
 
 // ─── AUTHENTICATION ──────────────────────────────────────────
 
-export const loginAdmin = async (email, password) => {
+export const loginUser = async (email, password) => {
     try {
         const response = await apiClient.post(`${ENDPOINTS.AUTH}/login`, { email, password });
         return { success: true, data: response.data.data };
     } catch (err) {
-        console.error('[API] loginAdmin error:', err);
+        console.error('[API] loginUser error:', err);
         return { success: false, error: err.response?.data?.message || err.message };
     }
 };
@@ -244,7 +244,7 @@ export const updateProfessionalStatus = async (isAvailable) => {
 
 export const fetchDashboardStats = async () => {
     try {
-        const response = await apiClient.get(`${ENDPOINTS.LEADS}/stats`);
+        const response = await apiClient.get('/users/dashboard-stats');
         return { success: true, data: response.data.data };
     } catch (err) {
         console.error('[API] fetchDashboardStats error:', err);
@@ -305,3 +305,23 @@ export const enrollInSubscription = async (enrollData) => {
         return { success: false, error: err.response?.data?.message || err.message };
     }
 };
+
+export const fetchUserProfile = async () => {
+    try {
+        const response = await apiClient.get('/users/profile');
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const updateUserProfile = async (userData) => {
+    try {
+        const response = await apiClient.put('/users/profile', userData);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+

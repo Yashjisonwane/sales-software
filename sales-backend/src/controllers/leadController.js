@@ -1,14 +1,20 @@
 const prisma = require('../config/db');
 
+const generateShortId = (prefix) => {
+    return `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+};
+
 // @route   POST /api/v1/leads
 // @desc    Create a new lead from the website
 const createLead = async (req, res) => {
     try {
-        const { customerName, email, phone, categoryId, categoryName, location, description } = req.body;
+        const { customerName, name, email, phone, categoryId, categoryName, servicePlan, location, description } = req.body;
 
         if (!email || !phone) {
             return res.status(400).json({ success: false, message: "Email and Phone are required to create a lead." });
         }
+
+        const leadNo = generateShortId('L');
 
         // 1. Upsert Customer
         let customer = await prisma.user.findFirst({
@@ -18,7 +24,7 @@ const createLead = async (req, res) => {
         if (!customer) {
             customer = await prisma.user.create({
                 data: {
-                    name: customerName || 'Valued Customer',
+                    name: customerName || name || 'Valued Customer',
                     email: email,
                     phone: phone,
                     role: 'CUSTOMER',
@@ -45,10 +51,12 @@ const createLead = async (req, res) => {
         // 3. Create Lead
         const lead = await prisma.lead.create({
             data: {
+                leadNo: leadNo,
                 customerId: customer.id,
                 categoryId: finalCategoryId,
                 location: location || 'Not Specified',
                 description: description || '',
+                servicePlan: servicePlan || 'Starter',
                 status: 'OPEN'
             },
             include: { category: true }
@@ -99,7 +107,10 @@ const getLeads = async (req, res) => {
             where,
             include: {
                 customer: { select: { name: true, phone: true, email: true } },
-                category: { select: { name: true } }
+                category: { select: { name: true } },
+                job: {
+                    select: { id: true, workerId: true, status: true, jobNo: true }
+                }
             },
             orderBy: { createdAt: 'desc' }
         });
@@ -107,7 +118,7 @@ const getLeads = async (req, res) => {
         res.status(200).json({ success: true, count: leads.length, data: leads });
     } catch (error) {
         console.error("Get Leads Error:", error);
-        res.status(500).json({ success: false, message: "Server Error" });
+        res.status(500).json({ success: false, message: "Server Error", error: error.message });
     }
 };
 
@@ -135,8 +146,10 @@ const assignLead = async (req, res) => {
         });
 
         // 2. Create Job
+        const jobNo = generateShortId('J');
         const newJob = await prisma.job.create({
             data: {
+                jobNo: jobNo,
                 leadId: lead.id,
                 customerId: lead.customerId,
                 workerId: workerId,
@@ -231,6 +244,29 @@ const deleteCategory = async (req, res) => {
 
 const getStats = async (req, res) => {
     try {
+        const user = req.user;
+        
+        if (user.role === 'WORKER') {
+            const totalAssigned = await prisma.job.count({ where: { workerId: user.id } });
+            const completed = await prisma.job.count({ where: { workerId: user.id, status: 'COMPLETED' } });
+            
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const leadsToday = await prisma.job.count({
+                where: { workerId: user.id, createdAt: { gte: today } }
+            });
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    totalLeads: totalAssigned,
+                    totalProfessionals: 1, // Self
+                    leadsToday,
+                    conversionRate: totalAssigned > 0 ? ((completed / totalAssigned) * 100).toFixed(1) : 0
+                }
+            });
+        }
+
         const totalLeads = await prisma.lead.count();
         const totalPros = await prisma.user.count({ where: { role: 'WORKER' } });
         const acceptedLeads = await prisma.lead.count({ where: { status: 'ASSIGNED' } });

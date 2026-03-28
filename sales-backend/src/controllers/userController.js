@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const bcrypt = require('bcryptjs');
 
 // @route   GET /api/v1/users/professionals
 // @desc    Get all users with role 'WORKER'
@@ -63,15 +64,30 @@ const toggleAvailability = async (req, res) => {
 const createProfessional = async (req, res) => {
     try {
         const { name, email, phone, password, category, address, city, state, pincode } = req.body;
+
+        const emailInUse = await prisma.user.findUnique({ where: { email } });
+        if (emailInUse) return res.status(400).json({ success: false, message: 'A professional with this email already exists!' });
+
+        const phoneInUse = await prisma.user.findUnique({ where: { phone } });
+        if (phoneInUse) return res.status(400).json({ success: false, message: 'A professional with this phone number already exists!' });
         
-        // 1. Create User as WORKER
+        // 1. Hash Password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // 2. Create User as WORKER
         const user = await prisma.user.create({
             data: {
                 name,
                 email,
                 phone,
-                password, // Note: In production, hash this
-                role: 'WORKER'
+                password: hashedPassword,
+                role: 'WORKER',
+                address,
+                city,
+                state,
+                pincode,
+                rating: parseFloat(req.body.rating || 0)
             }
         });
 
@@ -159,6 +175,7 @@ const updateProfessional = async (req, res) => {
             if (city !== undefined) dataToUpdate.city = city;
             if (state !== undefined) dataToUpdate.state = state;
             if (pincode !== undefined) dataToUpdate.pincode = pincode;
+            if (req.body.rating !== undefined) dataToUpdate.rating = parseFloat(req.body.rating || 0);
 
             // Perform the update
             const updatedUser = await tx.user.update({
@@ -221,11 +238,106 @@ const deleteProfessional = async (req, res) => {
     }
 };
 
+const getProfile = async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            include: { plan: true, categories: { include: { category: true } } }
+        });
+        res.status(200).json({ success: true, data: user });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Profile fetch failed' });
+    }
+};
+
+const updateProfile = async (req, res) => {
+    try {
+        const { 
+            name, email, phone, address, city, state, pincode, 
+            isAvailable, password, businessName, bio, 
+            availability, experience, serviceRadius, location 
+        } = req.body;
+        
+        const dataToUpdate = { 
+            name, email, phone, address, 
+            city: city || (location ? location.split(',')[0]?.trim() : undefined), 
+            state: state || (location ? location.split(',')[1]?.trim() : undefined), 
+            pincode, isAvailable, businessName, bio, 
+            availability, experience, 
+            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined 
+        };
+
+        if (password && password.trim() !== '') {
+            const salt = await bcrypt.genSalt(10);
+            dataToUpdate.password = await bcrypt.hash(password, salt);
+        }
+
+        const updated = await prisma.user.update({
+            where: { id: req.user.id },
+            data: dataToUpdate
+        });
+        res.status(200).json({ success: true, data: updated });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Profile update failed: ' + err.message });
+    }
+};
+
+const getDashboardStats = async (req, res) => {
+    try {
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        const now = new Date();
+        const todayStart = new Date(now.setHours(0, 0, 0, 0));
+        
+        if (user.role === 'ADMIN') {
+            const [totalLeads, totalPros, totalCustomers, newLeadsToday] = await Promise.all([
+                prisma.lead.count(),
+                prisma.user.count({ where: { role: 'WORKER' } }),
+                prisma.user.count({ where: { role: 'CUSTOMER' } }),
+                prisma.lead.count({ where: { createdAt: { gte: todayStart } } })
+            ]);
+
+            res.status(200).json({
+                success: true,
+                data: [
+                    { name: 'Total Leads', value: totalLeads, trend: '+12%', up: true },
+                    { name: 'Active Professionals', value: totalPros, trend: '+5%', up: true },
+                    { name: 'Total Customers', value: totalCustomers, trend: '+8%', up: true },
+                    { name: 'New Leads Today', value: newLeadsToday, trend: '+15%', up: true }
+                ]
+            });
+        } else {
+            // Worker Stats
+            const [totalAssigned, accepted, completed, todayNew] = await Promise.all([
+                prisma.job.count({ where: { workerId: user.id } }),
+                prisma.job.count({ where: { workerId: user.id, status: 'ACCEPTED' } }),
+                prisma.job.count({ where: { workerId: user.id, status: 'COMPLETED' } }),
+                prisma.job.count({ where: { workerId: user.id, createdAt: { gte: todayStart } } })
+            ]);
+
+            res.status(200).json({
+                success: true,
+                data: [
+                    { name: 'New Jobs Today', value: todayNew, trend: '+10%', up: true },
+                    { name: 'Total Assigned', value: totalAssigned, trend: '+4%', up: true },
+                    { name: 'Accepted Jobs', value: accepted, trend: '+2%', up: true },
+                    { name: 'Completed Tasks', value: completed, trend: '+6%', up: true }
+                ]
+            });
+        }
+    } catch (err) {
+        console.error("Dashboard Stats Error:", err);
+        res.status(500).json({ success: false, message: 'Failed to fetch stats' });
+    }
+};
+
 module.exports = {
     getProfessionals,
     updateLocation,
     toggleAvailability,
     createProfessional,
     updateProfessional,
-    deleteProfessional
+    deleteProfessional,
+    getProfile,
+    updateProfile,
+    getDashboardStats
 };

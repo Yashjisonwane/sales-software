@@ -1,24 +1,48 @@
-import React from 'react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMarketplace } from '../../context/MarketplaceContext';
 import { Briefcase, Users, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Globe } from 'lucide-react';
 
 const MarketplaceDashboard = () => {
     const { leads, professionals, dashboardStats } = useMarketplace();
+    const [chartFilter, setChartFilter] = useState('Weekly');
+    const [timeRange, setTimeRange] = useState('Last 30 Days');
 
-    const totalLeads = dashboardStats?.totalLeads || leads.length;
-    const leadsToday = dashboardStats?.leadsToday || 0;
-    const totalProfessionals = dashboardStats?.totalProfessionals || professionals.length;
-    const conversionRate = dashboardStats?.conversionRate || 0;
+    // Icon & Color mapping for API stats
+    const statIcons = {
+        'Total Leads': Briefcase,
+        'Active Professionals': Users,
+        'Total Customers': Globe,
+        'New Leads Today': Activity
+    };
 
-    const stats = [
-        { name: 'Total Leads', value: totalLeads, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+8%', up: true },
-        { name: 'Total Professionals', value: totalProfessionals, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+12%', up: true },
-        { name: 'Leads Today', value: leadsToday, icon: Activity, color: 'text-green-600', bg: 'bg-green-50', trend: '+5%', up: true },
-        { name: 'Conversion Rate', value: `${conversionRate}%`, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50', trend: '-2%', up: false },
+    const statColors = {
+        'Total Leads': 'text-blue-600 bg-blue-50',
+        'Active Professionals': 'text-purple-600 bg-purple-50',
+        'Total Customers': 'text-orange-600 bg-orange-50',
+        'New Leads Today': 'text-green-600 bg-green-50'
+    };
+
+    const stats = (dashboardStats && dashboardStats.length > 0) ? dashboardStats.map(s => ({
+        ...s,
+        icon: statIcons[s.name] || Activity,
+        color: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[0],
+        bg: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[1]
+    })) : [
+        { name: 'Total Leads', value: leads.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+8%', up: true },
+        { name: 'Total Professionals', value: professionals.length, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+12%', up: true },
+        { name: 'Total Customers', value: 0, icon: Globe, color: 'text-orange-600', bg: 'bg-orange-50', trend: '+10%', up: true },
+        { name: 'Leads Today', value: 0, icon: Activity, color: 'text-green-600', bg: 'bg-green-50', trend: '+5%', up: true },
     ];
 
-    // Mock weekly data based on today's leads just for visual activity
+    // Mock chart data for visualization
+    const leadsToday = (dashboardStats && Array.isArray(dashboardStats)) ? (dashboardStats.find(s => s.name === 'New Leads Today')?.value || 0) : 0;
+    const conversionRate = 89.2;
+
+    // Mock chart data based on filter
     const weeklyData = [40, 70, 55, 90, 65, 80, leadsToday * 10 || 50];
+    const monthlyData = [60, 45, 80, 95, 70, 85, 90];
+    const chartData = chartFilter === 'Weekly' ? weeklyData : monthlyData;
 
     return (
         <div className="space-y-8">
@@ -27,7 +51,11 @@ const MarketplaceDashboard = () => {
                     <h1 className="text-2xl font-bold text-gray-900">Marketplace Overview</h1>
                     <p className="text-sm text-gray-500 mt-1">Platform performance and key metrics</p>
                 </div>
-                <select className="bg-white border border-gray-200 rounded-xl text-sm shadow-sm py-2.5 px-4 font-medium text-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer">
+                <select 
+                    value={timeRange}
+                    onChange={(e) => setTimeRange(e.target.value)}
+                    className="bg-white border border-gray-200 rounded-xl text-sm shadow-sm py-2.5 px-4 font-medium text-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                >
                     <option>Last 30 Days</option>
                     <option>This Month</option>
                     <option>This Year</option>
@@ -59,33 +87,45 @@ const MarketplaceDashboard = () => {
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-lg font-bold text-gray-900">Lead Activity</h2>
                         <div className="flex gap-2 text-xs font-bold">
-                            <button className="px-3 py-1.5 bg-blue-600 text-white rounded-lg transition-colors">Weekly</button>
-                            <button className="px-3 py-1.5 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer">Monthly</button>
+                            <button 
+                                onClick={() => setChartFilter('Weekly')}
+                                className={`px-3 py-1.5 rounded-lg transition-colors ${chartFilter === 'Weekly' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-50'}`}
+                            >
+                                Weekly
+                            </button>
+                            <button 
+                                onClick={() => setChartFilter('Monthly')}
+                                className={`px-3 py-1.5 rounded-lg transition-colors ${chartFilter === 'Monthly' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-50'}`}
+                            >
+                                Monthly
+                            </button>
                         </div>
                     </div>
 
                     {/* Mock bar chart */}
                     <div className="flex-1 flex items-end gap-2 pb-4 border-b border-gray-100">
-                        {weeklyData.map((h, i) => (
+                        {chartData.map((h, i) => (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1">
                                 <div
                                     className="w-full rounded-t-lg bg-blue-500 hover:bg-blue-600 transition-colors cursor-pointer"
                                     style={{ height: `${h}%`, minHeight: '8px' }}
                                 ></div>
                                 <span className="text-[10px] font-bold text-gray-400">
-                                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
+                                    {chartFilter === 'Weekly' 
+                                        ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]
+                                        : ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'][i]}
                                 </span>
                             </div>
                         ))}
                     </div>
-                    <p className="text-xs text-gray-400 font-medium mt-4 text-center">Lead submissions per day this week</p>
+                    <p className="text-xs text-gray-400 font-medium mt-4 text-center">Lead submissions per {chartFilter.toLowerCase()} period</p>
                 </div>
 
                 {/* Growth Stats Placeholder */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex flex-col min-h-[320px]">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-lg font-bold text-gray-900">Growth Stats</h2>
-                        <button className="text-blue-600 text-xs font-bold hover:underline cursor-pointer">Full Report →</button>
+                        <Link to="/admin/reports" className="text-blue-600 text-xs font-bold hover:underline cursor-pointer">Full Report →</Link>
                     </div>
 
                     <div className="space-y-5 flex-1">
@@ -113,7 +153,7 @@ const MarketplaceDashboard = () => {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="flex justify-between items-center px-8 py-5 border-b border-gray-50">
                     <h2 className="text-lg font-bold text-gray-900">Recent Lead Activity</h2>
-                    <button className="text-blue-600 text-xs font-bold hover:underline cursor-pointer">View All Leads →</button>
+                    <Link to="/admin/leads" className="text-blue-600 text-xs font-bold hover:underline cursor-pointer">View All Leads →</Link>
                 </div>
 
                 {/* Desktop View */}

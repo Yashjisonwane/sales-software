@@ -63,7 +63,11 @@ const Leads = () => {
         })
         .map(lead => {
             const assignment = proAssignments.find(a => a.leadId === lead.id);
-            return { ...lead, assignmentStatus: assignment?.status || 'Sent', assignmentId: assignment?.id };
+            return { 
+                ...lead, 
+                assignmentStatus: assignment?.status || 'Sent', 
+                assignmentId: assignment?.id // Real Job UUID
+            };
         });
 
     // ── Apply search + status filter ──────────────────────────

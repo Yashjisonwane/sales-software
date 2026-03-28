@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Briefcase,
@@ -30,8 +30,11 @@ const ProfessionalLayout = () => {
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
-    const { currentUser, toast, showToast, notifications } = useMarketplace();
+    const { logout, currentUser, toast, showToast, notifications, isAuthenticated } = useMarketplace();
     useLocationTracker(); // Initialize auto-tracking
+
+    if (isAuthenticated === null) return null; // Wait for checkAuth
+    if (isAuthenticated === false) return <Navigate to="/login" replace />;
 
     const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/professional/dashboard' },
@@ -44,10 +47,8 @@ const ProfessionalLayout = () => {
     ];
 
     const handleLogout = () => {
-        // In a real app, clear tokens/session here
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('isLoggedIn');
-        navigate('/professional/login');
+        logout();
+        navigate('/login');
     };
 
     return (
@@ -89,14 +90,7 @@ const ProfessionalLayout = () => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-                        {/* Demo Role Switcher */}
-                        <button 
-                            onClick={() => navigate('/admin/dashboard')}
-                            className="hidden xs:flex items-center gap-2 px-3 py-1.5 bg-slate-900/5 hover:bg-slate-900/10 text-slate-600 rounded-full border border-slate-200 transition-all active:scale-95"
-                        >
-                            <Globe size={14} className="text-blue-600" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Admin View</span>
-                        </button>
+
 
                         <div className="relative">
                             <button
@@ -115,7 +109,7 @@ const ProfessionalLayout = () => {
                             </div>
                             <div className="hidden sm:block text-left min-w-0">
                                 <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[100px]">{currentUser?.name || 'Professional'}</p>
-                                <p className="text-[10px] text-gray-400 truncate">Provider</p>
+                                <p className="text-[10px] text-gray-400 truncate">{currentUser?.role === 'WORKER' ? 'Service Professional' : (currentUser?.role || 'Provider')}</p>
                             </div>
                         </div>
                     </div>

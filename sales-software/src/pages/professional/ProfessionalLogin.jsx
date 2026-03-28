@@ -9,38 +9,37 @@ const DUMMY_CREDS = { email: 'pro@demo.com', password: 'pro123' };
 
 const ProfessionalLogin = () => {
     const navigate = useNavigate();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('pro@market.com');
+    const [password, setPassword] = useState('pro123');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const { login } = useMarketplace();
     const { requestPermission } = useLocationTracker();
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
 
-        let currentEmail = email;
-        let currentPassword = password;
-
-        // If fields are empty, auto-fill with dummy credentials
-        if (!currentEmail || !currentPassword) {
-            currentEmail = DUMMY_CREDS.email;
-            currentPassword = DUMMY_CREDS.password;
-            setEmail(currentEmail);
-            setPassword(currentPassword);
-        }
-
-        if (currentEmail !== DUMMY_CREDS.email || currentPassword !== DUMMY_CREDS.password) {
-            setError('Invalid credentials.');
+        if (!email || !password) {
+            setError('Please enter both email and password.');
             return;
         }
 
         setIsLoading(true);
-        setTimeout(() => {
-            // Request GPS permission on login
-            requestPermission();
-            navigate('/professional/dashboard');
-        }, 800);
+        try {
+            const success = await login(email, password);
+            if (success) {
+                // Request GPS permission on login
+                requestPermission();
+                navigate('/professional/dashboard');
+            } else {
+                setError('Invalid credentials or account suspended.');
+            }
+        } catch (err) {
+            setError('An error occurred. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (

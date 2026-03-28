@@ -22,6 +22,8 @@ model User {
   city            String?
   state           String?
   pincode         String?
+  rating          Float            @default(0.0)
+  completedJobs   Int              @default(0) @map("completed_jobs")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
   jobsAsCustomer  Job[]            @relation("CustomerJobs")
@@ -31,6 +33,11 @@ model User {
   planId          String?          @map("plan_id")
   subscriptionExpiresAt DateTime?    @map("subscription_expires_at")
   plan            SubscriptionPlan? @relation(fields: [planId], references: [id])
+  businessName    String?          @map("business_name")
+  bio             String?          @db.Text
+  availability    String?
+  experience      String?
+  serviceRadius   Int?             @default(15) @map("service_radius")
 
   @@map("users")
 }
@@ -60,10 +67,12 @@ model WorkerCategory {
 
 model Lead {
   id          String     @id @default(uuid())
+  leadNo      String     @unique @default(cuid()) @map("lead_no") // Short friendly ID
   customerId  String     @map("customer_id")
   categoryId  String     @map("category_id")
   location    String
   description String?    @db.Text
+  servicePlan String     @default("Starter") @map("service_plan")
   status      LeadStatus @default(OPEN)
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
@@ -78,6 +87,7 @@ model Lead {
 
 model Job {
   id            String         @id @default(uuid())
+  jobNo         String         @unique @default(cuid()) @map("job_no") // Short friendly ID
   leadId        String?        @unique @map("lead_id")
   customerId    String         @map("customer_id")
   workerId      String         @map("worker_id")
@@ -170,6 +180,8 @@ enum Role {
 
 enum JobStatus {
   SCHEDULED
+  ACCEPTED
+  REJECTED
   IN_PROGRESS
   ESTIMATED
   INVOICED

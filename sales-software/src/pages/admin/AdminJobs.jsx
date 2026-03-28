@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Clock, ChevronRight, X, Briefcase, Tag, Map, Eye, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Clock, ChevronRight, X, Briefcase, Tag, Map, Eye, Edit2, Trash2, CheckCircle2, Download } from 'lucide-react';
 
 const AdminJobs = () => {
     const navigate = useNavigate();
     const { jobs, professionals, addJob, deleteJob, updateJob } = useMarketplace();
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
+    const [showFilters, setShowFilters] = useState(false);
+    
     const [showForm, setShowForm] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isViewing, setIsViewing] = useState(false);
@@ -25,11 +28,21 @@ const AdminJobs = () => {
         status: 'Scheduled'
     });
 
-    const filteredJobs = jobs.filter(job => 
-        job?.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job?.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job?.category?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredJobs = jobs.filter(job => {
+        const matchesSearch = 
+            job?.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job?.displayId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job?.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            job?.category?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // Normalize status for comparison (handle 'In Progress' vs 'IN_PROGRESS' etc if needed)
+        const jobStatus = (job?.status || '').toUpperCase().replace(/_/g, ' ');
+        const filterStatus = statusFilter.toUpperCase();
+        
+        const matchesStatus = statusFilter === 'All' || jobStatus === filterStatus;
+        
+        return matchesSearch && matchesStatus;
+    });
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -78,14 +91,15 @@ const AdminJobs = () => {
         }
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Scheduled': return 'text-blue-600 bg-blue-50';
-            case 'In Progress': return 'text-yellow-600 bg-yellow-50';
-            case 'Completed': return 'text-green-600 bg-green-50';
-            case 'Estimated': return 'text-indigo-600 bg-indigo-50';
-            case 'Invoiced': return 'text-purple-600 bg-purple-50';
-            default: return 'text-gray-600 bg-gray-50';
+    const getStatusColor = (status = '') => {
+        const s = status.toUpperCase().replace(/_/g, ' ');
+        switch (s) {
+            case 'SCHEDULED': return 'text-blue-600 bg-blue-50 border-blue-100';
+            case 'IN PROGRESS': return 'text-amber-600 bg-amber-50 border-amber-100';
+            case 'COMPLETED': return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+            case 'ESTIMATED': return 'text-indigo-600 bg-indigo-50 border-indigo-100';
+            case 'INVOICED': return 'text-purple-600 bg-purple-50 border-purple-100';
+            default: return 'text-gray-600 bg-gray-50 border-gray-100';
         }
     };
 
@@ -99,37 +113,46 @@ const AdminJobs = () => {
                 </div>
                 <button 
                     onClick={() => setShowForm(true)}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md transition-all active:scale-95"
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-md transition-all active:scale-95 w-full md:w-auto justify-center"
                 >
                     <Plus size={16} /> Create Job
                 </button>
             </div>
 
-            {/* List Section */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px]">
-                <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row gap-4 items-center justify-between bg-gray-50/30">
-                    <div className="relative w-full md:w-96">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <input 
-                            type="text" 
-                            placeholder="Search by client, ID or service..."
-                            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-300 shadow-sm"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <button className="flex-1 md:flex-none px-5 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-gray-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
-                             <Filter size={14} /> Filter
-                        </button>
-                        <button className="px-5 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-gray-700 transition-colors shadow-sm">
-                             Export
-                        </button>
-                    </div>
+            {/* Search and Filters Bar */}
+            <div className="flex flex-col xl:flex-row gap-4 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <div className="flex-1 relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Search by client, ID or service..."
+                        className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-gray-300"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
                 </div>
+                
+                <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
+                    {['All', 'Scheduled', 'In Progress', 'Estimated', 'Invoiced', 'Completed'].map(status => (
+                        <button
+                            key={status}
+                            onClick={() => setStatusFilter(status)}
+                            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${statusFilter === status ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                            {status}
+                        </button>
+                    ))}
+                </div>
+                
+                <button className="hidden xl:flex items-center justify-center px-5 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-gray-700 transition shadow-sm gap-2">
+                     <Download size={14} /> Export
+                </button>
+            </div>
 
+            {/* Table Section */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px]">
                 <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[800px]">
                         <thead>
                             <tr className="bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
                                 <th className="px-6 py-4">ID</th>
@@ -239,16 +262,16 @@ const AdminJobs = () => {
 
             {/* Create Job Form Modal */}
             {showForm && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" onClick={() => setShowForm(false)}></div>
                     
-                    <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="flex items-center justify-between px-8 pt-8 pb-2">
+                    <div className="relative w-[95%] sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between px-6 sm:px-8 pt-6 sm:pt-8 pb-4 shrink-0 bg-white border-b border-gray-50">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
                                     {isEditing ? <Edit2 size={22} /> : <Briefcase size={22} />}
                                 </div>
-                                <h2 className="text-xl font-bold text-gray-800">{isEditing ? 'Modify Job Order' : 'Create New Job'}</h2>
+                                <h2 className="text-lg sm:text-xl font-bold text-gray-800">{isEditing ? 'Modify Job Order' : 'Create New Job'}</h2>
                             </div>
                             <button 
                                 onClick={() => setShowForm(false)}
@@ -258,8 +281,8 @@ const AdminJobs = () => {
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="px-8 pb-8 pt-4 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-2 gap-3">
+                        <form onSubmit={handleSubmit} className="px-6 sm:px-8 pb-8 pt-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Customer Name</label>
                                     <input 
@@ -284,7 +307,7 @@ const AdminJobs = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Service Category</label>
                                     <select 
@@ -316,7 +339,7 @@ const AdminJobs = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Schedule Date</label>
                                     <input 
@@ -377,17 +400,17 @@ const AdminJobs = () => {
                                 />
                             </div>
 
-                            <div className="flex gap-3 pt-4">
+                            <div className="flex flex-col sm:flex-row gap-3 pt-4">
                                 <button 
                                     type="button"
                                     onClick={() => setShowForm(false)}
-                                    className="flex-1 px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm"
+                                    className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm w-full"
                                 >
                                     Cancel
                                 </button>
                                 <button 
                                     type="submit"
-                                    className={`flex-1 px-6 py-3 ${isEditing ? 'bg-amber-600' : 'bg-blue-600'} text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-200`}
+                                    className={`px-6 py-3 ${isEditing ? 'bg-amber-600' : 'bg-blue-600'} text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md shadow-blue-200 w-full`}
                                 >
                                     {isEditing ? <CheckCircle2 size={16} /> : <Plus size={16} />}
                                     <span>{isEditing ? 'Save Changes' : 'Create Job'}</span>
@@ -400,17 +423,17 @@ const AdminJobs = () => {
 
             {/* View Detail Modal - Matches Edit UI Style */}
             {isViewing && viewData && (
-                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-[150] flex items-center justify-center p-2 sm:p-4 overflow-hidden">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" onClick={closeModal}></div>
                     
-                    <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="flex items-center justify-between px-8 pt-8 pb-2">
+                    <div className="relative w-[95%] sm:max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-300 flex flex-col max-h-[90vh]">
+                        <div className="flex items-center justify-between px-6 sm:px-8 pt-6 sm:pt-8 pb-4 shrink-0 bg-white border-b border-gray-50">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
                                     <Eye size={22} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold text-gray-800">Review Job Record</h2>
+                                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">Review Job Record</h2>
                                     <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{viewData.displayId}</p>
                                 </div>
                             </div>
@@ -422,8 +445,8 @@ const AdminJobs = () => {
                             </button>
                         </div>
 
-                        <div className="px-8 pb-8 pt-4 space-y-4 max-h-[85vh] overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-2 gap-3">
+                        <div className="px-6 sm:px-8 pb-8 pt-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Customer Name</label>
                                     <div className="flex items-center gap-2">
@@ -440,7 +463,7 @@ const AdminJobs = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Service Category</label>
                                     <div className="flex items-center gap-2">
@@ -457,7 +480,7 @@ const AdminJobs = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="space-y-1.5 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Scheduled Date</label>
                                     <div className="flex items-center gap-2">
@@ -491,16 +514,16 @@ const AdminJobs = () => {
                                 </p>
                             </div>
 
-                            <div className="flex gap-3 pt-4">
+                            <div className="flex flex-col sm:flex-row gap-3 pt-4">
                                 <button 
                                     onClick={closeModal}
-                                    className="flex-1 px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm"
+                                    className="px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm w-full"
                                 >
                                     Close View
                                 </button>
                                 <button 
                                     onClick={() => navigate(`/admin/jobs/${viewData.id}`)}
-                                    className="flex-1 px-6 py-3 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md"
+                                    className="px-6 py-3 bg-slate-900 text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md w-full"
                                 >
                                     <span>Manage Job</span>
                                     <ChevronRight size={16} />

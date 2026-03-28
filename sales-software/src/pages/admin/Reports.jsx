@@ -17,7 +17,13 @@ import { useMarketplace } from '../../context/MarketplaceContext';
 import ConfirmationModal from '../../components/ConfirmationModal';
 
 const Reports = () => {
-    const { leads, professionals, assignments, servicesData, showToast } = useMarketplace();
+    const { 
+        leads = [], 
+        professionals = [], 
+        assignments = [], 
+        locations = [], 
+        showToast = () => {} 
+    } = useMarketplace() || {};
     const [timeRange, setTimeRange] = useState('This Month');
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -105,7 +111,7 @@ const Reports = () => {
                         className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-xl hover:bg-black transition-all text-xs font-bold shadow-lg shadow-gray-200 active:scale-95"
                     >
                         <Download size={16} />
-                        <span>Export CSV</span>
+                        <span>Export PDF</span>
                     </button>
                 </div>
             </div>
@@ -183,13 +189,69 @@ const Reports = () => {
                 isOpen={isExportModalOpen}
                 onClose={() => setIsExportModalOpen(false)}
                 onConfirm={() => {
-                    showToast("Generating analytics report...", "success");
+                    showToast("Preparing data-only PDF report...", "success");
                     setIsExportModalOpen(false);
+                    
+                    try {
+                        // 1. Create a clean data report in HTML
+                        const reportWindow = window.open('', '_blank');
+                        const leadsHtml = leads.map(l => `
+                            <tr>
+                                <td>${l.displayId || l.id}</td>
+                                <td>${l.customerName || '—'}</td>
+                                <td>${l.serviceCategory || '—'}</td>
+                                <td>${l.status}</td>
+                                <td>${new Date(l.createdAt || Date.now()).toLocaleDateString()}</td>
+                            </tr>
+                        `).join('');
+
+                        reportWindow.document.write(`
+                            <html>
+                                <head>
+                                    <title>Lead Analytics Data Report</title>
+                                    <style>
+                                        body { font-family: sans-serif; padding: 40px; color: #333; }
+                                        h1 { color: #2563eb; margin-bottom: 5px; }
+                                        p { color: #666; margin-bottom: 30px; }
+                                        table { width: 100%; border-collapse: collapse; }
+                                        th, td { text-left; padding: 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+                                        th { background: #f8fafc; color: #64748b; font-weight: bold; text-transform: uppercase; }
+                                    </style>
+                                </head>
+                                <body>
+                                    <h1>Lead Analytics Report</h1>
+                                    <p>Generated on ${new Date().toLocaleDateString()} | Total Elements: ${leads.length}</p>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Customer</th>
+                                                <th>Service</th>
+                                                <th>Status</th>
+                                                <th>Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${leadsHtml}
+                                        </tbody>
+                                    </table>
+                                </body>
+                            </html>
+                        `);
+                        reportWindow.document.close();
+                        
+                        // 2. Trigger print which allows 'Save as PDF'
+                        window.setTimeout(() => {
+                            reportWindow.print();
+                        }, 500);
+                    } catch (err) {
+                        console.error("PDF generation error:", err);
+                    }
                 }}
-                title="Export Analytics Data"
-                message="Are you sure you want to export the current lead analytics data as a CSV file for offline study?"
+                title="Export Data PDF"
+                message="Are you sure you want to generate a data-only PDF report? This will create a clean table of all lead data for your records."
                 icon={Download}
-                confirmText="Download Report"
+                confirmText="Generate Data PDF"
                 type="info"
             />
         </div>

@@ -16,8 +16,8 @@ const Settings = () => {
     const [activeTab, setActiveTab] = useState('integrations'); 
 
     const [formData, setFormData] = useState({
-        username: currentUser?.name || 'admin',
-        email: currentUser?.email || 'admin@leadmarket.platform',
+        username: currentUser?.name || '',
+        email: currentUser?.email || '',
         password: '',
         mapProvider: 'google', 
         apiKey: '••••••••••••••••',
@@ -28,8 +28,23 @@ const Settings = () => {
         defaultZoom: '10'
     });
 
+    // Auto-sync form data with live user profile once it loads from context
+    React.useEffect(() => {
+        if (currentUser) {
+            setFormData(prev => ({
+                ...prev,
+                username: currentUser.name || '',
+                email: currentUser.email || ''
+            }));
+        }
+    }, [currentUser]);
+
     const handleUpdate = async () => {
-        const res = await updateProfile({ name: formData.username, email: formData.email });
+        const res = await updateProfile({ 
+            name: formData.username, 
+            email: formData.email,
+            password: formData.password
+        });
         if (res.success) {
             setShowSuccess(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });

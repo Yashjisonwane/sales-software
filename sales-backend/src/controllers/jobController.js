@@ -34,43 +34,56 @@ const updateJob = async (req, res) => {
         const jobId = req.params.id;
         const { customerName, phone, category, professionalId, location, description, status, date, time } = req.body;
 
-        // 1. If customer details changed, upsert customer
-        let customerId;
-        if (customerName || phone) {
-            let customer = await prisma.user.findFirst({ where: { phone: phone } });
-            if (!customer) {
-                customer = await prisma.user.create({
-                    data: { name: customerName, phone, email: `${phone}@temp.com`, role: 'CUSTOMER', password: 'MOCK_PASSWORD' }
-                });
-            } else {
-                customer = await prisma.user.update({
-                    where: { id: customer.id },
-                    data: { name: customerName }
-                });
+        // 1. Perform update in a transaction
+        const result = await prisma.$transaction(async (tx) => {
+            // A. Get existing job first for Lead ID (Support both UUID and Short ID)
+            const existingJob = await tx.job.findFirst({ 
+                where: { 
+                    OR: [
+                        { id: jobId },
+                        { jobNo: jobId }
+                    ]
+                } 
+            });
+            
+            if (!existingJob) throw new Error("JOB_NOT_FOUND");
+
+            // Use the real UUID for the actual update
+            const realJobId = existingJob.id;
+
+            // B. If status is REJECTED/CANCELLED, set Lead back to OPEN
+            if (status === 'REJECTED' || status === 'CANCELLED') {
+                if (existingJob.leadId) {
+                    await tx.lead.update({
+                        where: { id: existingJob.leadId },
+                        data: { status: 'OPEN' }
+                    });
+                }
             }
-            customerId = customer.id;
-        }
 
-        // 2. Update Job
-        const updateData = {};
-        if (customerId) updateData.customerId = customerId;
-        if (professionalId) updateData.workerId = professionalId;
-        if (category) updateData.categoryName = category;
-        if (location) updateData.location = location;
-        if (description !== undefined) updateData.description = description;
-        if (status) updateData.status = status;
-        if (date) updateData.scheduledDate = new Date(date);
-        if (time) updateData.scheduledTime = time;
+            // C. Build updates
+            const updateData = {};
+            if (professionalId) updateData.workerId = professionalId;
+            if (category) updateData.categoryName = category;
+            if (location) updateData.location = location;
+            if (description !== undefined) updateData.description = description;
+            if (status) updateData.status = status;
+            if (date) updateData.scheduledDate = new Date(date);
+            if (time) updateData.scheduledTime = time;
 
-        const job = await prisma.job.update({
-            where: { id: jobId },
-            data: updateData
+            return await tx.job.update({
+                where: { id: realJobId },
+                data: updateData
+            });
         });
 
-        res.status(200).json({ success: true, data: job });
+        res.status(200).json({ success: true, data: result });
     } catch (err) {
         console.error("Job Update Error:", err);
-        res.status(500).json({ success: false, message: 'Job update failed: ' + err.message });
+        res.status(err.message === "JOB_NOT_FOUND" ? 404 : 500).json({ 
+            success: false, 
+            message: err.message === 'JOB_NOT_FOUND' ? 'Job not found' : 'Job update failed' 
+        });
     }
 };
 
@@ -91,7 +104,17 @@ const createEstimate = async (req, res) => {
     try {
         const jobId = req.params.id;
         const { amount, details } = req.body;
-        
+
+        // --- STRICT WORKFLOW CHECK ---
+        const job = await prisma.job.findUnique({
+            where: { id: jobId },
+            include: { photos: true, inspection: true }
+        });
+
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+        if (job.photos.length === 0) return res.status(400).json({ success: false, message: 'Photos are required before estimate' });
+        if (!job.inspection) return res.status(400).json({ success: false, message: 'Inspection is required before estimate' });
+
         const estimate = await prisma.jobEstimate.create({
             data: {
                 jobId: jobId,
@@ -115,6 +138,15 @@ const createInvoice = async (req, res) => {
     try {
         const jobId = req.params.id;
         const { amount } = req.body;
+
+        // --- STRICT WORKFLOW CHECK ---
+        const job = await prisma.job.findUnique({
+            where: { id: jobId },
+            include: { estimate: true }
+        });
+
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+        if (!job.estimate) return res.status(400).json({ success: false, message: 'Estimate is required before invoice' });
         
         const invoice = await prisma.jobInvoice.create({
             data: {

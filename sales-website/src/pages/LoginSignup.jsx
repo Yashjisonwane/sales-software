@@ -31,7 +31,14 @@ const LoginSignup = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        alert(`${isLogin ? 'Login' : 'Signup'} successful!`);
+        // Save mock user for demonstration
+        const mockUser = {
+            name: 'Kiaan Developer',
+            email: 'kiaan@example.com',
+            role: role
+        };
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        window.location.href = '/'; // Force reload to update Navbar
     };
 
     return (

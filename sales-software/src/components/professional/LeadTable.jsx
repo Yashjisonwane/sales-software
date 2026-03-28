@@ -41,18 +41,17 @@ const LeadTable = ({ leads, onAction }) => {
                             const isNew = ['new', 'open', 'sent', 'viewed'].includes(status);
                             const isAccepted = status === 'accepted';
 
-                            // Privacy Masking Logic
-                            const displayName = isNew ? `Customer #${lead.id}` : lead.customerName;
-                            const displayLocation = isNew ? "Location Hidden" : lead.location;
+                            const displayName = lead.customerName || 'Customer';
+                            const displayLocation = lead.location || 'Not Specified';
 
                             return (
                                 <tr key={lead.id} className="hover:bg-blue-50/20 transition-all duration-200 group">
-                                    <td className="px-4 py-5 whitespace-nowrap text-sm font-bold text-gray-900">#{lead.id}</td>
-                                    <td className={`px-4 py-5 whitespace-nowrap text-sm font-semibold ${isNew ? 'text-gray-400 italic' : 'text-gray-700'}`}>
+                                    <td className="px-4 py-5 whitespace-nowrap text-sm font-bold text-gray-900">#{lead.leadNo || lead.id}</td>
+                                    <td className="px-4 py-5 whitespace-nowrap text-sm font-semibold text-gray-700">
                                         <div className="max-w-[150px] truncate">{displayName}</div>
                                     </td>
                                     <td className="px-4 py-5 whitespace-nowrap text-sm text-gray-600 font-medium">{lead.serviceCategory}</td>
-                                    <td className={`hidden xl:table-cell px-4 py-5 whitespace-nowrap text-sm font-medium ${isNew ? 'text-gray-300 italic' : 'text-gray-500'}`}>
+                                    <td className="hidden xl:table-cell px-4 py-5 whitespace-nowrap text-sm font-medium text-gray-500">
                                         <div className="max-w-[180px] truncate">{displayLocation}</div>
                                     </td>
                                     <td className="hidden lg:table-cell px-4 py-5 whitespace-nowrap text-xs text-gray-400 font-bold">{new Date(lead.dateRequested).toLocaleDateString()}</td>
@@ -116,26 +115,25 @@ const LeadTable = ({ leads, onAction }) => {
                     const isAccepted = statusLower === 'accepted';
                     const isRejected = statusLower === 'rejected';
 
-                    // Privacy Masking Logic
-                    const displayName = isNew ? `Customer #${lead.id}` : lead.customerName;
-                    const displayLocation = isNew ? "Location Hidden" : lead.location;
+                    const displayName = lead.customerName || 'Customer';
+                    const displayLocation = lead.location || 'Not Specified';
 
                     return (
                         <div key={lead.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden flex flex-col transition-all active:scale-[0.99] hover:shadow-2xl">
                             {/* Card Header - Main Info */}
                             <div className="bg-gradient-to-r from-gray-50 to-white px-5 md:px-6 py-6 md:py-7 border-b border-gray-50">
                                 <div className="flex justify-between items-start mb-4">
-                                    <span className="px-3 py-1.5 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-50 shadow-sm leading-none">ID: #{lead.id}</span>
+                                    <span className="px-3 py-1.5 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-50 shadow-sm leading-none">ID: #{lead.leadNo || lead.id}</span>
                                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${getStatusColor(statusVal)}`}>
                                         {isNew ? 'New' : (statusLower === 'completed' || statusLower === 'closed' ? 'Closed' : statusVal)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="h-14 w-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shrink-0 border-4 border-white">
-                                        {isNew ? '#' : (lead.customerName?.charAt(0) || 'C')}
+                                        {(lead.customerName?.charAt(0) || 'C')}
                                     </div>
                                     <div className="min-w-0">
-                                        <h4 className={`font-black tracking-tight truncate leading-none mb-1.5 ${isNew ? 'text-gray-400 text-lg italic' : 'text-gray-900 text-xl'}`}>
+                                        <h4 className="font-black tracking-tight truncate leading-none mb-1.5 text-gray-900 text-xl">
                                             {displayName}
                                         </h4>
                                         <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">{new Date(lead.dateRequested).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
@@ -154,7 +152,7 @@ const LeadTable = ({ leads, onAction }) => {
 
                                 <div className="flex flex-col gap-1.5">
                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Location</p>
-                                    <div className={`bg-gray-50 px-5 py-3.5 rounded-2xl border border-gray-100 text-lg leading-relaxed ${isNew ? 'text-gray-300 italic font-medium' : 'text-gray-600 font-bold'}`}>
+                                    <div className="bg-gray-50 px-5 py-3.5 rounded-2xl border border-gray-100 text-lg leading-relaxed text-gray-900">
                                         {displayLocation}
                                     </div>
                                 </div>

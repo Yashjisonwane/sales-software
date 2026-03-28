@@ -129,9 +129,12 @@ const AdminSubscriptions = () => {
                                     <div className={`${plan.bg} ${plan.color} p-4 rounded-2xl shadow-sm transition-transform`}>
                                         <Icon size={24} />
                                     </div>
-                                    <div className="flex gap-2 opacity-0 group-hover/card:opacity-100 transition-opacity translate-x-4 group-hover/card:translate-x-0 transition-all duration-300">
-                                        <button onClick={() => { setSelectedPlan(plan); setShowEditPlanModal(true); }} className="p-2.5 bg-gray-50 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                                    <div className="flex gap-2 transition-all duration-300">
+                                        <button onClick={() => { setSelectedPlan(plan); setShowEditPlanModal(true); }} className="p-2.5 bg-gray-50 text-amber-600 hover:bg-amber-100 border border-amber-100 rounded-xl transition-all shadow-sm" title="Edit Plan">
                                             <Edit size={16} />
+                                        </button>
+                                        <button onClick={() => { setSelectedPlan(plan); setShowDeletePlanConfirm(true); }} className="p-2.5 bg-gray-50 text-rose-600 hover:bg-rose-100 border border-rose-100 rounded-xl transition-all shadow-sm" title="Delete Plan">
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
@@ -190,6 +193,7 @@ const AdminSubscriptions = () => {
                     </div>
                 </div>
 
+                {/* Responsive List View */}
                 <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -208,7 +212,7 @@ const AdminSubscriptions = () => {
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px]">
-                                                {sub.name.charAt(0)}
+                                                {sub.name?.charAt(0) || 'P'}
                                             </div>
                                             <span className="text-sm font-bold text-blue-600 cursor-pointer hover:underline">
                                                 {sub.name}
@@ -224,21 +228,69 @@ const AdminSubscriptions = () => {
                                         </span>
                                     </td>
                                     <td className="px-8 py-5 text-right">
-                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                                            <button onClick={() => { setSelectedSub(sub); setShowEditModal(true); }} className="p-2 text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors" title="Edit">
-                                                <Edit size={16} />
+                                        <div className="flex justify-end gap-1.5">
+                                            <button onClick={() => { setSelectedSub(sub); setShowEditModal(true); }} className="p-2 text-yellow-600 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded-lg transition-all" title="Edit">
+                                                <Edit size={14} />
                                             </button>
                                             {sub.status === 'Active' && (
-                                                <button onClick={() => { setSelectedSub(sub); setShowCancelConfirm(true); }} className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Cancel Subscription">
-                                                    <XCircle size={16} />
+                                                <button onClick={() => { setSelectedSub(sub); setShowCancelConfirm(true); }} className="p-2 text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg transition-all" title="Cancel Subscription">
+                                                    <XCircle size={14} />
                                                 </button>
                                             )}
+                                            <button onClick={() => { setSelectedSub(sub); setShowDeleteConfirm(true); }} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-all" title="Delete">
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Mobile View */}
+                <div className="md:hidden divide-y divide-gray-50">
+                    {sorted.map(sub => (
+                        <div key={sub.id} className="p-6 space-y-4">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                                        {sub.name?.charAt(0) || 'P'}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-gray-900">{sub.name}</h4>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{sub.plan} Plan</p>
+                                    </div>
+                                </div>
+                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${sub.status === 'Active' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                    {sub.status}
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-gray-50 p-2 rounded-xl">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Amount</p>
+                                    <p className="text-sm font-black text-gray-900">{sub.amount}</p>
+                                </div>
+                                <div className="bg-gray-50 p-2 rounded-xl">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Billing Date</p>
+                                    <p className="text-sm font-bold text-gray-600">{sub.date}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => { setSelectedSub(sub); setShowEditModal(true); }} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-yellow-50 text-yellow-700 font-bold text-xs rounded-xl border border-yellow-200">
+                                    <Edit size={14} /> Edit
+                                </button>
+                                {sub.status === 'Active' && (
+                                    <button onClick={() => { setSelectedSub(sub); setShowCancelConfirm(true); }} className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-orange-50 text-orange-700 font-bold text-xs rounded-xl border border-orange-200">
+                                        <XCircle size={14} /> Cancel
+                                    </button>
+                                )}
+                                <button onClick={() => { setSelectedSub(sub); setShowDeleteConfirm(true); }} className="p-2.5 bg-red-50 text-red-700 rounded-xl border border-red-200">
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -247,6 +299,20 @@ const AdminSubscriptions = () => {
             <EditSubscriptionModal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedSub(null); }} subscription={selectedSub} onSave={handleSaveEdit} plans={plans} />
             <ConfirmationModal isOpen={showCancelConfirm} onClose={() => { setShowCancelConfirm(false); setSelectedSub(null); }} onConfirm={handleConfirmCancel} title="Cancel Subscription" message="Are you sure?" icon={AlertCircle} confirmText="Cancel Subscription" type="warning" />
             <ConfirmationModal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setSelectedSub(null); }} onConfirm={handleConfirmDelete} title="Delete Record" message="Are you sure?" icon={AlertCircle} confirmText="Delete" type="danger" />
+            <ConfirmationModal 
+                isOpen={showDeletePlanConfirm} 
+                onClose={() => { setShowDeletePlanConfirm(false); setSelectedPlan(null); }} 
+                onConfirm={() => {
+                    setPlans(prev => prev.filter(p => p.id !== selectedPlan?.id));
+                    showToast('Plan deleted successfully', 'success');
+                    setShowDeletePlanConfirm(false);
+                }} 
+                title="Delete Subscription Plan" 
+                message={`Are you sure you want to delete the ${selectedPlan?.name} plan? Professionals already on this plan will remain unaffected.`} 
+                icon={AlertCircle} 
+                confirmText="Delete Plan" 
+                type="danger" 
+            />
             <EditPlanModal isOpen={showEditPlanModal} onClose={() => { setShowEditPlanModal(false); setSelectedPlan(null); }} plan={selectedPlan} onSave={(p) => setPlans(prev => prev.map(old => old.id === p.id ? p : old))} />
         </div>
     );

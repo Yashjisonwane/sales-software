@@ -18,17 +18,34 @@ const Profile = () => {
     const { currentUser, updateProfile, showToast } = useMarketplace();
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({
-        name: currentUser?.name || '',
-        businessName: currentUser?.businessName || '',
-        email: currentUser?.email || '',
-        phone: currentUser?.phone || '',
-        category: currentUser?.category || '',
-        location: currentUser?.location || '',
-        serviceRadius: currentUser?.serviceRadius || 15,
-        experience: currentUser?.experience || '5 years',
-        bio: currentUser?.bio || 'Dedicated professional with a commitment to excellence in service delivery and customer satisfaction.',
-        availability: currentUser?.availability || 'Mon - Fri, 9 AM - 6 PM'
+        name: '',
+        businessName: '',
+        email: '',
+        phone: '',
+        category: '',
+        location: '',
+        serviceRadius: 15,
+        experience: '',
+        bio: '',
+        availability: ''
     });
+
+    React.useEffect(() => {
+        if (currentUser) {
+            setFormData({
+                name: currentUser.name || '',
+                businessName: currentUser.businessName || '',
+                email: currentUser.email || '',
+                phone: currentUser.phone || '',
+                category: currentUser.categories?.[0]?.category?.name || 'General',
+                location: currentUser.city && currentUser.state ? `${currentUser.city}, ${currentUser.state}` : (currentUser.address || ''),
+                serviceRadius: currentUser.serviceRadius || 15,
+                experience: currentUser.experience || '',
+                bio: currentUser.bio || '',
+                availability: currentUser.availability || ''
+            });
+        }
+    }, [currentUser]);
     const [avatar, setAvatar] = useState(null);
 
     const handleAvatarChange = (e) => {
@@ -157,6 +174,36 @@ const Profile = () => {
                                             disabled={!isEditing}
                                             className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-700 disabled:opacity-50"
                                             placeholder="John Doe"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Business Name</label>
+                                    <div className="relative">
+                                        <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                        <input
+                                            type="text"
+                                            name="businessName"
+                                            value={formData.businessName}
+                                            onChange={handleChange}
+                                            disabled={!isEditing}
+                                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-700 disabled:opacity-50"
+                                            placeholder="John's Services"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Work Experience</label>
+                                    <div className="relative">
+                                        <Star className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                        <input
+                                            type="text"
+                                            name="experience"
+                                            value={formData.experience}
+                                            onChange={handleChange}
+                                            disabled={!isEditing}
+                                            className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-blue-600 focus:bg-white rounded-2xl outline-none transition-all font-bold text-gray-700 disabled:opacity-50"
+                                            placeholder="e.g. 5 Years"
                                         />
                                     </div>
                                 </div>

@@ -13,9 +13,9 @@ const AdminLogin = () => {
     const [isRegistering, setIsRegistering] = useState(false);
     
     const [name, setName] = useState('');
-    const [email, setEmail] = useState('admin@demo.com');
-    const [phone, setPhone] = useState('1234567890');
-    const [password, setPassword] = useState('admin123');
+    const [email, setEmail] = useState('admin@gmail.com');
+    const [phone, setPhone] = useState('9999912345');
+    const [password, setPassword] = useState('pass-123');
     
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');

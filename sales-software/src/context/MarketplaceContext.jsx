@@ -6,7 +6,7 @@ const MarketplaceContext = createContext();
 export const MarketplaceProvider = ({ children }) => {
     // ─── AUTHENTICATION STATE ───
     const [currentUser, setCurrentUser] = useState(null);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(null); // 'null' means loading, 'false' means logged out, 'true' means logged in
 
     // ─── DATA STATES ───
     const [leads, setLeads] = useState([]);
@@ -40,7 +40,7 @@ export const MarketplaceProvider = ({ children }) => {
 
     // --- AUTHENTICATION ACTIONS ---
     const login = async (email, password) => {
-        const res = await apiService.loginAdmin(email, password);
+        const res = await apiService.loginUser(email, password);
         if (res.success) {
             localStorage.setItem('userToken', res.data.token);
             setCurrentUser(res.data.user);
@@ -62,17 +62,28 @@ export const MarketplaceProvider = ({ children }) => {
         setJobs([]);
     };
 
-    // Auto-login check (Assuming valid token in local storage matches a session - Simplified for MVP)
+    // Auto-login check (Fetch real user profile from token)
     useEffect(() => {
-        const token = localStorage.getItem('userToken');
-        if (token) {
-            // Ideally we'd hit a '/me' endpoint here to re-validate token and get user role
-            // For now, we simulate success if token exists
-            setIsAuthenticated(true);
-            loadInitialData();
-            // Just for UI purposes, mock the current user visually until backend provides `GET /me`
-            setCurrentUser({ id: 'Admin1', name: 'Admin Account', role: 'ADMIN' });
-        }
+        const checkAuth = async () => {
+            const token = localStorage.getItem('userToken');
+            if (token) {
+                const res = await apiService.fetchUserProfile();
+                if (res.success) {
+                    setIsAuthenticated(true);
+                    setCurrentUser(res.data);
+                    await loadInitialData();
+                } else {
+                    // Token invalid (User not found in reset DB) or expired
+                    localStorage.removeItem('userToken');
+                    setIsAuthenticated(false);
+                    setCurrentUser(null);
+                    showToast('Session invalid. Please login again.', 'error');
+                }
+            } else {
+                setIsAuthenticated(false); // No token, definitely not authenticated
+            }
+        };
+        checkAuth();
     }, []);
 
     // --- DATA FETCHING ---
@@ -83,9 +94,10 @@ export const MarketplaceProvider = ({ children }) => {
                 // Flatten the data for easier UI consumption
                 const flattenedLeads = (leadsRes.data || []).map(l => ({
                     ...l,
-                    displayId: `LD-${l.id.slice(-4).toUpperCase()}`, // Clean Display ID
+                    displayId: l.leadNo || `LD-${l.id.slice(-4).toUpperCase()}`, // Clean Display ID
                     customerName: l.customer?.name || 'Unknown Customer',
                     customerPhone: l.customer?.phone || '',
+                    customerEmail: l.customer?.email || '',
                     serviceCategory: l.category?.name || 'General Service',
                     dateRequested: l.createdAt
                 }));
@@ -97,22 +109,36 @@ export const MarketplaceProvider = ({ children }) => {
                 // Flatten Jobs data for consume (Job -> lead -> customer)
                 const flattenedJobs = (jobsRes.data || []).map(j => ({
                     ...j,
-                    displayId: `JB-${j.id.slice(-4).toUpperCase()}`, // Clean Display ID
+                    displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`, // Clean Display ID
                     customerName: j.customer?.name || 'Customer',
                     category: j.categoryName || 'General',
                     date: j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString() : 'Today',
                     time: j.scheduledTime || 'TBD',
-                    workerName: j.worker?.name || 'Assigned Worker'
+                    workerName: j.worker?.name || 'Assigned Worker',
+                    professionalName: j.worker?.name || 'Assigned Worker'
                 }));
                 setJobs(flattenedJobs);
+
+                // --- NEW: Populate Assignments for Professional Dashboard from Jobs ---
+                const mappedAssignments = flattenedJobs.map(j => ({
+                    id: j.id,
+                    professionalId: j.workerId,
+                    leadId: j.leadId,
+                    status: j.status === 'SCHEDULED' ? 'Sent' : j.status, // Map SCHEDULED to 'Sent' for invitation feel
+                    date: j.createdAt
+                }));
+                setAssignments(mappedAssignments);
             }
 
             const profRes = await apiService.fetchAllProfessionals();
             if (profRes.success) {
                 const workers = (profRes.data || []).map(w => ({
                     ...w,
+                    address: w.address || '',
+                    city: w.city || '',
+                    pincode: w.pincode || '',
                     location: w.city || w.address || '—', // Use city or address for display
-                    status: w.status || (w.isAvailable ? 'Active' : 'Offline')
+                    status: w.status ? w.status : (w.isAvailable ? 'Active' : 'Offline')
                 }));
                 setProfessionals(workers); 
             }
@@ -235,8 +261,16 @@ export const MarketplaceProvider = ({ children }) => {
 
     // --- ASSIGNMENT RESPONSES ---
     const respondToLead = async (assignmentId, decision) => {
-        // Dummy placeholder until strictly implemented in worker views
-        showToast(`Locally responded to assignment: ${decision}`, 'info');
+        const mappedStatus = decision === 'accept' ? 'ACCEPTED' : (decision === 'reject' ? 'REJECTED' : decision);
+        const res = await apiService.updateJob(assignmentId, { status: mappedStatus.toUpperCase() });
+        if (res.success) {
+            showToast(`Lead ${decision === 'accept' ? 'Accepted' : 'Rejected'}!`, 'success');
+            loadInitialData();
+            return true;
+        } else {
+            showToast(res.error || 'Action failed', 'error');
+            return false;
+        }
     };
 
     const reassignLead = async (leadId) => {
@@ -244,8 +278,16 @@ export const MarketplaceProvider = ({ children }) => {
     };
 
     // --- PROFILES ---
-    const updateProfile = (updates) => {
-        setCurrentUser(prev => ({ ...prev, ...updates }));
+    const updateProfile = async (updates) => {
+        const res = await apiService.updateUserProfile(updates);
+        if (res.success) {
+            setCurrentUser(res.data);
+            showToast('Profile updated!', 'success');
+            return true;
+        } else {
+            showToast(res.error || 'Profile update failed', 'error');
+            return false;
+        }
     };
 
     const updateSubscription = (plan) => {

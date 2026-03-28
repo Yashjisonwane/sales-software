@@ -7,6 +7,8 @@ import Contact from './pages/Contact'; // Added
 import JobDetails from './pages/JobDetails';
 import FindServices from './pages/FindServices'; // Added
 import BecomeProfessional from './pages/BecomeProfessional'; // Added
+import AboutUs from './pages/AboutUs';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import ScrollToTop from './components/ScrollToTop';
 import './App.css';
 
@@ -24,6 +26,8 @@ function App() {
             <Route path="/job-details" element={<JobDetails />} />
             <Route path="/find-services" element={<FindServices />} />
             <Route path="/become-professional" element={<BecomeProfessional />} />
+            <Route path="/about-us" element={<AboutUs />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="*" element={<Home />} />
           </Routes>
         </main>

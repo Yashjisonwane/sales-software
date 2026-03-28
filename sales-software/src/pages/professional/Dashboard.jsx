@@ -21,22 +21,40 @@ import LeadDetailModal from '../../components/professional/LeadDetailModal';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-    const { leads, assignments, currentUser, respondToLead, showToast } = useMarketplace();
+    const { leads, assignments, currentUser, respondToLead, showToast, dashboardStats } = useMarketplace();
     const navigate = useNavigate();
     const [selectedLead, setSelectedLead] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    // Stats calculation
+    // Filter assignments once for internal logic (map, leads etc)
     const proAssignments = assignments.filter(a => a.professionalId === currentUser.id);
-    const newLeadsToday = proAssignments.filter(a => a.status === 'Sent').length;
-    const totalLeads = proAssignments.length;
-    const acceptedLeads = proAssignments.filter(a => a.status === 'Accepted').length;
 
-    const stats = [
-        { name: 'New Leads Today', value: newLeadsToday, icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%', up: true },
-        { name: 'Total Leads', value: totalLeads, icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+8%', up: true },
-        { name: 'Accepted Leads', value: acceptedLeads, icon: ListChecks, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%', up: true },
-        { name: 'Conversion Rate', value: '64%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+2%', up: true },
+    // Icons Mapping
+    const statIcons = {
+        'New Jobs Today': Zap,
+        'Total Assigned': Briefcase,
+        'Accepted Jobs': ListChecks,
+        'Completed Tasks': TrendingUp
+    };
+
+    const statColors = {
+        'New Jobs Today': 'text-blue-600 bg-blue-50',
+        'Total Assigned': 'text-indigo-600 bg-indigo-50',
+        'Accepted Jobs': 'text-emerald-600 bg-emerald-50',
+        'Completed Tasks': 'text-purple-600 bg-purple-50'
+    };
+
+    // Use Dashboard Stats from API if available, else fallback to locally calculated basics
+    const stats = (dashboardStats && dashboardStats.length > 0) ? dashboardStats.map(s => ({
+        ...s,
+        icon: statIcons[s.name] || Zap,
+        color: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[0],
+        bg: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[1]
+    })) : [
+        { name: 'New Leads Today', value: proAssignments.filter(a => a.status === 'Sent' || a.status === 'Viewed').length, icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%', up: true },
+        { name: 'Total Leads', value: proAssignments.length, icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+8%', up: true },
+        { name: 'Accepted Leads', value: proAssignments.filter(a => a.status === 'Accepted').length, icon: ListChecks, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%', up: true },
+        { name: 'Conversion Rate', value: '0%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+0%', up: true },
     ];
 
     // Leads for map - combine lead data with assignment status
@@ -53,7 +71,11 @@ const Dashboard = () => {
         .slice(0, 10)
         .map(l => {
             const assignment = proAssignments.find(a => a.leadId === l.id);
-            return { ...l, assignmentStatus: assignment?.status || 'Sent' };
+            return { 
+                ...l, 
+                assignmentStatus: assignment?.status || 'Sent',
+                assignmentId: assignment?.id // Real Job UUID
+            };
         });
 
     const handleAction = (type, lead) => {

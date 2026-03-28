@@ -70,14 +70,7 @@ const AdminLayout = () => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-                        {/* Demo Role Switcher */}
-                        <button 
-                            onClick={() => navigate('/professional/dashboard')}
-                            className="hidden xs:flex items-center gap-2 px-3 py-1.5 bg-slate-900/5 hover:bg-slate-900/10 text-slate-600 rounded-full border border-slate-200 transition-all active:scale-95"
-                        >
-                            <Briefcase size={14} className="text-blue-600" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Pro Dashboard</span>
-                        </button>
+
 
                         <button
                             className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"

@@ -27,18 +27,29 @@ const AdminLeads = () => {
                 lead.displayId.toLowerCase().includes(searchLower) ||
                 lead.id.toLowerCase().includes(searchLower);
 
-            const matchStatus = statusFilter === 'All' || lead.status === statusFilter;
+            const status = lead.status?.toUpperCase();
+            let matchStatus = statusFilter === 'All';
+            
+            if (statusFilter === 'New') matchStatus = status === 'OPEN' || status === 'NEW';
+            else if (statusFilter === 'Assigned') matchStatus = status === 'ASSIGNED';
+            else if (statusFilter === 'Accepted') matchStatus = status === 'ACCEPTED';
+            else if (statusFilter === 'Completed') matchStatus = status === 'COMPLETED';
+            else if (statusFilter === 'Closed') matchStatus = status === 'CLOSED';
+            else if (statusFilter !== 'All') matchStatus = status === statusFilter.toUpperCase();
+
             return matchSearch && matchStatus;
         });
     }, [leads, searchTerm, statusFilter]);
 
     const getStatusColor = (status) => {
-        switch (status) {
-            case 'New': return 'bg-blue-100 text-blue-700 border border-blue-200';
-            case 'Assigned': return 'bg-indigo-100 text-indigo-700 border border-indigo-200';
-            case 'Accepted': return 'bg-amber-100 text-amber-700 border border-amber-200';
-            case 'Completed': return 'bg-green-100 text-green-700 border border-green-200';
-            case 'Closed': return 'bg-gray-100 text-gray-700 border border-gray-200';
+        const s = status?.toUpperCase();
+        switch (s) {
+            case 'NEW':
+            case 'OPEN': return 'bg-blue-100 text-blue-700 border border-blue-200';
+            case 'ASSIGNED': return 'bg-indigo-100 text-indigo-700 border border-indigo-200';
+            case 'ACCEPTED': return 'bg-amber-100 text-amber-700 border border-amber-200';
+            case 'COMPLETED': return 'bg-green-100 text-green-700 border border-green-200';
+            case 'CLOSED': return 'bg-gray-100 text-gray-700 border border-gray-200';
             default: return 'bg-gray-100 text-gray-600 border border-gray-200';
         }
     };
@@ -137,7 +148,9 @@ const AdminLeads = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-50 bg-white">
                             {filtered.map(lead => {
-                                const acceptedPro = professionals.find(p => p.id === lead.assignedTo);
+                                // Find if there's a job for this lead to show who it's assigned to
+                                const assignment = lead.job || null;
+                                const acceptedPro = professionals.find(p => p.id === (assignment?.workerId || assignment?.professionalId));
                                 return (
                                     <tr key={lead.id} className="hover:bg-blue-50/30 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{lead.displayId}</td>
@@ -187,7 +200,8 @@ const AdminLeads = () => {
                 {/* Mobile Card Layout */}
                 <div className="sm:hidden divide-y divide-gray-100">
                     {filtered.map(lead => {
-                        const acceptedPro = professionals.find(p => p.id === lead.assignedTo);
+                        const assignment = lead.job || null;
+                        const acceptedPro = professionals.find(p => p.id === (assignment?.workerId || assignment?.professionalId));
                         return (
                             <div key={lead.id} className="p-5 space-y-4 hover:bg-gray-50/50 transition-colors">
                                 <div className="flex justify-between items-start">

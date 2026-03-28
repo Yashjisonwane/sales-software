@@ -18,7 +18,7 @@ const BLANK_PRO = {
     trackingEnabled: false, lat: '', lng: ''
 };
 
-const CATEGORIES = ['Plumbing', 'Electrical', 'Cleaning', 'HVAC', 'Roofing', 'Painting', 'Handyman', 'Landscaping'];
+const CATEGORIES = ['General', 'Plumbing', 'Electrical', 'Cleaning', 'HVAC', 'Roofing', 'Painting', 'Handyman', 'Landscaping'];
 
 const categoryIcons = {
     'Plumbing': Wrench,
@@ -76,9 +76,10 @@ const AdminProfessionals = () => {
     const [searchParams] = useSearchParams();
     const querySearch = searchParams.get('search') || '';
 
-    const { professionals, addProfessional, editProfessional, removeProfessional } = useMarketplace();
+    const { professionals, addProfessional, editProfessional, removeProfessional, categories, addCategory } = useMarketplace();
     const [searchTerm, setSearchTerm] = useState(querySearch);
     const [statusFilter, setStatusFilter] = useState('All');
+    const [categoryFilter, setCategoryFilter] = useState('All Categories');
     const [modalMode, setModalMode] = useState(null); // null | 'add' | 'edit'
     const [formData, setFormData] = useState(BLANK_PRO);
     const [formErrors, setFormErrors] = useState({});
@@ -87,8 +88,12 @@ const AdminProfessionals = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedPro, setSelectedPro] = useState(null);
     
-    // Category management
-    const [availableCategories, setAvailableCategories] = useState(CATEGORIES);
+    // Category management — Combine database categories with defaults and sort alphabetically
+    const availableCategories = Array.from(new Set([
+        ...CATEGORIES, 
+        ...(categories || []).map(c => c.name)
+    ])).sort();
+    
     const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
     // Sync search term if query param changes
@@ -101,18 +106,31 @@ const AdminProfessionals = () => {
     // ── Filtering ─────────────────────────────────────────────
     const filtered = professionals.filter(pro => {
         const terms = searchTerm.toLowerCase();
-        const matchSearch = pro.name.toLowerCase().includes(terms) ||
-            pro.category.toLowerCase().includes(terms) ||
-            pro.location.toLowerCase().includes(terms);
-        const matchStatus = statusFilter === 'All' || pro.status === statusFilter;
-        return matchSearch && matchStatus;
+        const matchSearch = (pro.name || '').toLowerCase().includes(terms) ||
+            (pro.category || '').toLowerCase().includes(terms) ||
+            (pro.location || '').toLowerCase().includes(terms);
+        
+        const jobStatus = (pro.status || '').toUpperCase();
+        const filterStatus = statusFilter.toUpperCase();
+        
+        let matchStatus = statusFilter === 'All';
+        if (!matchStatus) {
+            if (statusFilter === 'Suspended') {
+                matchStatus = ['SUSPENDED', 'OFFLINE'].includes(jobStatus);
+            } else {
+                matchStatus = jobStatus === filterStatus;
+            }
+        }
+        
+        const matchCategory = categoryFilter === 'All Categories' || pro.category === categoryFilter;
+        
+        return matchSearch && matchStatus && matchCategory;
     });
 
     const counts = {
         All: professionals.length,
-        Active: professionals.filter(p => p.status === 'Active').length,
-        Suspended: professionals.filter(p => p.status === 'Suspended').length,
-        Pending: professionals.filter(p => p.status === 'Pending').length,
+        Active: professionals.filter(p => (p.status || '').toUpperCase() === 'ACTIVE').length,
+        Suspended: professionals.filter(p => ['SUSPENDED', 'OFFLINE'].includes((p.status || '').toUpperCase())).length,
     };
 
     // ── Toast ─────────────────────────────────────────────────
@@ -174,11 +192,10 @@ const AdminProfessionals = () => {
         return Object.keys(errors).length === 0;
     };
 
-    const handleQuickAddCategory = (categoryData) => {
+    const handleQuickAddCategory = async (categoryData) => {
         if (!availableCategories.includes(categoryData.name)) {
-            setAvailableCategories(prev => [...prev, categoryData.name]);
+            await addCategory(categoryData);
             setFormData(prev => ({ ...prev, category: categoryData.name }));
-            showToast(`✨ ${categoryData.name} added and selected!`, 'info');
         }
         setIsCategoryModalOpen(false);
     };
@@ -225,11 +242,13 @@ const AdminProfessionals = () => {
         }
     };
 
-    const statusColor = (s) => ({
-        Active: 'bg-green-100 text-green-700 border border-green-200',
-        Suspended: 'bg-red-100 text-red-700 border border-red-200',
-        Pending: 'bg-yellow-100 text-yellow-700 border border-yellow-200',
-    }[s] || 'bg-gray-100 text-gray-600');
+    const statusColor = (s) => {
+        const status = (s || '').toUpperCase();
+        if (['SUSPENDED', 'OFFLINE'].includes(status)) return 'bg-red-100 text-red-700 border border-red-200';
+        if (status === 'ACTIVE') return 'bg-green-100 text-green-700 border border-green-200';
+        if (status === 'PENDING') return 'bg-yellow-100 text-yellow-700 border border-yellow-200';
+        return 'bg-gray-100 text-gray-600';
+    };
 
     return (
         <div className="space-y-6">
@@ -346,6 +365,7 @@ const AdminProfessionals = () => {
                                 <Field label="Phone" name="phone" type="tel" required value={formData.phone} error={formErrors.phone} onChange={handleField} />
                                 <Field label="Email" name="email" type="email" required value={formData.email} error={formErrors.email} onChange={handleField} />
                             </div>
+                            <Field label="Performance Rating (0-5)" name="rating" type="number" step="0.1" max="5" min="0" value={formData.rating} error={formErrors.rating} onChange={handleField} />
 
                             {modalMode === 'add' && (
                                 <div className="grid grid-cols-2 gap-4">
@@ -382,7 +402,6 @@ const AdminProfessionals = () => {
                                 </Field>
                                 <Field label="Status" name="status" as="select" value={formData.status} onChange={handleField}>
                                     <option>Active</option>
-                                    <option>Pending</option>
                                     <option>Suspended</option>
                                 </Field>
                             </div>
@@ -434,8 +453,23 @@ const AdminProfessionals = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
+                
+                {/* Category Dropdown */}
+                <div className="shrink-0">
+                    <select
+                        className="w-full md:w-48 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                    >
+                        <option>All Categories</option>
+                        {availableCategories.map(cat => (
+                            <option key={cat}>{cat}</option>
+                        ))}
+                    </select>
+                </div>
+
                 <div className="flex gap-2 shrink-0 flex-wrap">
-                    {['All', 'Active', 'Suspended', 'Pending'].map(s => (
+                    {['All', 'Active', 'Suspended'].map(s => (
                         <button key={s} onClick={() => setStatusFilter(s)}
                             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 ${statusFilter === s ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
                                 }`}>
@@ -484,13 +518,22 @@ const AdminProfessionals = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pro.location}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="flex items-center gap-1 text-sm font-bold text-gray-800">
-                                            <Star size={14} className="text-yellow-400 fill-current" />
-                                            {pro.rating || '—'}
-                                        </div>
-                                    </td>
+                                        <div className="flex items-center gap-2">
+                                             <div className="flex items-center gap-0.5">
+                                                 {[1, 2, 3, 4, 5].map(star => (
+                                                     <Star 
+                                                         key={star} 
+                                                         size={12} 
+                                                         className={`${star <= Math.round(pro.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-100'}`} 
+                                                     />
+                                                 ))}
+                                             </div>
+                                         </div>
+                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${statusColor(pro.status)}`}>{pro.status}</span>
+                                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${statusColor(pro.status)}`}>
+                                            {(pro.status || '').toUpperCase() === 'OFFLINE' || (pro.status || '').toUpperCase() === 'SUSPENDED' ? 'Suspended' : pro.status}
+                                        </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -565,7 +608,9 @@ const AdminProfessionals = () => {
                                     <p className="text-sm font-bold text-gray-900 truncate">{pro.name}</p>
                                     <p className="text-xs text-gray-400">{pro.completedJobs} Jobs • {pro.subscriptionPlan || 'Starter'}</p>
                                 </div>
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${statusColor(pro.status)}`}>{pro.status}</span>
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${statusColor(pro.status)}`}>
+                                    {(pro.status || '').toUpperCase() === 'OFFLINE' || (pro.status || '').toUpperCase() === 'SUSPENDED' ? 'Suspended' : pro.status}
+                                </span>
                             </div>
 
                             {/* Card Info Grid */}
@@ -589,9 +634,14 @@ const AdminProfessionals = () => {
                                 </div>
                                 <div className="bg-gray-50 rounded-xl px-3 py-2">
                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-0.5">Rating</p>
-                                    <div className="flex items-center gap-1">
-                                        <Star size={13} className="text-yellow-400 fill-current" />
-                                        <p className="text-sm font-bold text-gray-800">{pro.rating || '—'}</p>
+                                    <div className="flex items-center gap-0.5 mt-0.5">
+                                        {[1, 2, 3, 4, 5].map(star => (
+                                            <Star 
+                                                key={star} 
+                                                size={10} 
+                                                className={`${star <= Math.round(pro.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-100'}`} 
+                                            />
+                                        ))}
                                     </div>
                                 </div>
                             </div>
