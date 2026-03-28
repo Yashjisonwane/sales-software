@@ -1,22 +1,15 @@
-import React, { useState } from 'react';
-import { MapPin, Plus, Edit, Trash2 } from 'lucide-react';
-import { AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MapPin, Plus, Edit, Trash2, Loader2, X, AlertCircle, Sparkles } from 'lucide-react';
 import AddLocationModal from '../../components/locations/AddLocationModal';
 import EditLocationModal from '../../components/locations/EditLocationModal';
 import LocationDetailsModal from '../../components/locations/LocationDetailsModal';
 import ConfirmationModal from '../../components/ConfirmationModal';
-
-const MOCK_LOCATIONS = [
-    { id: 1, city: 'Los Angeles', state: 'CA', country: 'USA', professionals: 42, leads: 89, status: 'Active' },
-    { id: 2, city: 'New York', state: 'NY', country: 'USA', professionals: 67, leads: 134, status: 'Active' },
-    { id: 3, city: 'Chicago', state: 'IL', country: 'USA', professionals: 31, leads: 61, status: 'Active' },
-    { id: 4, city: 'Houston', state: 'TX', country: 'USA', professionals: 28, leads: 55, status: 'Active' },
-    { id: 5, city: 'Phoenix', state: 'AZ', country: 'USA', professionals: 22, leads: 43, status: 'Inactive' },
-    { id: 6, city: 'Philadelphia', state: 'PA', country: 'USA', professionals: 19, leads: 38, status: 'Active' },
-];
+import { fetchAllLocations, createLocation, removeLocation } from '../../services/apiService';
 
 const AdminLocations = () => {
-    const [locations, setLocations] = useState(MOCK_LOCATIONS);
+    const [locations, setLocations] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [toast, setToast] = useState(null);
 
     // Modal states
     const [showAddModal, setShowAddModal] = useState(false);
@@ -25,10 +18,37 @@ const AdminLocations = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState(null);
 
+    useEffect(() => {
+        loadLocations();
+    }, []);
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const loadLocations = async () => {
+        setLoading(true);
+        const res = await fetchAllLocations();
+        if (res.success) {
+            setLocations(res.data);
+        } else {
+            showToast(res.error || 'Failed to fetch locations', 'error');
+        }
+        setLoading(false);
+    };
+
     // ── Handlers ──────────────────────────────────────────────
 
-    const handleAddLocation = (newLocation) => {
-        setLocations(prev => [...prev, newLocation]);
+    const handleAddLocation = async (locData) => {
+        const res = await createLocation(locData);
+        if (res.success) {
+            showToast(`📍 ${locData.city} added to service areas!`, 'success');
+            loadLocations();
+            setShowAddModal(false);
+        } else {
+            showToast(res.error || 'Failed to add location', 'error');
+        }
     };
 
     const handleCardClick = (loc) => {
@@ -43,7 +63,9 @@ const AdminLocations = () => {
     };
 
     const handleSaveEdit = (updatedLocation) => {
+        // UI only update for now or add API if exists
         setLocations(prev => prev.map(l => l.id === updatedLocation.id ? updatedLocation : l));
+        setShowEditModal(false);
     };
 
     const handleDeleteClick = (e, loc) => {
@@ -52,9 +74,17 @@ const AdminLocations = () => {
         setShowDeleteConfirm(true);
     };
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (selectedLocation) {
-            setLocations(prev => prev.filter(l => l.id !== selectedLocation.id));
+            const res = await removeLocation(selectedLocation.id);
+            if (res.success) {
+                showToast(`🗑️ Service area removed.`, 'error');
+                loadLocations();
+            } else {
+                showToast(res.error || 'Could not remove area', 'error');
+            }
+            setShowDeleteConfirm(false);
+            setSelectedLocation(null);
         }
     };
 
@@ -66,10 +96,23 @@ const AdminLocations = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed top-5 right-5 z-[100] px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 ${
+                    toast.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+                } text-white font-bold text-sm`}>
+                    {toast.type === 'error' ? <AlertCircle size={18} /> : <Sparkles size={18} />}
+                    {toast.message}
+                    <button onClick={() => setToast(null)} className="ml-2 hover:rotate-90 transition-transform">
+                        <X size={16} />
+                    </button>
+                </div>
+            )}
+
             <div className="flex justify-between items-end">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Marketplace Locations</h1>
-                    <p className="text-base text-gray-500 mt-1 font-medium">Manage active service areas and professional density.</p>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Marketplace Locations</h1>
+                    <p className="text-base text-gray-500 mt-1 font-medium font-sans">Manage active service areas and professional density.</p>
                 </div>
                 <button
                     onClick={() => setShowAddModal(true)}
@@ -79,64 +122,75 @@ const AdminLocations = () => {
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {locations.map(loc => (
-                    <div
-                        key={loc.id}
-                        onClick={() => handleCardClick(loc)}
-                        className="bg-white rounded-[2rem] border border-gray-100 p-7 hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden"
+            {loading ? (
+                <div className="h-64 flex flex-col items-center justify-center text-gray-400 gap-3">
+                    <Loader2 className="animate-spin text-blue-600" size={32} />
+                    <p className="font-bold text-sm uppercase tracking-widest italic">Mapping Territories...</p>
+                </div>
+            ) : locations.length === 0 ? (
+                <div className="h-64 flex flex-col items-center justify-center bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200 gap-3">
+                    <MapPin className="text-gray-300" size={48} />
+                    <p className="font-bold text-gray-500 italic">No service areas active. Expand your reach!</p>
+                    <button 
+                        onClick={() => setShowAddModal(true)}
+                        className="text-blue-600 font-bold hover:underline"
                     >
-                        <div className="flex items-start justify-between mb-6">
-                            <div className="flex items-center gap-4">
-                                <div className="p-4 rounded-2xl bg-orange-50 text-orange-500 shadow-inner border border-white">
-                                    <MapPin size={24} />
+                        + Define New Market Location
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {locations.map(loc => (
+                        <div
+                            key={loc.id}
+                            onClick={() => handleCardClick(loc)}
+                            className="bg-white rounded-[2rem] border border-gray-100 p-7 hover:shadow-xl transition-all cursor-pointer group relative overflow-hidden"
+                        >
+                            <div className="flex items-start justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-4 rounded-2xl bg-orange-50 text-orange-500 shadow-inner border border-white group-hover:bg-orange-600 group-hover:text-white transition-all transform group-hover:scale-110">
+                                        <MapPin size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-900 text-lg tracking-tight group-hover:text-blue-600 transition-colors uppercase italic">{loc.city}</h3>
+                                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{loc.state}, {loc.country || 'USA'}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-900 text-lg tracking-tight">{loc.city}</h3>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">{loc.state}, {loc.country || 'USA'}</p>
+                                <div className="flex flex-col items-end gap-2">
+                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyle(loc.status)}`}>
+                                        {loc.status || 'Active'}
+                                    </span>
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={(e) => handleEditClick(e, loc)}
+                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-blue-100"
+                                            title="Edit"
+                                        >
+                                            <Edit size={16} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDeleteClick(e, loc)}
+                                            className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-rose-100"
+                                            title="Delete"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end gap-2">
-                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusStyle(loc.status)}`}>
-                                    {loc.status || 'Active'}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={(e) => handleEditClick(e, loc)}
-                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-blue-100"
-                                        title="Edit"
-                                    >
-                                        <Edit size={16} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => handleDeleteClick(e, loc)}
-                                        className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all shadow-sm border border-transparent hover:border-rose-100"
-                                        title="Delete"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+
+                            <div className="grid grid-cols-2 gap-4 p-5 bg-gray-50/50 rounded-3xl border border-gray-100 mb-2">
+                                <div className="text-center">
+                                    <p className="text-lg font-bold text-gray-900 leading-none mb-1.5">{loc.professionals || 0}</p>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Professionals</p>
+                                </div>
+                                <div className="text-center border-l border-gray-100">
+                                    <p className="text-lg font-bold text-gray-900 leading-none mb-1.5">{loc.activeLeads || 0}</p>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Leads</p>
                                 </div>
                             </div>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-4 p-5 bg-gray-50/50 rounded-3xl border border-gray-100 mb-2">
-                            <div className="text-center">
-                                <p className="text-lg font-bold text-gray-900 leading-none mb-1.5">{loc.professionals}</p>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Professionals</p>
-                            </div>
-                            <div className="text-center border-l border-gray-100">
-                                <p className="text-lg font-bold text-gray-900 leading-none mb-1.5">{loc.leads}</p>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Leads</p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {locations.length === 0 && (
-                <div className="text-center py-16 text-gray-400">
-                    <MapPin size={48} className="mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">No locations added yet.</p>
+                    ))}
                 </div>
             )}
 

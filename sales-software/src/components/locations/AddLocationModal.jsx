@@ -21,18 +21,15 @@ const AddLocationModal = ({ isOpen, onClose, onAdd }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const newLocation = {
-            id: Date.now(),
+        const payload = {
+            name: form.city, // Backend requires name, using city as display name
             city: form.city,
-            state: form.state,
+            state: form.state || '',
             country: form.country || 'USA',
-            professionals: parseInt(form.professionals) || 0,
-            leads: parseInt(form.leads) || 0,
             status: form.status,
         };
-        onAdd(newLocation);
+        onAdd(payload);
         setForm(initialForm);
-        onClose();
     };
 
     return (

@@ -148,7 +148,7 @@ const AdminJobs = () => {
                                     className="group hover:bg-blue-50/20 transition-colors border-b border-gray-50 last:border-0"
                                 >
                                     <td className="px-6 py-4">
-                                        <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200">{job.id}</span>
+                                        <span className="text-xs font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200">{job.displayId}</span>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -411,7 +411,7 @@ const AdminJobs = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-xl font-bold text-gray-800">Review Job Record</h2>
-                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{viewData.id}</p>
+                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{viewData.displayId}</p>
                                 </div>
                             </div>
                             <button 

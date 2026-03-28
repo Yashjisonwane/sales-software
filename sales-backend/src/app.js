@@ -6,6 +6,8 @@ const authRoutes = require('./routes/authRoutes');
 const leadRoutes = require('./routes/leadRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const userRoutes = require('./routes/userRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
+const locationRoutes = require('./routes/locationRoutes');
 
 const app = express();
 
@@ -18,6 +20,8 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/leads', leadRoutes);
 app.use('/api/v1/jobs', jobRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/categories', categoryRoutes);
+app.use('/api/v1/locations', locationRoutes);
 
 // Health Check Route
 app.get('/api/v1/health', (req, res) => {

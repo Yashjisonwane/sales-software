@@ -12,7 +12,11 @@ export const MarketplaceProvider = ({ children }) => {
     const [leads, setLeads] = useState([]);
     const [jobs, setJobs] = useState([]);
     const [professionals, setProfessionals] = useState([]);
-    const [assignments, setAssignments] = useState([]); // Can be derived from leads in backend or kept for compatibility
+    const [categories, setCategories] = useState([]);
+    const [locations, setLocations] = useState([]);
+    const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+    const [assignments, setAssignments] = useState([]);
+    const [dashboardStats, setDashboardStats] = useState(null);
 
     // ─── UI & MOCK STATES (Preserved for Admin Demo functionality) ───
     const [reviews, setReviews] = useState([]);
@@ -79,6 +83,7 @@ export const MarketplaceProvider = ({ children }) => {
                 // Flatten the data for easier UI consumption
                 const flattenedLeads = (leadsRes.data || []).map(l => ({
                     ...l,
+                    displayId: `LD-${l.id.slice(-4).toUpperCase()}`, // Clean Display ID
                     customerName: l.customer?.name || 'Unknown Customer',
                     customerPhone: l.customer?.phone || '',
                     serviceCategory: l.category?.name || 'General Service',
@@ -92,6 +97,7 @@ export const MarketplaceProvider = ({ children }) => {
                 // Flatten Jobs data for consume (Job -> lead -> customer)
                 const flattenedJobs = (jobsRes.data || []).map(j => ({
                     ...j,
+                    displayId: `JB-${j.id.slice(-4).toUpperCase()}`, // Clean Display ID
                     customerName: j.customer?.name || 'Customer',
                     category: j.categoryName || 'General',
                     date: j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString() : 'Today',
@@ -102,7 +108,26 @@ export const MarketplaceProvider = ({ children }) => {
             }
 
             const profRes = await apiService.fetchAllProfessionals();
-            if (profRes.success) setProfessionals(profRes.data);
+            if (profRes.success) {
+                const workers = (profRes.data || []).map(w => ({
+                    ...w,
+                    location: w.city || w.address || '—', // Use city or address for display
+                    status: w.status || (w.isAvailable ? 'Active' : 'Offline')
+                }));
+                setProfessionals(workers); 
+            }
+
+            const catRes = await apiService.fetchAllCategories();
+            if (catRes.success) setCategories(catRes.data);
+
+            const locRes = await apiService.fetchAllLocations();
+            if (locRes.success) setLocations(locRes.data);
+
+            const subRes = await apiService.fetchAllSubscriptions();
+            if (subRes.success) setSubscriptionPlans(subRes.data);
+
+            const statsRes = await apiService.fetchDashboardStats();
+            if (statsRes.success) setDashboardStats(statsRes.data);
         } catch (error) {
             console.error('Initial Data Load Error:', error);
             showToast('Failed to load live data', 'error');
@@ -136,17 +161,39 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    const updateLead = (leadId, updates) => {
-        // Mock fallback for UI states not yet in Database
-        setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...updates } : l));
+    const updateLead = async (leadId, updates) => {
+        const res = await apiService.updateLead(leadId, updates);
+        if (res.success) {
+            showToast('Lead updated successfully!', 'success');
+            loadInitialData();
+        } else {
+            showToast(res.error || 'Update failed', 'error');
+        }
     };
 
-    const deleteLead = (leadId) => {
-        // Mock fallback for UI states not yet in Database
-        setLeads(prev => prev.filter(l => l.id !== leadId));
+    const deleteLead = async (leadId) => {
+        const res = await apiService.deleteLead(leadId);
+        if (res.success) {
+            showToast('Lead deleted successfully!', 'success');
+            loadInitialData();
+        } else {
+            showToast(res.error || 'Deletion failed', 'error');
+        }
     };
 
     // --- JOBS & WORKFLOW ---
+    const addJob = async (jobData) => {
+        const res = await apiService.createJob(jobData);
+        if (res.success) {
+            showToast('Job created successfully!', 'success');
+            loadInitialData();
+            return res.data;
+        } else {
+            showToast(res.error || 'Failed to create job', 'error');
+            return null;
+        }
+    };
+
     const startJob = (jobId) => {
         // Backend handles this via Photo Upload mapping automatically 
         showToast('Initiating Job in Backend...', 'info');
@@ -157,17 +204,33 @@ export const MarketplaceProvider = ({ children }) => {
         setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'Completed' } : j));
     };
 
-    const deleteJob = (jobId) => {
-        setJobs(prev => prev.filter(j => j.id !== jobId));
+    const deleteJob = async (jobId) => {
+        const res = await apiService.deleteJob(jobId);
+        if (res.success) {
+            showToast('Job record deleted', 'success');
+            setJobs(prev => prev.filter(j => j.id !== jobId));
+            loadInitialData();
+        } else {
+            showToast(res.error || 'Failed to delete job', 'error');
+        }
     };
 
-    const updateJob = (jobId, updates) => {
-        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, ...updates } : j));
-        showToast('Job updated locally', 'success');
+    const updateJob = async (jobId, updates) => {
+        const res = await apiService.updateJob(jobId, updates);
+        if (res.success) {
+            showToast('Job record updated!', 'success');
+            loadInitialData();
+        } else {
+            showToast(res.error || 'Update failed', 'error');
+        }
     };
 
-    const updateJobStatus = (jobId, newStatus) => {
-        setJobs(prev => prev.map(l => l.id === jobId ? { ...l, status: newStatus } : l));
+    const updateJobStatus = async (jobId, newStatus) => {
+        const res = await apiService.updateJob(jobId, { status: newStatus });
+        if (res.success) {
+            showToast('Status changed', 'info');
+            loadInitialData();
+        }
     };
 
     // --- ASSIGNMENT RESPONSES ---
@@ -193,15 +256,104 @@ export const MarketplaceProvider = ({ children }) => {
         setCurrentUser(prev => ({ ...prev, status: 'Inactive' }));
     };
 
-    // --- LIVE TRACKING & LOCATION LOGIC ---
-    const updateProfessionalLocation = (proId, lat, lng) => {};
-    const updateProfessionalStatus = (proId, status) => {};
-    const toggleTrackingSetting = (proId, enabled) => {};
+    // --- PROFESSIONAL TRACKING & FLEET ---
+    const updateProfessionalLocation = async (lat, lng) => {
+        const res = await apiService.updateProfessionalLocation(lat, lng);
+        if (res.success) {
+            setProfessionals(prev => prev.map(p => p.id === currentUser?.id ? { ...p, lastLocation: { lat, lng } } : p));
+            return res;
+        }
+        return res;
+    };
+
+    const updateProfessionalStatus = async (isAvailable) => {
+        const res = await apiService.updateProfessionalStatus(isAvailable);
+        if (res.success) {
+            setProfessionals(prev => prev.map(p => p.id === currentUser?.id ? { ...p, isAvailable, onlineStatus: isAvailable ? 'Online' : 'Offline' } : p));
+            return res;
+        }
+        return res;
+    };
+
+    const addProfessional = async (userData) => {
+        const res = await apiService.createProfessional(userData);
+        if (res.success) {
+            showToast('Professional added successfully!', 'success');
+            loadInitialData();
+            return res.data;
+        } else {
+            showToast(res.error || 'Failed to add professional', 'error');
+            return null;
+        }
+    };
+
+    const editProfessional = async (id, userData) => {
+        const res = await apiService.updateProfessional(id, userData);
+        if (res.success) {
+            showToast('Professional record updated', 'success');
+            loadInitialData();
+            return res.data;
+        } else {
+            showToast(res.error || 'Failed to update', 'error');
+            return null;
+        }
+    };
+
+    const removeProfessional = async (id) => {
+        const res = await apiService.deleteProfessional(id);
+        if (res.success) {
+            showToast('Professional removed from database', 'success');
+            loadInitialData();
+            return true;
+        } else {
+            showToast(res.error || 'Deletion failed', 'error');
+            return false;
+        }
+    };
+
+    const toggleTrackingSetting = (enabled) => {
+        showToast(`Tracking ${enabled ? 'Enabled' : 'Disabled'}`, 'info');
+    };
+
+    // --- CATEGORIES ---
+    const addCategory = async (data) => {
+        const res = await apiService.addCategory(data);
+        if (res.success) {
+            showToast('Category added successfully!', 'success');
+            loadInitialData();
+        } else {
+            showToast(res.error, 'error');
+        }
+    };
+
+    const editCategory = async (id, data) => {
+        const res = await apiService.updateCategory(id, data);
+        if (res.success) {
+            showToast('Category updated!', 'success');
+            loadInitialData();
+        } else {
+            showToast(res.error, 'error');
+        }
+    };
+
+    const deleteCategory = async (id) => {
+        const res = await apiService.deleteCategory(id);
+        if (res.success) {
+            showToast('Category deleted!', 'success');
+            loadInitialData();
+        } else {
+            showToast(res.error, 'error');
+        }
+    };
 
     return (
         <MarketplaceContext.Provider value={{
             leads,
             professionals,
+            addProfessional,
+            editProfessional,
+            removeProfessional,
+            categories,
             assignments,
             reviews,
             notifications,
@@ -219,17 +371,23 @@ export const MarketplaceProvider = ({ children }) => {
             jobs,
             startJob,
             completeJob,
-            addJob: () => showToast('Job added directly is strictly disabled to prevent workflow bypassing.', 'error'),
+            addJob,
             deleteJob,
             updateJob,
             updateJobStatus,
             addNotification,
             markNotificationRead,
+            addCategory,
+            editCategory,
+            deleteCategory,
             setCurrentUser,
             updateProfile,
             updateSubscription,
             deactivateAccount,
             locationLogs,
+            dashboardStats,
+            locations,
+            subscriptionPlans,
             updateProfessionalLocation,
             updateProfessionalStatus,
             toggleTrackingSetting,

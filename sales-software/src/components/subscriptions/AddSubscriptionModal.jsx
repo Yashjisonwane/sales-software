@@ -11,11 +11,18 @@ const initialForm = {
     featureList: []
 };
 
-const AddSubscriptionModal = ({ isOpen, onClose, onAdd, plans = [] }) => {
+const AddSubscriptionModal = ({ isOpen, onClose, onAdd, plans = [], professionals = [] }) => {
     const [form, setForm] = useState(initialForm);
     const [newFeature, setNewFeature] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     if (!isOpen) return null;
+
+    const suggestions = professionals.filter(p => 
+        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        p.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    ).slice(0, 5);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -34,19 +41,15 @@ const AddSubscriptionModal = ({ isOpen, onClose, onAdd, plans = [] }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        const newSub = {
-            id: `SUB-${Date.now()}`,
+        const payload = {
             name: form.professional,
             business: form.business,
             plan: form.plan,
-            amount: form.amount,
-            date: form.date || new Date().toISOString().slice(0, 10),
             status: form.status,
-            featureList: form.featureList
+            date: form.date || new Date().toISOString().slice(0, 10),
         };
-        onAdd(newSub);
+        onAdd(payload);
         setForm(initialForm);
-        onClose();
     };
 
     return (
@@ -69,11 +72,39 @@ const AddSubscriptionModal = ({ isOpen, onClose, onAdd, plans = [] }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-8 pb-8 pt-4 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Professional Name *</label>
-                        <input name="professional" value={form.professional} onChange={handleChange} required
+                    <div className="relative">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Search Professional *</label>
+                        <input 
+                            name="professional" 
+                            value={form.professional} 
+                            onChange={(e) => {
+                                handleChange(e);
+                                setSearchTerm(e.target.value);
+                                setShowSuggestions(true);
+                            }} 
+                            required
+                            onFocus={() => setShowSuggestions(true)}
                             className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="Full name of the professional" />
+                            placeholder="Type name (must match a real professional)..." 
+                        />
+                        {showSuggestions && searchTerm && suggestions.length > 0 && (
+                            <div className="absolute z-[130] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden py-1">
+                                {suggestions.map(p => (
+                                    <div 
+                                        key={p.id}
+                                        onClick={() => {
+                                            setForm(prev => ({ ...prev, professional: p.name }));
+                                            setSearchTerm(p.name);
+                                            setShowSuggestions(false);
+                                        }}
+                                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                                    >
+                                        <div className="text-sm font-bold text-gray-900">{p.name}</div>
+                                        <div className="text-[10px] text-gray-400">{p.email}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div>

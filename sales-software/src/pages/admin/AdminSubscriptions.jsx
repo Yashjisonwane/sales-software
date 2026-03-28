@@ -1,52 +1,23 @@
 import React, { useState } from 'react';
 import { Zap, Shield, Crown, CreditCard, Plus, Edit, Trash2, XCircle, AlertCircle, Check } from 'lucide-react';
+import * as apiService from '../../services/apiService';
+import { useMarketplace } from '../../context/MarketplaceContext';
 import AddSubscriptionModal from '../../components/subscriptions/AddSubscriptionModal';
 import EditSubscriptionModal from '../../components/subscriptions/EditSubscriptionModal';
 import SubscriptionDetailsModal from '../../components/subscriptions/SubscriptionDetailsModal';
 import ConfirmationModal from '../../components/ConfirmationModal';
-
 import EditPlanModal from '../../components/subscriptions/EditPlanModal';
 
-const INITIAL_PLANS = [
-    {
-        id: 'P1',
-        name: 'Starter',
-        price: '29',
-        leadsLimit: '10',
-        features: { priority: false, support: 'Email Support', premiumAccess: false },
-        featureList: ['Basic Dashboard', 'Email Notifications'],
-        icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50'
-    },
-    {
-        id: 'P2',
-        name: 'Pro',
-        price: '79',
-        leadsLimit: '50',
-        features: { priority: true, support: 'Priority Support', premiumAccess: false },
-        featureList: ['Unlimited CRM Access', 'SMS Alerts', 'Live Tracking'],
-        icon: Shield, color: 'text-purple-600', bg: 'bg-purple-50'
-    },
-    {
-        id: 'P3',
-        name: 'Premium',
-        price: '149',
-        leadsLimit: 'Unlimited',
-        features: { priority: true, support: '24/7 Dedicated Support', premiumAccess: true },
-        featureList: ['Advanced Analytics', 'Geo-fencing', 'White-labeling'],
-        icon: Crown, color: 'text-orange-600', bg: 'bg-orange-50'
-    },
-];
-
 const MOCK_SUBS = [
-    { id: 'SUB-1', name: 'John the Plumber', business: 'Doe Plumbing', plan: 'Pro', amount: '$79', date: '2025-03-01', status: 'Active' },
-    { id: 'SUB-2', name: 'Mary Electric', business: 'Mary Electric Co.', plan: 'Premium', amount: '$149', date: '2025-03-03', status: 'Active' },
-    { id: 'SUB-3', name: 'CleanPro Services', business: 'CleanPro LLC', plan: 'Starter', amount: '$29', date: '2025-02-28', status: 'Cancelled' },
-    { id: 'SUB-4', name: 'HVAC Masters', business: 'HVAC Masters Inc.', plan: 'Pro', amount: '$79', date: '2025-03-05', status: 'Active' },
+    { id: 'SUB-1', name: 'John the Plumber', business: 'Doe Plumbing', plan: 'Professional', amount: '$99', date: '2025-03-01', status: 'Active' },
+    { id: 'SUB-2', name: 'Mary Electric', business: 'Mary Electric Co.', plan: 'Enterprise', amount: '$299', date: '2025-03-03', status: 'Active' },
 ];
 
 const AdminSubscriptions = () => {
-    const [subscriptions, setSubscriptions] = useState(MOCK_SUBS);
-    const [plans, setPlans] = useState(INITIAL_PLANS);
+    const { subscriptionPlans, showToast, professionals } = useMarketplace();
+    const [subscriptions, setSubscriptions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [plans, setPlans] = useState([]);
 
     // Modal states
     const [showAddModal, setShowAddModal] = useState(false);
@@ -61,74 +32,73 @@ const AdminSubscriptions = () => {
     const [showDeletePlanConfirm, setShowDeletePlanConfirm] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
 
-    // Sort by date, newest first
+    // Sync plans from context
+    React.useEffect(() => {
+        if (subscriptionPlans?.length > 0) {
+            setPlans(subscriptionPlans.map(p => ({
+                ...p,
+                icon: p.name === 'Starter' ? Zap : p.name === 'Professional' ? Shield : Crown,
+                color: p.name === 'Starter' ? 'text-blue-600' : p.name === 'Professional' ? 'text-purple-600' : 'text-orange-600',
+                bg: p.name === 'Starter' ? 'bg-blue-50' : p.name === 'Professional' ? 'bg-purple-50' : 'bg-orange-50',
+                featureList: p.name === 'Starter' ? ['Basic Dashboard', 'Email Notifications'] : ['Unlimited CRM Access', 'Live Tracking'],
+                features: { support: p.name === 'Starter' ? 'Email Support' : 'Priority Support' }
+            })));
+        }
+        
+        // Fetch subscriptions (using mocked data for history if backend is empty)
+        const loadSubs = async () => {
+            setLoading(true);
+            const res = await apiService.fetchActiveSubscriptions();
+            if (res.success && res.data.length > 0) {
+                setSubscriptions(res.data);
+            } else {
+                setSubscriptions(MOCK_SUBS); // Fallback to help admin see the UI if db is empty
+            }
+            setLoading(false);
+        };
+        loadSubs();
+    }, [subscriptionPlans]);
+
     const sorted = [...subscriptions].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Dynamic plan counts
-    const getPlanCount = (planName) => {
-        return subscriptions.filter(s => s.plan === planName && s.status === 'Active').length;
-    };
-
     // ── Handlers ──────────────────────────────────────────────
-
-    const handleAddSub = (newSub) => {
-        setSubscriptions(prev => [newSub, ...prev]);
-    };
-
-    const handleNameClick = (sub) => {
-        setSelectedSub(sub);
-        setShowDetailsModal(true);
-    };
-
-    const handleEditClick = (sub) => {
-        setSelectedSub(sub);
-        setShowEditModal(true);
+    const handleAddSub = async (formData) => {
+        // Find if name matches an existing professional to get their ID
+        const matchedWorker = professionals.find(p => p.name.toLowerCase() === formData.name.toLowerCase());
+        
+        const payload = {
+            professionalId: matchedWorker?.id, // Send ID if found
+            professionalName: formData.name,
+            planName: formData.plan,
+            status: formData.status
+        };
+        const res = await apiService.enrollInSubscription(payload);
+        if (res.success) {
+            showToast('Subscription added successfully', 'success');
+            // Refresh logs
+            const freshLogs = await apiService.fetchActiveSubscriptions();
+            if (freshLogs.success) setSubscriptions(freshLogs.data);
+            setShowAddModal(false);
+        } else {
+            showToast(res.error || 'Enrollment failed', 'error');
+        }
     };
 
     const handleSaveEdit = (updatedSub) => {
         setSubscriptions(prev => prev.map(s => s.id === updatedSub.id ? updatedSub : s));
     };
 
-    const handleCancelClick = (sub) => {
-        setSelectedSub(sub);
-        setShowCancelConfirm(true);
-    };
-
     const handleConfirmCancel = () => {
         if (selectedSub) {
             setSubscriptions(prev => prev.map(s => s.id === selectedSub.id ? { ...s, status: 'Cancelled' } : s));
+            showToast('Subscription cancelled', 'info');
         }
-    };
-
-    const handleDeleteClick = (sub) => {
-        setSelectedSub(sub);
-        setShowDeleteConfirm(true);
     };
 
     const handleConfirmDelete = () => {
         if (selectedSub) {
             setSubscriptions(prev => prev.filter(s => s.id !== selectedSub.id));
-        }
-    };
-
-    // Plan management handlers
-    const handleEditPlanClick = (plan) => {
-        setSelectedPlan(plan);
-        setShowEditPlanModal(true);
-    };
-
-    const handleSavePlan = (updatedPlan) => {
-        setPlans(prev => prev.map(p => p.id === updatedPlan.id ? updatedPlan : p));
-    };
-
-    const handleDeletePlanClick = (plan) => {
-        setSelectedPlan(plan);
-        setShowDeletePlanConfirm(true);
-    };
-
-    const handleConfirmDeletePlan = () => {
-        if (selectedPlan) {
-            setPlans(prev => prev.filter(p => p.id !== selectedPlan.id));
+            showToast('Record deleted', 'success');
         }
     };
 
@@ -163,9 +133,6 @@ const AdminSubscriptions = () => {
                                         <button onClick={() => { setSelectedPlan(plan); setShowEditPlanModal(true); }} className="p-2.5 bg-gray-50 text-gray-400 hover:text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all">
                                             <Edit size={16} />
                                         </button>
-                                        <button onClick={() => { setSelectedPlan(plan); setShowDeletePlanConfirm(true); }} className="p-2.5 bg-gray-50 text-gray-400 hover:text-rose-500 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                                            <Trash2 size={16} />
-                                        </button>
                                     </div>
                                 </div>
 
@@ -178,7 +145,7 @@ const AdminSubscriptions = () => {
                                 </div>
 
                                 <div className="inline-flex px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-8 self-start border border-blue-100 shadow-sm">
-                                    {plan.leadsLimit} Leads per month
+                                    {plan.leads || 'Unlimited'} Leads per month
                                 </div>
 
                                 <div className="space-y-4 mb-8 flex-1">
@@ -194,7 +161,7 @@ const AdminSubscriptions = () => {
                                         <div className="w-5 h-5 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100 shadow-sm">
                                             <Check size={10} className="text-gray-400" />
                                         </div>
-                                        <span className="text-xs font-bold text-gray-400 italic capitalize">{plan.features.support}</span>
+                                        <span className="text-xs font-bold text-gray-400 italic capitalize">{plan.features?.support}</span>
                                     </div>
                                 </div>
 
@@ -223,7 +190,6 @@ const AdminSubscriptions = () => {
                     </div>
                 </div>
 
-                {/* Desktop Table View */}
                 <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -244,7 +210,7 @@ const AdminSubscriptions = () => {
                                             <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-[10px]">
                                                 {sub.name.charAt(0)}
                                             </div>
-                                            <span className="text-sm font-bold text-blue-600 cursor-pointer hover:underline" onClick={() => handleNameClick(sub)}>
+                                            <span className="text-sm font-bold text-blue-600 cursor-pointer hover:underline">
                                                 {sub.name}
                                             </span>
                                         </div>
@@ -259,11 +225,11 @@ const AdminSubscriptions = () => {
                                     </td>
                                     <td className="px-8 py-5 text-right">
                                         <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                                            <button onClick={() => handleEditClick(sub)} className="p-2 text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors" title="Edit">
+                                            <button onClick={() => { setSelectedSub(sub); setShowEditModal(true); }} className="p-2 text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors" title="Edit">
                                                 <Edit size={16} />
                                             </button>
                                             {sub.status === 'Active' && (
-                                                <button onClick={() => handleCancelClick(sub)} className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Cancel Subscription">
+                                                <button onClick={() => { setSelectedSub(sub); setShowCancelConfirm(true); }} className="p-2 text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Cancel Subscription">
                                                     <XCircle size={16} />
                                                 </button>
                                             )}
@@ -274,81 +240,14 @@ const AdminSubscriptions = () => {
                         </tbody>
                     </table>
                 </div>
-
-                {/* Empty State */}
-                {sorted.length === 0 && (
-                    <div className="text-center py-20 animate-in fade-in duration-500">
-                        <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-gray-100 shadow-inner">
-                            <CreditCard size={28} className="text-gray-200" />
-                        </div>
-                        <h3 className="text-lg font-bold text-gray-900">No subscriptions found</h3>
-                    </div>
-                )}
             </div>
 
-            {/* ── Modals ──────────────────────────────────────────── */}
-
-            <AddSubscriptionModal
-                isOpen={showAddModal}
-                onClose={() => setShowAddModal(false)}
-                onAdd={handleAddSub}
-                plans={plans}
-            />
-
-            <SubscriptionDetailsModal
-                isOpen={showDetailsModal}
-                onClose={() => { setShowDetailsModal(false); setSelectedSub(null); }}
-                subscription={selectedSub}
-            />
-
-            <EditSubscriptionModal
-                isOpen={showEditModal}
-                onClose={() => { setShowEditModal(false); setSelectedSub(null); }}
-                subscription={selectedSub}
-                onSave={handleSaveEdit}
-                plans={plans}
-            />
-
-            <ConfirmationModal
-                isOpen={showCancelConfirm}
-                onClose={() => { setShowCancelConfirm(false); setSelectedSub(null); }}
-                onConfirm={handleConfirmCancel}
-                title="Cancel Subscription"
-                message={`Are you sure you want to cancel ${selectedSub ? selectedSub.name + "'s" : 'this'} subscription? They will lose access to premium features.`}
-                icon={AlertCircle}
-                confirmText="Cancel Subscription"
-                type="warning"
-            />
-
-            <ConfirmationModal
-                isOpen={showDeleteConfirm}
-                onClose={() => { setShowDeleteConfirm(false); setSelectedSub(null); }}
-                onConfirm={handleConfirmDelete}
-                title="Delete Subscription"
-                message={`Are you sure you want to permanently delete ${selectedSub ? selectedSub.name + "'s" : 'this'} subscription record? This cannot be undone.`}
-                icon={AlertCircle}
-                confirmText="Delete"
-                type="danger"
-            />
-
-            {/* Plan Management Modals */}
-            <EditPlanModal
-                isOpen={showEditPlanModal}
-                onClose={() => { setShowEditPlanModal(false); setSelectedPlan(null); }}
-                plan={selectedPlan}
-                onSave={handleSavePlan}
-            />
-
-            <ConfirmationModal
-                isOpen={showDeletePlanConfirm}
-                onClose={() => { setShowDeletePlanConfirm(false); setSelectedPlan(null); }}
-                onConfirm={handleConfirmDeletePlan}
-                title="Delete Subscription Plan"
-                message={`Are you sure you want to delete the ${selectedPlan ? selectedPlan.name : 'this'} plan? Professionals currently on this plan may be affected.`}
-                icon={AlertCircle}
-                confirmText="Delete Plan"
-                type="danger"
-            />
+            <AddSubscriptionModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onAdd={handleAddSub} plans={plans} professionals={useMarketplace().professionals} />
+            <SubscriptionDetailsModal isOpen={showDetailsModal} onClose={() => { setShowDetailsModal(false); setSelectedSub(null); }} subscription={selectedSub} />
+            <EditSubscriptionModal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedSub(null); }} subscription={selectedSub} onSave={handleSaveEdit} plans={plans} />
+            <ConfirmationModal isOpen={showCancelConfirm} onClose={() => { setShowCancelConfirm(false); setSelectedSub(null); }} onConfirm={handleConfirmCancel} title="Cancel Subscription" message="Are you sure?" icon={AlertCircle} confirmText="Cancel Subscription" type="warning" />
+            <ConfirmationModal isOpen={showDeleteConfirm} onClose={() => { setShowDeleteConfirm(false); setSelectedSub(null); }} onConfirm={handleConfirmDelete} title="Delete Record" message="Are you sure?" icon={AlertCircle} confirmText="Delete" type="danger" />
+            <EditPlanModal isOpen={showEditPlanModal} onClose={() => { setShowEditPlanModal(false); setSelectedPlan(null); }} plan={selectedPlan} onSave={(p) => setPlans(prev => prev.map(old => old.id === p.id ? p : old))} />
         </div>
     );
 };

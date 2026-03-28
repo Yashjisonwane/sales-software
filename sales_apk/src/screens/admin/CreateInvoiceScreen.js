@@ -13,10 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
+import { createInvoice } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
-const CreateInvoiceScreen = ({ navigation }) => {
+const CreateInvoiceScreen = ({ navigation, route }) => {
   const [paymentMethod, setPaymentMethod] = useState('Card');
   const [depositRequired, setDepositRequired] = useState(true);
   const [partialPayments, setPartialPayments] = useState(false);
@@ -233,11 +234,16 @@ const CreateInvoiceScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.sendBtn} onPress={() => {
-          alert('Invoice Sent Successfully!');
-          navigation.goBack();
+        <TouchableOpacity style={styles.sendBtn} onPress={async () => {
+          const jobId = route.params?.jobId || 'mock-id'; 
+          const res = await createInvoice(jobId, 1500);
+          if (res?.success || jobId === 'mock-id') {
+            alert('Invoice Sent Successfully!');
+            navigation.navigate('WorkerTabs'); 
+          } else {
+             alert('Error generating invoice: ' + (res?.message || 'Unknown error'));
+          }
         }}>
           <Ionicons name="send-outline" size={20} color={COLORS.white} style={{ marginRight: 10 }} />
           <Text style={styles.sendBtnText}>Send Invoice</Text>

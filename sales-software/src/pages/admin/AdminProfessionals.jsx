@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useMarketplace } from '../../context/MarketplaceContext';
 import { professionalsData } from '../../data/models';
 import { Search, CheckCircle, XCircle, Edit, Plus, Star, X, Save, Users, Trash2, Eye, EyeOff, AlertCircle, Activity, MapPin, Wrench, Zap, Sparkles, Wind, Home, Package, TreePine, Paintbrush } from 'lucide-react';
 import ConfirmationModal from '../../components/ConfirmationModal';
@@ -75,7 +76,7 @@ const AdminProfessionals = () => {
     const [searchParams] = useSearchParams();
     const querySearch = searchParams.get('search') || '';
 
-    const [professionals, setProfessionals] = useState(initialPros);
+    const { professionals, addProfessional, editProfessional, removeProfessional } = useMarketplace();
     const [searchTerm, setSearchTerm] = useState(querySearch);
     const [statusFilter, setStatusFilter] = useState('All');
     const [modalMode, setModalMode] = useState(null); // null | 'add' | 'edit'
@@ -122,7 +123,24 @@ const AdminProfessionals = () => {
 
     // ── Modal ─────────────────────────────────────────────────
     const openAdd = () => { setFormData({ ...BLANK_PRO }); setFormErrors({}); setModalMode('add'); };
-    const openEdit = (pro) => { setFormData({ ...pro }); setFormErrors({}); setModalMode('edit'); };
+    const openEdit = (pro) => { 
+        // Normalize pro data to match BLANK_PRO structure for the form
+        setFormData({ 
+            ...BLANK_PRO, 
+            ...pro,
+            // Ensure address fields are picked up even if nested or named slightly differently
+            address: pro.address || '',
+            city: pro.city || '',
+            state: pro.state || '',
+            pincode: pro.pincode || '',
+            hourlyRate: pro.hourlyRate || '',
+            subscriptionPlan: pro.subscriptionPlan || 'Starter',
+            serviceRadius: pro.serviceRadius || 20,
+            status: pro.status || 'Active'
+        }); 
+        setFormErrors({}); 
+        setModalMode('edit'); 
+    };
     const closeModal = () => setModalMode(null);
 
     const handleField = (e) => {
@@ -166,27 +184,26 @@ const AdminProfessionals = () => {
     };
 
     // ── CRUD ──────────────────────────────────────────────────
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!validate()) return;
         if (modalMode === 'add') {
-            const newPro = {
-                ...formData,
-                id: `P${String(professionals.length + 1).padStart(3, '0')}`,
-                services: [formData.category],
-                completedJobs: 0, rating: 0, reviews: 0,
-            };
-            setProfessionals(prev => [newPro, ...prev]);
-            showToast(`✅ ${newPro.name} added successfully!`, 'success');
+            const res = await addProfessional(formData);
+            if (res) {
+               showToast(`✅ ${formData.name} added successfully!`, 'success');
+               closeModal();
+            }
         } else {
-            setProfessionals(prev => prev.map(p => p.id === formData.id ? { ...formData } : p));
-            showToast(`✏️ ${formData.name} updated!`, 'info');
+            const res = await editProfessional(formData.id, formData);
+            if (res) {
+               showToast(`✏️ ${formData.name} updated!`, 'info');
+               closeModal();
+            }
         }
-        closeModal();
     };
 
     const handleStatusToggle = (pro) => {
         const newStatus = pro.status === 'Active' ? 'Suspended' : 'Active';
-        setProfessionals(prev => prev.map(p => p.id === pro.id ? { ...p, status: newStatus } : p));
+        editProfessional(pro.id, { status: newStatus });
         showToast(
             newStatus === 'Suspended' ? `🚫 ${pro.name} suspended.` : `✅ ${pro.name} approved.`,
             newStatus === 'Suspended' ? 'error' : 'success'
@@ -198,12 +215,14 @@ const AdminProfessionals = () => {
         setShowDeleteConfirm(true);
     };
 
-    const handleConfirmDelete = () => {
+    const handleConfirmDelete = async () => {
         if (!selectedPro) return;
-        setProfessionals(prev => prev.filter(p => p.id !== selectedPro.id));
-        showToast(`🗑️ ${selectedPro.name} removed.`, 'error');
-        setShowDeleteConfirm(false);
-        setSelectedPro(null);
+        const success = await removeProfessional(selectedPro.id);
+        if (success) {
+            showToast(`🗑️ ${selectedPro.name} removed.`, 'error');
+            setShowDeleteConfirm(false);
+            setSelectedPro(null);
+        }
     };
 
     const statusColor = (s) => ({

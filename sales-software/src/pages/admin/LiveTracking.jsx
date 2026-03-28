@@ -109,8 +109,9 @@ const LiveTracking = () => {
                         key={pro.id}
                         className="absolute cursor-pointer transition-transform hover:scale-110 active:scale-95 z-20"
                         style={{ 
-                            left: `${Math.random() * 80 + 10}%`, 
-                            top: `${Math.random() * 80 + 10}%` 
+                            // Simplified Coordinate to Pixel mapping for Demo - in real map we'd use Google Maps Library
+                            left: `${40 + (pro.lastLocation.lng - 72.8) * 200}%`, 
+                            top: `${40 - (pro.lastLocation.lat - 19.0) * 200}%` 
                         }}
                         onClick={() => setSelectedPro(pro)}
                     >
