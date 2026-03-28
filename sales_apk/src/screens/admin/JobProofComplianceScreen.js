@@ -11,8 +11,9 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS } from '../../constants/theme';
+import { submitCompliance } from '../../api/apiService';
 
-const JobProofComplianceScreen = ({ navigation }) => {
+const JobProofComplianceScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [photos, setPhotos] = useState([
     'https://images.unsplash.com/photo-1504307651254-35680f356dfd?q=80&w=400',
@@ -91,9 +92,14 @@ const JobProofComplianceScreen = ({ navigation }) => {
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.submitBtn}
-          onPress={() => {
-            alert('Job Submitted for Approval!');
-            navigation.reset({ index: 0, routes: [{ name: 'AdminTabs' }] });
+          onPress={async () => {
+            const res = await submitCompliance(route.params?.jobId);
+            if(res?.success) {
+               alert('Job Submitted for Approval!');
+               navigation.reset({ index: 0, routes: [{ name: 'WorkerTabs' }] });
+            } else {
+               alert('Error submitting job proof: ' + (res?.message || 'Unknown error'));
+            }
           }}
         >
           <Text style={styles.submitBtnText}>Submit for Approval</Text>

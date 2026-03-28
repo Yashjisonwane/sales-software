@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS } from '../../constants/theme';
+import { acceptLead } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
@@ -168,11 +169,15 @@ const JobOfferDetailScreen = ({ navigation, route }) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.acceptBtn}
-              onPress={() => {
+              onPress={async () => {
                 const leadId = route.params?.lead?.id;
                 if (leadId) {
-                  // This will eventually call the API, but for now it flow matches navigation
-                  navigation.navigate('Pricing', { leadId });
+                  const res = await acceptLead(leadId);
+                  if (res.success) {
+                    navigation.navigate('Pricing', { leadId });
+                  } else {
+                    alert(res.message || 'Error accepting lead');
+                  }
                 } else {
                   navigation.navigate('Pricing');
                 }

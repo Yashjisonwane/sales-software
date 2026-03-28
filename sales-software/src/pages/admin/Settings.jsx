@@ -5,22 +5,22 @@ import {
     Zap, Settings as SettingsIcon, ShieldAlert 
 } from 'lucide-react';
 import ConfirmationModal from '../../components/ConfirmationModal';
+import { useMarketplace } from '../../context/MarketplaceContext';
 
 const Settings = () => {
+    const { currentUser, updateProfile, showToast } = useMarketplace();
     const [isDiscardModalOpen, setIsDiscardModalOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [testConnection, setTestConnection] = useState(false);
-    const [activeTab, setActiveTab] = useState('integrations'); // 'integrations' | 'security'
+    const [activeTab, setActiveTab] = useState('integrations'); 
 
     const [formData, setFormData] = useState({
-        // Auth Settings
-        username: 'admin',
+        username: currentUser?.name || 'admin',
+        email: currentUser?.email || 'admin@leadmarket.platform',
         password: '',
-        
-        // Map Settings
         mapProvider: 'google', 
-        apiKey: '',
+        apiKey: '••••••••••••••••',
         enableLiveTracking: true,
         enableDashboardMap: true,
         enableLocationPicker: false,
@@ -28,18 +28,22 @@ const Settings = () => {
         defaultZoom: '10'
     });
 
-    const handleUpdate = () => {
-        setShowSuccess(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        setTimeout(() => setShowSuccess(false), 3000);
+    const handleUpdate = async () => {
+        const res = await updateProfile({ name: formData.username, email: formData.email });
+        if (res.success) {
+            setShowSuccess(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => setShowSuccess(false), 3000);
+        }
     };
 
     const handleDiscard = () => {
         setFormData({
-            username: 'admin',
+            username: currentUser?.name || 'admin',
+            email: currentUser?.email || 'admin@leadmarket.platform',
             password: '',
             mapProvider: 'google',
-            apiKey: '',
+            apiKey: '••••••••••••••••',
             enableLiveTracking: true,
             enableDashboardMap: true,
             enableLocationPicker: false,
@@ -102,7 +106,6 @@ const Settings = () => {
 
             <div className="space-y-6">
                 {activeTab === 'integrations' ? (
-                    /* 🗺️ SECTION: Map Configuration */
                     <div className="bg-white rounded-[2rem] border border-gray-100 shadow-lg shadow-blue-50/5 overflow-hidden animate-in fade-in slide-in-from-right-3 duration-500">
                         <div className="p-6 lg:p-8">
                             <div className="flex items-center gap-3.5 mb-8">
@@ -113,7 +116,6 @@ const Settings = () => {
                             </div>
 
                             <div className="space-y-10">
-                                {/* 1. Map Provider Selection */}
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] ml-1">Provider Selection</label>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -142,7 +144,6 @@ const Settings = () => {
                                     </div>
                                 </div>
 
-                                {/* 2. API Key Input */}
                                 <div className="space-y-2">
                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] ml-1">Authentication Credentials</label>
                                     <div className="relative group">
@@ -164,7 +165,6 @@ const Settings = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 pt-2 border-t border-gray-50 mt-4">
-                                    {/* 3. Feature Toggles */}
                                     <div className="space-y-2">
                                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] ml-1">Capabilities Engine</label>
                                         <div className="grid grid-cols-1">
@@ -189,7 +189,6 @@ const Settings = () => {
                                         </div>
                                     </div>
 
-                                    {/* 4. Default Map Settings */}
                                     <div className="space-y-4">
                                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] ml-1">Universal View Engine</label>
                                         <div className="grid grid-cols-1 gap-4">
@@ -239,7 +238,6 @@ const Settings = () => {
                             </div>
                         </div>
 
-                        {/* Footer Actions */}
                         <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-end gap-3">
                             <button
                                 onClick={() => setIsDiscardModalOpen(true)}
@@ -257,7 +255,6 @@ const Settings = () => {
                         </div>
                     </div>
                 ) : (
-                    /* 🔒 SECTION: Security Configuration */
                     <div className="bg-white rounded-[2rem] border border-gray-100 shadow-lg shadow-slate-50/5 overflow-hidden animate-in fade-in slide-in-from-left-3 duration-500">
                         <div className="p-6 lg:p-8">
                             <div className="flex items-center gap-3.5 mb-8">
@@ -336,7 +333,6 @@ const Settings = () => {
                             </div>
                         </div>
 
-                         {/* Footer Actions */}
                         <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex items-center justify-end gap-3">
                             <button
                                 onClick={handleUpdate}

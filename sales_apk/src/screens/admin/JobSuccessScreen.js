@@ -9,15 +9,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const JobSuccessScreen = ({ navigation }) => {
+const JobSuccessScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const isWorker = route.params?.role === 'worker';
+  const homeRoute = isWorker ? 'WorkerTabs' : 'AdminTabs';
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
       <View style={styles.content}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.navigate('AdminTabs')}>
+        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.navigate(homeRoute)}>
           <Ionicons name="close" size={24} color="#000" />
         </TouchableOpacity>
 
@@ -35,7 +37,7 @@ const JobSuccessScreen = ({ navigation }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
           style={styles.homeBtn}
-          onPress={() => navigation.navigate('AdminTabs')}
+          onPress={() => navigation.navigate(homeRoute)}
         >
           <Text style={styles.homeBtnText}>Back to Home</Text>
         </TouchableOpacity>

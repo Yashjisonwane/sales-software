@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createEstimate } from '../../api/apiService';
 
 const QuoteReviewScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -98,7 +99,16 @@ const QuoteReviewScreen = ({ navigation, route }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
           style={styles.sendBtn}
-          onPress={() => navigation.navigate('QuoteSuccess', { ...route.params })}
+          onPress={async () => {
+            const jobId = route.params?.jobId || route.params?.quoteId;
+            if(!jobId) return alert('No Job record attached to this quote!');
+            const res = await createEstimate(jobId, 1896.15, 'HVAC Installation');
+            if(res?.success) {
+               navigation.navigate('QuoteSuccess', { ...route.params, role: 'worker' });
+            } else {
+               alert('Error creating estimate: ' + (res?.message || 'Unknown error'));
+            }
+          }}
         >
           <Text style={styles.sendBtnText}>Send Quote</Text>
         </TouchableOpacity>

@@ -24,8 +24,8 @@ const AdminLeads = () => {
         return leads.filter(lead => {
             const searchLower = searchTerm.toLowerCase();
             const matchSearch = lead.customerName.toLowerCase().includes(searchLower) ||
-                lead.id.toLowerCase().includes(searchLower) ||
-                (lead.id.startsWith('#') && lead.id.slice(1).toLowerCase().includes(searchLower));
+                lead.displayId.toLowerCase().includes(searchLower) ||
+                lead.id.toLowerCase().includes(searchLower);
 
             const matchStatus = statusFilter === 'All' || lead.status === statusFilter;
             return matchSearch && matchStatus;
@@ -140,7 +140,7 @@ const AdminLeads = () => {
                                 const acceptedPro = professionals.find(p => p.id === lead.assignedTo);
                                 return (
                                     <tr key={lead.id} className="hover:bg-blue-50/30 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">#{lead.id}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{lead.displayId}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
                                                 <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0">
@@ -193,7 +193,7 @@ const AdminLeads = () => {
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-3">
                                         <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xs border border-blue-100 shadow-sm">
-                                            {lead.id}
+                                            {lead.displayId}
                                         </div>
                                         <div>
                                             <h4 className="font-bold text-gray-900 leading-none">{lead.customerName}</h4>
@@ -318,7 +318,7 @@ const AdminLeads = () => {
                 onClose={() => { setShowDeleteConfirm(false); setSelectedLead(null); }}
                 onConfirm={handleConfirmDelete}
                 title="Delete Lead"
-                message={`Are you sure you want to delete this lead${selectedLead ? ` (#${selectedLead.id} — ${selectedLead.customerName})` : ''}? This action cannot be undone.`}
+                message={`Are you sure you want to delete this lead${selectedLead ? ` (${selectedLead.displayId} — ${selectedLead.customerName})` : ''}? This action cannot be undone.`}
                 icon={AlertCircle}
                 confirmText="Delete"
                 type="danger"

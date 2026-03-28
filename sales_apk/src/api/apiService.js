@@ -34,12 +34,59 @@ export const acceptLead = async (leadId) => {
         const response = await apiClient.patch(`/leads/${leadId}/assign`);
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Could not accept lead' };
+        console.error('Accept Lead API Error:', error.response?.data || error.message);
+        return { 
+            success: false, 
+            message: error.response?.data?.message || 'Could not accept lead. Please try again.' 
+        };
+    }
+};
+
+/**
+ * SERVICE: Jobs Management
+ */
+export const getWorkerJobs = async () => {
+    try {
+        const response = await apiClient.get('/jobs');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Could not fetch jobs' };
+    }
+};
+
+export const submitCompliance = async (jobId) => {
+    try {
+        const response = await apiClient.post(`/jobs/${jobId}/compliance`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to submit compliance' };
+    }
+};
+
+export const createEstimate = async (jobId, amount, details) => {
+    try {
+        const response = await apiClient.post(`/jobs/${jobId}/estimate`, { amount, details });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to create estimate' };
+    }
+};
+
+export const createInvoice = async (jobId, amount) => {
+    try {
+        const response = await apiClient.post(`/jobs/${jobId}/invoice`, { amount });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to create invoice' };
     }
 };
 
 export default {
     loginWorker,
     getAvailableLeads,
-    acceptLead
+    acceptLead,
+    getWorkerJobs,
+    submitCompliance,
+    createEstimate,
+    createInvoice
 };

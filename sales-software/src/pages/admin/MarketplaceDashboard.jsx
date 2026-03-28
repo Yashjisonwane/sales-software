@@ -3,22 +3,16 @@ import { useMarketplace } from '../../context/MarketplaceContext';
 import { Briefcase, Users, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Globe } from 'lucide-react';
 
 const MarketplaceDashboard = () => {
-    const { leads, professionals } = useMarketplace();
+    const { leads, professionals, dashboardStats } = useMarketplace();
 
-    const totalLeads = leads.length;
-    const leadsToday = leads.filter(l => {
-        const today = new Date().toDateString();
-        // Assuming dateRequested might be string or Date
-        return l.dateRequested && new Date(l.dateRequested).toDateString() === today;
-    }).length;
-
-    // Leads that have been accepted or are in progress
-    const acceptedLeads = leads.filter(l => l.status === 'Accepted' || l.status === 'In Progress' || l.status === 'Completed').length;
-    const conversionRate = totalLeads > 0 ? ((acceptedLeads / totalLeads) * 100).toFixed(1) : 0;
+    const totalLeads = dashboardStats?.totalLeads || leads.length;
+    const leadsToday = dashboardStats?.leadsToday || 0;
+    const totalProfessionals = dashboardStats?.totalProfessionals || professionals.length;
+    const conversionRate = dashboardStats?.conversionRate || 0;
 
     const stats = [
         { name: 'Total Leads', value: totalLeads, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+8%', up: true },
-        { name: 'Total Professionals', value: professionals.length, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+12%', up: true },
+        { name: 'Total Professionals', value: totalProfessionals, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+12%', up: true },
         { name: 'Leads Today', value: leadsToday, icon: Activity, color: 'text-green-600', bg: 'bg-green-50', trend: '+5%', up: true },
         { name: 'Conversion Rate', value: `${conversionRate}%`, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50', trend: '-2%', up: false },
     ];

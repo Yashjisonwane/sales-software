@@ -43,12 +43,26 @@ const Reports = () => {
     }, [leads, professionals]);
 
     // --- Charts Data ---
-    const leadsGrowthData = [45, 52, 38, 65, 48, 72, 55, 80, 62, 85, 75, 95]; // Monthly
+    const leadsGrowthData = useMemo(() => {
+        const months = new Array(12).fill(0);
+        const now = new Date();
+        leads.forEach(l => {
+            const d = new Date(l.createdAt);
+            const monthDiff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+            if (monthDiff >= 0 && monthDiff < 12) {
+                months[11 - monthDiff]++;
+            }
+        });
+        // Normalize for height if needed, but 0-100 scale is fine for simple bars
+        const max = Math.max(...months, 10);
+        return months.map(m => (m / max) * 100);
+    }, [leads]);
     
     const categoryDemand = useMemo(() => {
         const counts = {};
         leads.forEach(l => {
-            counts[l.serviceCategory] = (counts[l.serviceCategory] || 0) + 1;
+            const cat = l.serviceCategory || 'General';
+            counts[cat] = (counts[cat] || 0) + 1;
         });
         return Object.entries(counts)
             .map(([name, count]) => ({ name, count }))
@@ -56,12 +70,12 @@ const Reports = () => {
             .slice(0, 5);
     }, [leads]);
 
-    const locationData = [
-        { name: 'Downtown', count: 42 },
-        { name: 'North District', count: 28 },
-        { name: 'West End', count: 35 },
-        { name: 'East Side', count: 19 },
-    ];
+    const locationData = useMemo(() => {
+        return locations.map(l => ({
+            name: l.city,
+            count: l.activeLeads || 0
+        })).slice(0, 4);
+    }, [locations]);
 
     return (
         <div className="space-y-8 pb-12 animate-in fade-in duration-700">

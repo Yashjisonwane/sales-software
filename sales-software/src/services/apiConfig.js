@@ -9,7 +9,10 @@ export const ENDPOINTS = {
     ASSIGNMENTS: '/assignments',
     JOBS: '/jobs',
     CHATS: '/chats',
-    AUTH: '/auth'
+    AUTH: '/auth',
+    CATEGORIES: '/categories',
+    LOCATIONS: '/locations',
+    SUBSCRIPTIONS: '/leads/subscriptions'
 };
 
 export const getApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;
