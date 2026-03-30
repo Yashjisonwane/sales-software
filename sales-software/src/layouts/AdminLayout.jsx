@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Briefcase, Users, FolderOpen, MapPin, CreditCard, BarChart2, Settings, LogOut, Menu, X, ShieldAlert, Bell, Zap, Activity, Navigation, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import { useData } from '../context/DataContext';
+import { useMarketplace } from '../context/MarketplaceContext';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Toast from '../components/Toast';
 import Sidebar from '../components/Sidebar';
@@ -10,6 +11,7 @@ const AdminLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const { notifications, toast, showToast } = useData();
+    const { currentUser } = useMarketplace();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -20,10 +22,9 @@ const AdminLayout = () => {
         { icon: Briefcase, label: 'Leads', path: '/admin/leads' },
         { icon: ClipboardList, label: 'Jobs', path: '/admin/jobs' },
         { icon: Users, label: 'Professionals', path: '/admin/professionals' },
-        { icon: Activity, label: 'Live Tracking', path: '/admin/live-tracking' },
-        // { icon: Navigation, label: 'Nearby Pros', path: '/admin/nearby' },
         { icon: FolderOpen, label: 'Categories', path: '/admin/categories' },
         { icon: MapPin, label: 'Locations', path: '/admin/locations' },
+        { icon: Navigation, label: 'Live Tracking', path: '/admin/live-tracking' },
         { icon: CreditCard, label: 'Subscriptions', path: '/admin/subscriptions' },
         { icon: BarChart2, label: 'Reports', path: '/admin/reports' },
         { icon: Settings, label: 'Settings', path: '/admin/settings' },
@@ -85,11 +86,15 @@ const AdminLayout = () => {
                         </button>
                         <div className="flex items-center gap-2 sm:gap-3 cursor-pointer" onClick={() => navigate('/admin/settings')}>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shrink-0">
-                                A
+                                {currentUser?.name?.charAt(0) || 'A'}
                             </div>
                             <div className="hidden sm:block text-left min-w-0">
-                                <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[100px]">Admin</p>
-                                <p className="text-[10px] text-gray-400 truncate">System Root</p>
+                                <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[100px]">
+                                    {currentUser?.name || 'Admin'}
+                                </p>
+                                <p className="text-[10px] text-gray-400 truncate uppercase font-extrabold tracking-widest">
+                                    {currentUser?.role === 'WORKER' ? 'PROFESSIONAL' : (currentUser?.role || 'ADMIN')}
+                                </p>
                             </div>
                         </div>
                     </div>

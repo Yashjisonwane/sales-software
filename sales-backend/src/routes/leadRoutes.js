@@ -1,6 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { createLead, getLeads, assignLead, deleteLead, updateLead, getCategories, getStats, createCategory, updateCategory, deleteCategory, getLocations, getSubscriptions, enrollInPlan, getActiveSubscriptions } = require('../controllers/leadController');
+const { 
+    createLead, 
+    getLeads, 
+    assignLead, 
+    deleteLead, 
+    updateLead, 
+    getCategories, 
+    getStats, 
+    createCategory, 
+    updateCategory, 
+    deleteCategory, 
+    getLocations, 
+    getSubscriptions, 
+    enrollInPlan, 
+    getActiveSubscriptions, 
+    createSubscriptionPlan, 
+    updateSubscriptionPlan, 
+    deleteSubscriptionPlan,
+    getUpgradeRequests,
+    approveUpgradeRequest,
+    rejectUpgradeRequest
+} = require('../controllers/leadController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
 // @route   GET /api/v1/leads/stats
@@ -12,7 +33,15 @@ router.get('/locations', getLocations);
 // @route   GET /api/v1/leads/subscriptions
 router.get('/subscriptions', getSubscriptions);
 router.get('/subscriptions/active', getActiveSubscriptions);
-router.post('/subscriptions/enroll', protect, authorize('ADMIN'), enrollInPlan);
+router.post('/subscriptions', protect, authorize('ADMIN', 'WORKER'), createSubscriptionPlan);
+router.put('/subscriptions/:id', protect, authorize('ADMIN', 'WORKER'), updateSubscriptionPlan);
+router.delete('/subscriptions/:id', protect, authorize('ADMIN', 'WORKER'), deleteSubscriptionPlan);
+
+// Enrollment & Upgrade Requests
+router.post('/subscriptions/enroll', protect, authorize('ADMIN', 'WORKER'), enrollInPlan);
+router.get('/subscriptions/upgrade-requests', protect, authorize('ADMIN'), getUpgradeRequests);
+router.put('/subscriptions/upgrade-requests/:id/approve', protect, authorize('ADMIN'), approveUpgradeRequest);
+router.put('/subscriptions/upgrade-requests/:id/reject', protect, authorize('ADMIN'), rejectUpgradeRequest);
 
 // @route   GET /api/v1/leads/categories
 router.get('/categories', getCategories);
@@ -39,6 +68,6 @@ router.patch('/:id/assign', protect, authorize('WORKER', 'ADMIN'), assignLead);
 router.put('/:id', protect, authorize('ADMIN'), updateLead);
 
 // @route   DELETE /api/v1/leads/:id
-router.delete('/:id', protect, authorize('ADMIN'), deleteLead);
+router.delete('/:id', protect, authorize('ADMIN', 'WORKER'), deleteLead);
 
 module.exports = router;

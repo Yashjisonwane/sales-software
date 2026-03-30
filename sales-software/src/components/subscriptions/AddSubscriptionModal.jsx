@@ -14,15 +14,8 @@ const initialForm = {
 const AddSubscriptionModal = ({ isOpen, onClose, onAdd, plans = [], professionals = [] }) => {
     const [form, setForm] = useState(initialForm);
     const [newFeature, setNewFeature] = useState('');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [showSuggestions, setShowSuggestions] = useState(false);
 
     if (!isOpen) return null;
-
-    const suggestions = professionals.filter(p => 
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    ).slice(0, 5);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -72,39 +65,20 @@ const AddSubscriptionModal = ({ isOpen, onClose, onAdd, plans = [], professional
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-8 pb-8 pt-4 space-y-5 max-h-[75vh] overflow-y-auto custom-scrollbar">
-                    <div className="relative">
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Search Professional *</label>
-                        <input 
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Select Professional *</label>
+                        <select 
                             name="professional" 
                             value={form.professional} 
-                            onChange={(e) => {
-                                handleChange(e);
-                                setSearchTerm(e.target.value);
-                                setShowSuggestions(true);
-                            }} 
+                            onChange={handleChange} 
                             required
-                            onFocus={() => setShowSuggestions(true)}
-                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                            placeholder="Type name (must match a real professional)..." 
-                        />
-                        {showSuggestions && searchTerm && suggestions.length > 0 && (
-                            <div className="absolute z-[130] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl overflow-hidden py-1">
-                                {suggestions.map(p => (
-                                    <div 
-                                        key={p.id}
-                                        onClick={() => {
-                                            setForm(prev => ({ ...prev, professional: p.name }));
-                                            setSearchTerm(p.name);
-                                            setShowSuggestions(false);
-                                        }}
-                                        className="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
-                                    >
-                                        <div className="text-sm font-bold text-gray-900">{p.name}</div>
-                                        <div className="text-[10px] text-gray-400">{p.email}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="">Select professional...</option>
+                            {professionals.map(p => (
+                                <option key={p.id} value={p.name}>{p.name} ({p.email})</option>
+                            ))}
+                        </select>
                     </div>
 
                     <div>

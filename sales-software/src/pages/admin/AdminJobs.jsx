@@ -5,7 +5,7 @@ import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Cl
 
 const AdminJobs = () => {
     const navigate = useNavigate();
-    const { jobs, professionals, addJob, deleteJob, updateJob } = useMarketplace();
+    const { jobs, professionals, categories, addJob, deleteJob, updateJob } = useMarketplace();
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [showFilters, setShowFilters] = useState(false);
@@ -317,10 +317,9 @@ const AdminJobs = () => {
                                         required
                                     >
                                         <option value="">Select Category</option>
-                                        <option value="Plumbing">Plumbing</option>
-                                        <option value="Electrical">Electrical</option>
-                                        <option value="Cleaning">Cleaning</option>
-                                        <option value="Roofing">Roofing</option>
+                                        {categories.map(cat => (
+                                            <option key={cat.id} value={cat.name}>{cat.name}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>

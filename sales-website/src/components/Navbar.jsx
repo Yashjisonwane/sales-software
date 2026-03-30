@@ -7,6 +7,8 @@ import {
   ClipboardList, 
   ChevronRight, 
   CheckCircle,
+  CreditCard,
+  Briefcase,
   X 
 } from 'lucide-react';
 const Navbar = () => {
@@ -73,11 +75,40 @@ const Navbar = () => {
           }}>
             <Link to="/" style={{ textDecoration: 'none', color: '#111827', fontSize: 14, fontWeight: 700 }}>Home</Link>
             <Link to="/about-us" style={{ textDecoration: 'none', color: '#111827', fontSize: 14, fontWeight: 700 }}>About Us</Link>
+            <a href="/#pricing" onClick={(e) => {
+              if (window.location.pathname === '/') {
+                e.preventDefault();
+                document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+              }
+            }} style={{ textDecoration: 'none', color: '#111827', fontSize: 14, fontWeight: 700 }}>Pricing</a>
             <Link to="/privacy-policy" style={{ textDecoration: 'none', color: '#111827', fontSize: 14, fontWeight: 700 }}>Privacy Policy</Link>
           </div>
 
           {/* Right Side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            {/* Join as Professional Button (Desktop) */}
+            <div className="desktop-menu" style={{ display: 'none' }}>
+              <Link to="/become-professional" className="nav-cta-button" style={{
+                textDecoration: 'none',
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)',
+                color: 'white',
+                borderRadius: '12px',
+                fontSize: '13px',
+                fontWeight: '700',
+                boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                whiteSpace: 'nowrap',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                <Briefcase size={16} />
+                Join as a Professional
+              </Link>
+            </div>
+
             {/* Language Selector */}
             <button style={{
               display: 'flex',
@@ -191,6 +222,60 @@ const Navbar = () => {
               <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Get connected with top services</div>
             </div>
           </Link>
+
+          <a 
+            href="/#pricing" 
+            onClick={(e) => {
+              setMenuOpen(false);
+              if (window.location.pathname === '/') {
+                e.preventDefault();
+                setTimeout(() => {
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                }, 300);
+              }
+            }}
+            style={{
+              padding: '24px',
+              background: '#F9FAFB',
+              borderRadius: 20,
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              transition: 'background 0.2s'
+            }}
+          >
+            <div style={{ width: 48, height: 48, background: '#111827', color: 'white', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CreditCard size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#111827' }}>Our Pricing</div>
+              <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Choose a plan that fits you</div>
+            </div>
+          </a>
+
+          <Link 
+            to="/become-professional" 
+            onClick={() => setMenuOpen(false)}
+            style={{
+              padding: '24px',
+              background: '#F9FAFB',
+              borderRadius: 20,
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              transition: 'background 0.2s'
+            }}
+          >
+            <div style={{ width: 48, height: 48, background: '#7C3AED', color: 'white', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Briefcase size={24} />
+            </div>
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#7C3AED' }}>Join as Professional</div>
+              <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Grow your business with us</div>
+            </div>
+          </Link>
         </div>
       </div>
 
@@ -203,6 +288,14 @@ const Navbar = () => {
           .desktop-menu {
             display: flex !important;
           }
+        }
+        .nav-cta-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 25px rgba(124, 58, 237, 0.4);
+          filter: brightness(1.1);
+        }
+        .nav-cta-button:active {
+          transform: translateY(0);
         }
       `}</style>
     </>

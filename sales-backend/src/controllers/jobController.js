@@ -1,5 +1,9 @@
 const prisma = require('../config/db');
 
+const generateShortId = (prefix) => {
+    return `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+};
+
 // @route   GET /api/v1/jobs
 // @desc    Get all jobs (ADMIN) or professional-specific jobs (WORKER)
 const getJobs = async (req, res) => {
@@ -11,19 +15,22 @@ const getJobs = async (req, res) => {
             jobs = await prisma.job.findMany({
                 include: { customer: { select: { name: true } }, worker: { select: { name: true } } }
             });
-        } else if (user.role === 'WORKER') {
+        } else {
+            // Workers only see their own assigned jobs
             jobs = await prisma.job.findMany({
                 where: { workerId: user.id },
-                include: { 
-                    customer: { select: { name: true } },
-                    lead: { include: { category: true } },
-                    estimate: true,
-                    invoice: true
-                }
+                include: { customer: { select: { name: true } }, worker: { select: { name: true } } }
             });
         }
 
-        res.status(200).json({ success: true, count: jobs.length, data: jobs });
+        const formattedJobs = jobs.map(j => ({
+            ...j,
+            customerName: j.customer?.name || 'Valued Customer',
+            workerName: j.worker?.name || 'Unassigned',
+            displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`
+        }));
+
+        res.status(200).json({ success: true, count: jobs.length, data: formattedJobs });
     } catch (error) {
         res.status(500).json({ success: false, message: "Server Error" });
     }
@@ -188,9 +195,13 @@ const createJob = async (req, res) => {
             });
         }
 
+        const jobNo = generateShortId('J');
+
         // 2. Create Job directly
         const job = await prisma.job.create({
             data: {
+                jobId: jobNo, // Ensure schema compatibility if this field name differs
+                jobNo: jobNo, 
                 customerId: customer.id,
                 workerId: professionalId,
                 categoryName: category,
@@ -199,7 +210,8 @@ const createJob = async (req, res) => {
                 status: 'SCHEDULED',
                 scheduledDate: new Date(date),
                 scheduledTime: time || '10:00 AM'
-            }
+            },
+            include: { customer: { select: { name: true } }, worker: { select: { name: true } } }
         });
 
         res.status(201).json({ success: true, data: job });
@@ -212,9 +224,18 @@ const createJob = async (req, res) => {
 const deleteJob = async (req, res) => {
     try {
         const jobId = req.params.id;
-        await prisma.job.delete({
-            where: { id: jobId }
-        });
+        const user = req.user;
+
+        const job = await prisma.job.findUnique({ where: { id: jobId } });
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        // Admin can delete anything; Worker can only delete their own assigned jobs
+        if (user.role !== 'ADMIN' && job.workerId !== user.id) {
+            console.warn(`⛔ [AUTH] Deletion blocked: User ${user.id} not authorized to delete job ${jobId}`);
+            return res.status(403).json({ success: false, message: 'You are not authorized to delete this job' });
+        }
+
+        await prisma.job.delete({ where: { id: jobId } });
         res.status(200).json({ success: true, message: 'Job deleted successfully' });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Job deletion failed' });

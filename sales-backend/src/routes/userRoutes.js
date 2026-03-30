@@ -21,9 +21,9 @@ router.get('/profile', protect, getProfile);
 router.put('/profile', protect, updateProfile);
 
 // Admin Professional Management
-router.post('/workers', protect, authorize('ADMIN'), createProfessional);
-router.put('/workers/:id', protect, authorize('ADMIN'), updateProfessional);
-router.delete('/workers/:id', protect, authorize('ADMIN'), deleteProfessional);
+router.post('/workers', protect, authorize('ADMIN', 'WORKER'), createProfessional);
+router.put('/workers/:id', protect, authorize('ADMIN', 'WORKER'), updateProfessional);
+router.delete('/workers/:id', protect, authorize('ADMIN', 'WORKER'), deleteProfessional);
 
 // @route   PATCH /api/v1/users/location
 router.patch('/location', protect, updateLocation);

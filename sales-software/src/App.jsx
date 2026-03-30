@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import MarketplaceDashboard from './pages/admin/MarketplaceDashboard';
 import AdminLeads from './pages/admin/AdminLeads';
 import AdminProfessionals from './pages/admin/AdminProfessionals';
+import AdminProfessionalRequests from './pages/admin/AdminProfessionalRequests';
 import AdminCategories from './pages/admin/AdminCategories';
 import AdminLocations from './pages/admin/AdminLocations';
 import AdminSubscriptions from './pages/admin/AdminSubscriptions';
@@ -25,13 +26,14 @@ import ProfessionalLeadMap from './pages/professional/LeadMap';
 import ProfessionalMessages from './pages/professional/Messages';
 import ProfessionalReviews from './pages/professional/Reviews';
 import ProfessionalSubscription from './pages/professional/Subscription';
-import ProfessionalProfile from './pages/professional/Profile';
+// Profile consolidated into Settings
 import ProfessionalSettings from './pages/professional/Settings';
 
 import AdminLayout from './layouts/AdminLayout';
 import ProfessionalLayout from './layouts/ProfessionalLayout';
 import { DataProvider } from './context/DataContext';
 import { MarketplaceProvider } from './context/MarketplaceContext';
+
 
 function App() {
   return (
@@ -51,6 +53,8 @@ function App() {
               <Route path="jobs" element={<AdminJobs />} />
               <Route path="jobs/:id" element={<JobDetail />} />
               <Route path="professionals" element={<AdminProfessionals />} />
+              <Route path="pro-requests" element={<AdminProfessionalRequests />} />
+
               <Route path="categories" element={<AdminCategories />} />
               <Route path="locations" element={<AdminLocations />} />
               <Route path="live-tracking" element={<LiveTracking />} />
@@ -72,7 +76,7 @@ function App() {
               <Route path="messages" element={<ProfessionalMessages />} />
               <Route path="reviews" element={<ProfessionalReviews />} />
               <Route path="subscription" element={<ProfessionalSubscription />} />
-              <Route path="profile" element={<ProfessionalProfile />} />
+// Profile route removed
               <Route path="settings" element={<ProfessionalSettings />} />
             </Route>
           </Routes>

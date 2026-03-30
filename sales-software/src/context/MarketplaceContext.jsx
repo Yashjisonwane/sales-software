@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as apiService from '../services/apiService';
 
 const MarketplaceContext = createContext();
@@ -16,7 +16,9 @@ export const MarketplaceProvider = ({ children }) => {
     const [locations, setLocations] = useState([]);
     const [subscriptionPlans, setSubscriptionPlans] = useState([]);
     const [assignments, setAssignments] = useState([]);
+    const [professionalRequests, setProfessionalRequests] = useState([]);
     const [dashboardStats, setDashboardStats] = useState(null);
+    const [upgradeRequests, setUpgradeRequests] = useState([]);
 
     // ─── UI & MOCK STATES (Preserved for Admin Demo functionality) ───
     const [reviews, setReviews] = useState([]);
@@ -26,10 +28,10 @@ export const MarketplaceProvider = ({ children }) => {
     const [toast, setToast] = useState(null);
 
     // --- TOASTS ---
-    const showToast = (message, type = 'success') => {
+    const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
-    };
+    }, []);
 
     const addNotification = (notif) => {
         setNotifications(prev => [{ id: Date.now(), date: new Date().toISOString(), unread: true, ...notif }, ...prev]);
@@ -87,7 +89,7 @@ export const MarketplaceProvider = ({ children }) => {
     }, []);
 
     // --- DATA FETCHING ---
-    const loadInitialData = async () => {
+    const loadInitialData = useCallback(async () => {
         try {
             const leadsRes = await apiService.fetchAllLeads();
             if (leadsRes.success) {
@@ -99,6 +101,9 @@ export const MarketplaceProvider = ({ children }) => {
                     customerPhone: l.customer?.phone || '',
                     customerEmail: l.customer?.email || '',
                     serviceCategory: l.category?.name || 'General Service',
+                    servicePlan: l.servicePlan || 'Basic',
+                    description: l.description || '',
+                    preferredDate: l.preferredDate || '',
                     dateRequested: l.createdAt
                 }));
                 setLeads(flattenedLeads);
@@ -152,11 +157,66 @@ export const MarketplaceProvider = ({ children }) => {
             const subRes = await apiService.fetchAllSubscriptions();
             if (subRes.success) setSubscriptionPlans(subRes.data);
 
-            const statsRes = await apiService.fetchDashboardStats();
-            if (statsRes.success) setDashboardStats(statsRes.data);
+            const profileRes = await apiService.fetchUserProfile();
+            if (profileRes.success) {
+                const user = profileRes.data;
+                setCurrentUser(user);
+                
+                // --- ADMIN-ONLY DATA ---
+                if (user.role === 'ADMIN') {
+                    const statsRes = await apiService.fetchDashboardStats();
+                    if (statsRes.success) setDashboardStats(statsRes.data);
+
+                    const requestsRes = await apiService.fetchAllProfessionalRequests();
+                    if (requestsRes.success) setProfessionalRequests(requestsRes.data);
+
+                    const upgradeRes = await apiService.fetchSubscriptionUpgradeRequests();
+                    if (upgradeRes.success) setUpgradeRequests(upgradeRes.data);
+                }
+            }
         } catch (error) {
             console.error('Initial Data Load Error:', error);
-            showToast('Failed to load live data', 'error');
+            // Non-critical: only notify if it wasn't a permission error (403/401)
+            if (!error.message?.includes('403') && !error.message?.includes('401')) {
+                showToast('Failed to load live data', 'error');
+            }
+        }
+    }, [showToast]);
+
+    // --- SUBSCRIPTION PLANS ---
+    const addSubscriptionPlan = async (planData) => {
+        const res = await apiService.createSubscriptionPlan(planData);
+        if (res.success) {
+            showToast('New plan created!', 'success');
+            loadInitialData();
+            return res.data;
+        } else {
+            showToast(res.error, 'error');
+            return null;
+        }
+    };
+
+    const editSubscriptionPlan = async (id, planData) => {
+        const res = await apiService.updateSubscriptionPlan(id, planData);
+        if (res.success) {
+            showToast('Plan updated successfully', 'success');
+            loadInitialData();
+            return res.data;
+        } else {
+            showToast(res.error, 'error');
+            return null;
+        }
+    };
+
+    const deleteSubscriptionPlan = async (id) => {
+        const res = await apiService.deleteSubscriptionPlan(id);
+        if (res.success) {
+            showToast('Plan deleted', 'success');
+            loadInitialData();
+            return true;
+        } else {
+            showToast(res.error, 'error');
+            return false;
         }
     };
 
@@ -290,8 +350,19 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    const updateSubscription = (plan) => {
-        setCurrentUser(prev => ({ ...prev, subscriptionPlan: plan }));
+    const updateSubscription = async (planName) => {
+        const res = await apiService.enrollInSubscription({ 
+            professionalId: currentUser?.id, 
+            planName: planName 
+        });
+        if (res.success) {
+            showToast(res.message || `Upgraded to ${planName}!`, 'success');
+            loadInitialData(); // This will refresh the user profile with the new plan
+            return true;
+        } else {
+            showToast(res.error || 'Upgrade failed', 'error');
+            return false;
+        }
     };
 
     const deactivateAccount = () => {
@@ -349,6 +420,30 @@ export const MarketplaceProvider = ({ children }) => {
             return true;
         } else {
             showToast(res.error || 'Deletion failed', 'error');
+            return false;
+        }
+    };
+
+    const approveProfessionalRequest = async (id) => {
+        const res = await apiService.approveProfessionalRequest(id);
+        if (res.success) {
+            showToast('Request Approved! Password generated.', 'success');
+            loadInitialData();
+            return res.data; // Includes generatedPassword
+        } else {
+            showToast(res.error || 'Approval failed', 'error');
+            return null;
+        }
+    };
+
+    const rejectProfessionalRequest = async (id) => {
+        const res = await apiService.rejectProfessionalRequest(id);
+        if (res.success) {
+            showToast('Request Deleted', 'info');
+            loadInitialData();
+            return true;
+        } else {
+            showToast(res.error || 'Rejection failed', 'error');
             return false;
         }
     };
@@ -433,6 +528,34 @@ export const MarketplaceProvider = ({ children }) => {
             updateProfessionalLocation,
             updateProfessionalStatus,
             toggleTrackingSetting,
+            addSubscriptionPlan,
+            editSubscriptionPlan,
+            deleteSubscriptionPlan,
+            professionalRequests,
+            approveProfessionalRequest,
+            rejectProfessionalRequest,
+            upgradeRequests,
+            approveUpgradeRequest: async (id) => {
+                const res = await apiService.approveSubscriptionUpgrade(id);
+                if (res.success) {
+                    showToast('Upgrade approved!', 'success');
+                    loadInitialData();
+                    return true;
+                }
+                showToast(res.error || 'Approval failed', 'error');
+                return false;
+            },
+            rejectUpgradeRequest: async (id) => {
+                const res = await apiService.rejectSubscriptionUpgrade(id);
+                if (res.success) {
+                    showToast('Upgrade rejected', 'info');
+                    loadInitialData();
+                    return true;
+                }
+                showToast(res.error || 'Rejection failed', 'error');
+                return false;
+            },
+            refreshData: loadInitialData, // Exporting refresh function
             // Custom Auth Methods
             login,
             logout,

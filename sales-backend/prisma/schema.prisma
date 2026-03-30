@@ -40,6 +40,7 @@ model User {
   serviceRadius   Int?             @default(15) @map("service_radius")
 
   @@map("users")
+  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
 }
 
 model Category {
@@ -73,6 +74,7 @@ model Lead {
   location    String
   description String?    @db.Text
   servicePlan String     @default("Starter") @map("service_plan")
+  preferredDate String?  @map("preferred_date")
   status      LeadStatus @default(OPEN)
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
@@ -95,6 +97,7 @@ model Job {
   status        JobStatus      @default(SCHEDULED)
   location      String
   description   String?        @db.Text
+  preferredDate String?        @map("preferred_date")
   scheduledDate DateTime       @map("scheduled_date")
   scheduledTime String         @map("scheduled_time")
   createdAt     DateTime       @default(now()) @map("created_at")
@@ -218,4 +221,37 @@ model SubscriptionPlan {
   users     User[]
 
   @@map("subscription_plans")
+  upgradeRequests SubscriptionUpgradeRequest[]
+}
+
+model SubscriptionUpgradeRequest {
+  id              String           @id @default(uuid())
+  userId          String           @map("user_id")
+  planId          String           @map("plan_id")
+  status          String           @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan            SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("subscription_upgrade_requests")
+}
+
+model ProfessionalRequest {
+  id              String   @id @default(uuid())
+  name            String
+  businessName    String?  @map("business_name")
+  email           String   @unique
+  phone           String
+  category        String
+  address         String?  @db.Text
+  city            String?
+  state           String?
+  pincode         String?
+  preferredPlan   String   @map("preferred_plan")
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("professional_requests")
 }

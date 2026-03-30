@@ -7,8 +7,8 @@ const { protect, authorize } = require('../middlewares/authMiddleware');
 router.get('/', protect, getCategories);
 
 // Only Admin can manage categories
-router.post('/', protect, authorize('ADMIN'), createCategory);
-router.put('/:id', protect, authorize('ADMIN'), updateCategory);
-router.delete('/:id', protect, authorize('ADMIN'), deleteCategory);
+router.post('/', protect, authorize('ADMIN', 'WORKER'), createCategory);
+router.put('/:id', protect, authorize('ADMIN', 'WORKER'), updateCategory);
+router.delete('/:id', protect, authorize('ADMIN', 'WORKER'), deleteCategory);
 
 module.exports = router;

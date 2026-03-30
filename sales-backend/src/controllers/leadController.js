@@ -8,7 +8,7 @@ const generateShortId = (prefix) => {
 // @desc    Create a new lead from the website
 const createLead = async (req, res) => {
     try {
-        const { customerName, name, email, phone, categoryId, categoryName, servicePlan, location, description } = req.body;
+        const { customerName, name, email, phone, categoryId, categoryName, servicePlan, location, description, preferredDate } = req.body;
 
         if (!email || !phone) {
             return res.status(400).json({ success: false, message: "Email and Phone are required to create a lead." });
@@ -29,6 +29,16 @@ const createLead = async (req, res) => {
                     phone: phone,
                     role: 'CUSTOMER',
                     password: 'MOCK_PASSWORD'
+                }
+            });
+        } else {
+            // Update existing customer details to match newest request
+            customer = await prisma.user.update({
+                where: { id: customer.id },
+                data: {
+                    name: customerName || name || customer.name,
+                    email: email || customer.email,
+                    phone: phone || customer.phone
                 }
             });
         }
@@ -57,6 +67,7 @@ const createLead = async (req, res) => {
                 location: location || 'Not Specified',
                 description: description || '',
                 servicePlan: servicePlan || 'Starter',
+                preferredDate: preferredDate || null,
                 status: 'OPEN'
             },
             include: { category: true }
@@ -115,7 +126,16 @@ const getLeads = async (req, res) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        res.status(200).json({ success: true, count: leads.length, data: leads });
+        const formattedLeads = leads.map(l => ({
+            ...l,
+            customerName: l.customer?.name || 'Valued Customer',
+            customerEmail: l.customer?.email,
+            customerPhone: l.customer?.phone,
+            categoryName: l.category?.name || 'Uncategorized',
+            displayId: l.leadNo
+        }));
+
+        res.status(200).json({ success: true, count: leads.length, data: formattedLeads });
     } catch (error) {
         console.error("Get Leads Error:", error);
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
@@ -156,6 +176,7 @@ const assignLead = async (req, res) => {
                 categoryName: lead.category.name,
                 location: lead.location,
                 description: lead.description,
+                preferredDate: lead.preferredDate,
                 status: 'SCHEDULED',
                 scheduledDate: new Date(),
                 scheduledTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
@@ -188,9 +209,22 @@ const updateLead = async (req, res) => {
 const deleteLead = async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
+
+        const lead = await prisma.lead.findUnique({ where: { id } });
+        if (!lead) return res.status(404).json({ success: false, message: 'Lead not found' });
+
+        // Admin can delete any lead. 
+        // For Workers, we already authorized them in the route (leadRoutes.js), 
+        // but here we can add extra checks if needed.
+        if (user.role !== 'ADMIN' && user.role !== 'WORKER') {
+             return res.status(403).json({ success: false, message: 'Not authorized to delete leads' });
+        }
+
         await prisma.lead.delete({ where: { id } });
-        res.status(200).json({ success: true, message: 'Lead deleted' });
+        res.status(200).json({ success: true, message: 'Lead deleted successfully' });
     } catch (err) {
+        console.error("Delete Lead Error:", err);
         res.status(500).json({ success: false, message: 'Lead deletion failed' });
     }
 };
@@ -309,10 +343,22 @@ const getSubscriptions = async (req, res) => {
             orderBy: { price: 'asc' }
         });
         
-        const formatted = plans.map(p => ({
-            ...p,
-            features: p.features ? JSON.parse(p.features) : []
-        }));
+        const formatted = plans.map(p => {
+            let parsedFeatures = [];
+            if (p.features) {
+                try {
+                    // Try parsing if it's a string, otherwise use it as is if it's already an array
+                    parsedFeatures = typeof p.features === 'string' ? JSON.parse(p.features) : p.features;
+                } catch (e) {
+                    console.warn(`⚠️ [DB] Invalid JSON features for plan ${p.id}:`, p.features);
+                    parsedFeatures = typeof p.features === 'string' ? p.features.split(',') : [];
+                }
+            }
+            return {
+                ...p,
+                features: Array.isArray(parsedFeatures) ? parsedFeatures : []
+            };
+        });
 
         res.status(200).json({ success: true, data: formatted });
     } catch (err) {
@@ -323,53 +369,60 @@ const getSubscriptions = async (req, res) => {
 
 const enrollInPlan = async (req, res) => {
     try {
-        const { professionalId, professionalName, planName, status } = req.body;
+        const { professionalId, professionalName, planName } = req.body;
         
-        // 1. Find Plan
+        let targetId = professionalId;
+        if (req.user.role === 'WORKER') {
+            targetId = req.user.id;
+        }
+
         const plan = await prisma.subscriptionPlan.findUnique({
             where: { name: planName }
         });
         if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
 
-        // 2. Find or Create User
         let user;
-        if (professionalId) {
-            user = await prisma.user.findUnique({ where: { id: professionalId } });
-        } else {
+        if (targetId) {
+            user = await prisma.user.findUnique({ where: { id: targetId } });
+        } else if (req.user.role === 'ADMIN') {
             user = await prisma.user.findFirst({
                 where: { name: professionalName, role: 'WORKER' }
             });
-            if (!user && professionalName) {
-                user = await prisma.user.findFirst({
-                    where: { name: { contains: professionalName }, role: 'WORKER' }
-                });
-            }
-        }
-
-        // AUTO-CREATE if not found (to help Admin maintain flow)
-        if (!user && professionalName) {
-            const tempEmail = `${professionalName.replace(/\s+/g, '').toLowerCase()}_${Date.now()}@temp.com`;
-            user = await prisma.user.create({
-                data: {
-                    name: professionalName,
-                    email: tempEmail,
-                    phone: `AUTOGEN_${Date.now()}`, // Placeholder
-                    role: 'WORKER',
-                    password: 'TEMP_PASSWORD',
-                    isAvailable: true
-                }
-            });
-            console.log(`[AUTO-USER] Created new worker profile for enrollment: ${professionalName}`);
         }
 
         if (!user) return res.status(404).json({ success: false, message: 'Could not resolve professional' });
 
-        // 3. Update User Plan
+        // NEW FLOW: If caller is a WORKER, we create a REQUEST for ADMIN to approve
+        if (req.user.role === 'WORKER') {
+            const existingRequest = await prisma.subscriptionUpgradeRequest.findFirst({
+                where: { userId: user.id, planId: plan.id, status: 'PENDING' }
+            });
+
+            if (existingRequest) {
+                return res.status(400).json({ success: false, message: 'Existing request for this plan is already pending admin approval.' });
+            }
+
+            const request = await prisma.subscriptionUpgradeRequest.create({
+                data: {
+                    userId: user.id,
+                    planId: plan.id,
+                    status: 'PENDING'
+                }
+            });
+
+            return res.status(200).json({ 
+                success: true, 
+                message: 'Enrollment request submitted! Waiting for Admin Approval.',
+                data: request 
+            });
+        }
+
+        // AUTO-APPROVE if Admin is doing it
         const updated = await prisma.user.update({
             where: { id: user.id },
             data: { 
                 planId: plan.id,
-                subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // +30 days
+                subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) 
             },
             include: { plan: true }
         });
@@ -378,6 +431,62 @@ const enrollInPlan = async (req, res) => {
     } catch (err) {
         console.error("Enrollment Error:", err);
         res.status(500).json({ success: false, message: 'Enrollment failed: ' + err.message });
+    }
+};
+
+const getUpgradeRequests = async (req, res) => {
+    try {
+        const requests = await prisma.subscriptionUpgradeRequest.findMany({
+            include: { user: true, plan: true },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.status(200).json({ success: true, data: requests });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Fetch requests failed' });
+    }
+};
+
+const approveUpgradeRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const upgradeRequest = await prisma.subscriptionUpgradeRequest.findUnique({
+            where: { id },
+            include: { plan: true }
+        });
+
+        if (!upgradeRequest) return res.status(404).json({ success: false, message: 'Request not found' });
+
+        // Update User Plan
+        await prisma.user.update({
+            where: { id: upgradeRequest.userId },
+            data: {
+                planId: upgradeRequest.planId,
+                subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            }
+        });
+
+        // Update Request Status
+        await prisma.subscriptionUpgradeRequest.update({
+            where: { id },
+            data: { status: 'APPROVED' }
+        });
+
+        res.status(200).json({ success: true, message: 'Request Approved! Professional plan updated.' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Approval failed: ' + err.message });
+    }
+};
+
+const rejectUpgradeRequest = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.subscriptionUpgradeRequest.update({
+            where: { id },
+            data: { status: 'REJECTED' }
+        });
+        res.status(200).json({ success: true, message: 'Request Rejected' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Rejection failed' });
     }
 };
 
@@ -404,6 +513,52 @@ const getActiveSubscriptions = async (req, res) => {
     }
 };
 
+const createSubscriptionPlan = async (req, res) => {
+    try {
+        const { name, price, leads, features } = req.body;
+        const plan = await prisma.subscriptionPlan.create({
+            data: {
+                name,
+                price: parseFloat(price),
+                leads: parseInt(leads) || 0,
+                features: features ? (typeof features === 'string' ? features : JSON.stringify(features)) : '[]'
+            }
+        });
+        res.status(201).json({ success: true, data: plan });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Plan creation failed' });
+    }
+};
+
+const updateSubscriptionPlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, price, leads, features } = req.body;
+        const plan = await prisma.subscriptionPlan.update({
+            where: { id },
+            data: {
+                name,
+                price: parseFloat(price),
+                leads: parseInt(leads) || 0,
+                features: features ? (typeof features === 'string' ? features : JSON.stringify(features)) : undefined
+            }
+        });
+        res.status(200).json({ success: true, data: plan });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Plan update failed' });
+    }
+};
+
+const deleteSubscriptionPlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        await prisma.subscriptionPlan.delete({ where: { id } });
+        res.status(200).json({ success: true, message: 'Plan deleted' });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Plan deletion failed' });
+    }
+};
+
 module.exports = {
     createLead,
     getLeads,
@@ -418,5 +573,11 @@ module.exports = {
     getLocations,
     getSubscriptions,
     enrollInPlan,
-    getActiveSubscriptions
+    getActiveSubscriptions,
+    createSubscriptionPlan,
+    updateSubscriptionPlan,
+    deleteSubscriptionPlan,
+    getUpgradeRequests,
+    approveUpgradeRequest,
+    rejectUpgradeRequest
 };

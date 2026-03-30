@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import SearchBar from './SearchBar';
 
 const words = ['Job', 'Worker', 'Lead', 'Contract'];
 
@@ -28,15 +29,16 @@ const HeroSection = () => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden',
+        overflow: 'visible',
         paddingTop: 80,
       }}
     >
-      {/* Real Map Background */}
+      {/* Real Map Background - Handle overflow here */}
       <div style={{
         position: 'absolute',
         inset: 0,
         zIndex: 0,
+        overflow: 'hidden'
       }}>
         <iframe
           src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d14724.205058627349!2d75.8650035!3d22.68913545!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773642840506!5m2!1sen!2sin"
@@ -130,19 +132,10 @@ const HeroSection = () => {
           </span>
         </h1>
 
-        {/* CTA Button */}
-        <Link
-          to="/request-service"
-          className="btn-black"
-          style={{
-            padding: '14px 44px',
-            fontSize: 16,
-            borderRadius: 12,
-            marginTop: 4,
-          }}
-        >
-          Request Service
-        </Link>
+        {/* Search Bar - Main CTA */}
+        <div className="w-full max-w-4xl">
+           <SearchBar />
+        </div>
       </div>
     </section>
   );

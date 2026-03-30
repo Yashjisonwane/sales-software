@@ -39,10 +39,10 @@ const ProfessionalLayout = () => {
     const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/professional/dashboard' },
         { icon: Briefcase, label: 'Leads', path: '/professional/leads' },
+        // { icon: Map, label: 'Map View', path: '/professional/map' },
         { icon: MessageSquare, label: 'Messages', path: '/professional/messages' },
         { icon: Star, label: 'Reviews', path: '/professional/reviews' },
         { icon: CreditCard, label: 'Subscription', path: '/professional/subscription' },
-        { icon: User, label: 'Profile', path: '/professional/profile' },
         { icon: Settings, label: 'Settings', path: '/professional/settings' },
     ];
 
@@ -103,7 +103,7 @@ const ProfessionalLayout = () => {
                                 )}
                             </button>
                         </div>
-                        <div className="flex items-center gap-2 sm:gap-3 cursor-pointer" onClick={() => navigate('/professional/profile')}>
+                        <div className="flex items-center gap-2 sm:gap-3 cursor-pointer" onClick={() => navigate('/professional/settings')}>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shrink-0">
                                 {currentUser?.name?.charAt(0) || 'P'}
                             </div>

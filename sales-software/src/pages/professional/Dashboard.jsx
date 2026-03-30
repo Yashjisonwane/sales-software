@@ -13,7 +13,8 @@ import {
     Star,
     Zap,
     ChevronRight,
-    ListChecks
+    ListChecks,
+    Crown
 } from 'lucide-react';
 import LeadTable from '../../components/professional/LeadTable';
 import LeadMap from '../../components/professional/LeadMap';
@@ -51,15 +52,32 @@ const Dashboard = () => {
         color: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[0],
         bg: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[1]
     })) : [
-        { name: 'New Leads Today', value: proAssignments.filter(a => a.status === 'Sent' || a.status === 'Viewed').length, icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%', up: true },
+        { 
+            name: 'New Leads Today', 
+            value: proAssignments.filter(a => {
+                const s = a.status?.toLowerCase();
+                return s === 'sent' || s === 'viewed' || s === 'new' || s === 'scheduled';
+            }).length, 
+            icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%', up: true 
+        },
         { name: 'Total Leads', value: proAssignments.length, icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+8%', up: true },
-        { name: 'Accepted Leads', value: proAssignments.filter(a => a.status === 'Accepted').length, icon: ListChecks, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%', up: true },
-        { name: 'Conversion Rate', value: '0%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+0%', up: true },
+        { 
+            name: 'Accepted Leads', 
+            value: proAssignments.filter(a => {
+                const s = a.status?.toLowerCase();
+                return s === 'accepted' || s === 'in progress' || s === 'active';
+            }).length, 
+            icon: ListChecks, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%', up: true 
+        },
+        { name: 'Conversion Rate', value: proAssignments.length > 0 ? ((proAssignments.filter(a => a.status?.toLowerCase() === 'completed').length / proAssignments.length) * 100).toFixed(0) + '%' : '0%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+0%', up: true },
     ];
 
     // Leads for map - combine lead data with assignment status
     const mapLeads = leads
-        .filter(l => proAssignments.some(a => a.leadId === l.id && a.status !== 'Rejected'))
+        .filter(l => proAssignments.some(a => {
+            const s = a.status?.toLowerCase();
+            return a.leadId === l.id && s !== 'rejected';
+        }))
         .map(l => {
             const assignment = proAssignments.find(a => a.leadId === l.id);
             return { ...l, status: assignment?.status || 'Sent' };
@@ -67,7 +85,10 @@ const Dashboard = () => {
 
     // Recent leads for this professional — attach assignmentStatus so LeadTable renders correct buttons
     const recentLeads = leads
-        .filter(l => proAssignments.some(a => a.leadId === l.id && (['Sent', 'Viewed', 'Accepted', 'In Progress'].includes(a.status)) && a.status !== 'Rejected'))
+        .filter(l => proAssignments.some(a => {
+            const s = a.status?.toLowerCase();
+            return a.leadId === l.id && (['sent', 'viewed', 'accepted', 'in progress', 'active', 'scheduled', 'new'].includes(s)) && s !== 'rejected';
+        }))
         .slice(0, 10)
         .map(l => {
             const assignment = proAssignments.find(a => a.leadId === l.id);
@@ -98,6 +119,12 @@ const Dashboard = () => {
                 <div className="w-full">
                     <h1 className="text-2xl font-bold text-slate-900">Professional Overview</h1>
                     <p className="text-sm md:text-base text-gray-500 mt-1 font-medium leading-relaxed">Welcome back, {currentUser.name}! Here's your business performance today.</p>
+                    {currentUser.plan && (
+                        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-lg border border-purple-100 shadow-sm transition-all hover:shadow-md animate-in fade-in slide-in-from-top-1 duration-500">
+                            <Crown size={14} className="text-purple-600" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">{currentUser.plan.name} Tier</span>
+                        </div>
+                    )}
                 </div>
                 <div className="w-full md:w-auto px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-bold text-gray-600 flex items-center justify-between md:justify-start gap-2">
                     <div className="flex items-center gap-2">

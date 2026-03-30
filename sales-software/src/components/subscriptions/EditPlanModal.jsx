@@ -5,13 +5,13 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
     const [form, setForm] = useState({
         name: '',
         price: '',
-        leadsLimit: '',
-        features: {
+        leads: '',
+        features: [],
+        settings: {
             priority: false,
             support: 'Email',
             premiumAccess: false
-        },
-        featureList: []
+        }
     });
     const [newFeature, setNewFeature] = useState('');
 
@@ -20,18 +20,18 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
             setForm({
                 name: plan.name || '',
                 price: plan.price || '',
-                leadsLimit: plan.leadsLimit || '',
-                features: plan.features || {
+                leads: plan.leads || '',
+                features: Array.isArray(plan.features) ? plan.features : (typeof plan.features === 'string' ? JSON.parse(plan.features) : []),
+                settings: plan.settings || {
                     priority: false,
                     support: 'Email',
                     premiumAccess: false
-                },
-                featureList: plan.featureList || []
+                }
             });
         }
     }, [plan]);
 
-    if (!isOpen || !plan) return null;
+    if (!isOpen) return null;
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -39,7 +39,7 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
             const featName = name.replace('feat_', '');
             setForm(prev => ({
                 ...prev,
-                features: { ...prev.features, [featName]: type === 'checkbox' ? checked : value }
+                settings: { ...prev.settings, [featName]: type === 'checkbox' ? checked : value }
             }));
         } else {
             setForm(prev => ({ ...prev, [name]: value }));
@@ -52,6 +52,8 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
         onClose();
     };
 
+    const isEdit = !!(plan && plan.id);
+
     return (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300" onClick={onClose} />
@@ -59,10 +61,10 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
                 <div className="flex items-center justify-between px-8 pt-8 pb-2">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-100">
-                            <Edit size={20} strokeWidth={2.5} />
+                            {isEdit ? <Edit size={20} strokeWidth={2.5} /> : <Save size={20} strokeWidth={2.5} />}
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900">Configure {plan.name} Tier</h2>
+                            <h2 className="text-xl font-bold text-gray-900">{isEdit ? `Edit ${plan.name}` : 'Create New Plan'}</h2>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest italic">Plan Settings & Features</p>
                         </div>
                     </div>
@@ -76,56 +78,30 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Plan Name</label>
                             <input name="name" value={form.name} onChange={handleChange} required
-                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+                                placeholder="e.g. Starter" />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Price / Month</label>
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">$</span>
                                 <input name="price" value={form.price} onChange={handleChange} required
-                                    className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                                    className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+                                    placeholder="0.00" />
                             </div>
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Leads Limit (Per Month)</label>
-                        <input name="leadsLimit" value={form.leadsLimit} onChange={handleChange} required
+                        <input name="leads" value={form.leads} onChange={handleChange} required
                             className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
-                            placeholder="e.g. 50 or Unlimited" />
-                    </div>
-
-                    <div className="space-y-4 pt-2">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2">Toggle Entitlements</p>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <label className="flex items-center justify-between p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 hover:border-blue-200 cursor-pointer transition-all group">
-                                <span className="text-xs font-bold text-gray-600 group-hover:text-blue-600 transition-colors">Priority Listing</span>
-                                <input type="checkbox" name="feat_priority" checked={form.features.priority} onChange={handleChange}
-                                    className="w-5 h-5 rounded-lg border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                            </label>
-
-                            <label className="flex items-center justify-between p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100 hover:border-blue-200 cursor-pointer transition-all group">
-                                <span className="text-xs font-bold text-gray-600 group-hover:text-blue-600 transition-colors">Premium Access</span>
-                                <input type="checkbox" name="feat_premiumAccess" checked={form.features.premiumAccess} onChange={handleChange}
-                                    className="w-5 h-5 rounded-lg border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                            </label>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Service Support Level</label>
-                            <select name="feat_support" value={form.features.support} onChange={handleChange}
-                                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all appearance-none cursor-pointer">
-                                <option value="Email Support">Basic Email Support</option>
-                                <option value="Priority Support">Priority Support (24h)</option>
-                                <option value="24/7 Dedicated Support">24/7 Dedicated Support</option>
-                            </select>
-                        </div>
+                            placeholder="e.g. 50 or 0 for Unlimited" />
                     </div>
 
                     {/* Dynamic Plan Features Section */}
                     <div className="space-y-4 pt-4 border-t border-gray-50">
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Dynamic Features</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Plan Features</p>
                         
                         <div className="flex gap-2">
                             <input 
@@ -138,8 +114,8 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
                             <button 
                                 type="button"
                                 onClick={() => {
-                                    if (newFeature.trim() && !form.featureList.includes(newFeature.trim())) {
-                                        setForm(prev => ({ ...prev, featureList: [...prev.featureList, newFeature.trim()] }));
+                                    if (newFeature.trim() && !form.features.includes(newFeature.trim())) {
+                                        setForm(prev => ({ ...prev, features: [...prev.features, newFeature.trim()] }));
                                         setNewFeature('');
                                     }
                                 }}
@@ -150,7 +126,7 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-2">
-                            {form.featureList.map((feature, idx) => (
+                            {(Array.isArray(form.features) ? form.features : []).map((feature, idx) => (
                                 <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 group animate-in slide-in-from-left-2 duration-200 shadow-sm">
                                     <div className="flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
@@ -158,7 +134,7 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
                                     </div>
                                     <button 
                                         type="button"
-                                        onClick={() => setForm(prev => ({ ...prev, featureList: prev.featureList.filter((_, i) => i !== idx) }))}
+                                        onClick={() => setForm(prev => ({ ...prev, features: prev.features.filter((_, i) => i !== idx) }))}
                                         className="p-1.5 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                                     >
                                         <X size={14} />
@@ -171,7 +147,8 @@ const EditPlanModal = ({ isOpen, onClose, plan, onSave }) => {
                     <div className="flex gap-3 pt-6 sticky bottom-0 bg-white/80 backdrop-blur-sm">
                         <button type="button" onClick={onClose} className="flex-1 px-6 py-3.5 text-gray-500 font-bold hover:bg-gray-50 rounded-2xl transition-all text-sm">Cancel</button>
                         <button type="submit" className="flex-2 px-10 py-3.5 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-xl shadow-blue-100">
-                            <Save size={18} /><span>Apply Changes</span>
+                            {isEdit ? <Save size={18} /> : <Check size={18} />}
+                            <span>{isEdit ? 'Save Changes' : 'Create Plan'}</span>
                         </button>
                     </div>
                 </form>

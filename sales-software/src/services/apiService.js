@@ -288,6 +288,33 @@ export const fetchAllSubscriptions = async () => {
     }
 };
 
+export const createSubscriptionPlan = async (planData) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.LEADS}/subscriptions`, planData);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const updateSubscriptionPlan = async (id, planData) => {
+    try {
+        const response = await apiClient.put(`${ENDPOINTS.LEADS}/subscriptions/${id}`, planData);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const deleteSubscriptionPlan = async (id) => {
+    try {
+        const response = await apiClient.delete(`${ENDPOINTS.LEADS}/subscriptions/${id}`);
+        return { success: true };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
 export const fetchActiveSubscriptions = async () => {
     try {
         const response = await apiClient.get(`${ENDPOINTS.LEADS}/subscriptions/active`);
@@ -300,7 +327,7 @@ export const fetchActiveSubscriptions = async () => {
 export const enrollInSubscription = async (enrollData) => {
     try {
         const response = await apiClient.post(`${ENDPOINTS.LEADS}/subscriptions/enroll`, enrollData);
-        return { success: true, data: response.data.data };
+        return { success: true, data: response.data.data, message: response.data.message };
     } catch (err) {
         return { success: false, error: err.response?.data?.message || err.message };
     }
@@ -324,4 +351,62 @@ export const updateUserProfile = async (userData) => {
     }
 };
 
+// ─── PROFESSIONAL REQUESTS ───────────────────────────────────
 
+export const fetchAllProfessionalRequests = async () => {
+    try {
+        const response = await apiClient.get('/professional-requests');
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] fetchAllProfessionalRequests error:', err);
+        return { success: false, error: err.message };
+    }
+};
+
+export const approveProfessionalRequest = async (id) => {
+    try {
+        const response = await apiClient.put(`/professional-requests/${id}/approve`);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] approveProfessionalRequest error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const rejectProfessionalRequest = async (id) => {
+    try {
+        const response = await apiClient.delete(`/professional-requests/${id}/reject`);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] rejectProfessionalRequest error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+
+export const fetchSubscriptionUpgradeRequests = async () => {
+    try {
+        const response = await apiClient.get(`${ENDPOINTS.LEADS}/subscriptions/upgrade-requests`);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const approveSubscriptionUpgrade = async (id) => {
+    try {
+        const response = await apiClient.put(`${ENDPOINTS.LEADS}/subscriptions/upgrade-requests/${id}/approve`);
+        return { success: true, data: response.data.message };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const rejectSubscriptionUpgrade = async (id) => {
+    try {
+        const response = await apiClient.put(`${ENDPOINTS.LEADS}/subscriptions/upgrade-requests/${id}/reject`);
+        return { success: true, data: response.data.message };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};

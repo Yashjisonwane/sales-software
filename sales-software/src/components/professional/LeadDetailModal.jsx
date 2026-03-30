@@ -96,7 +96,7 @@ const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Phone Number</p>
-                                        <p className="text-sm md:text-base font-bold text-gray-900">{lead.phone || '987-654-3210'}</p>
+                                        <p className="text-sm md:text-base font-bold text-gray-900">{lead.customerPhone || 'Not Provided'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-4">
@@ -105,7 +105,7 @@ const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
                                     </div>
                                     <div className="min-w-0">
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Email Address</p>
-                                        <p className="text-sm md:text-base font-bold text-gray-900 truncate">{lead.customerEmail || 'customer@example.com'}</p>
+                                        <p className="text-sm md:text-base font-bold text-gray-900 truncate">{lead.customerEmail || 'Not Provided'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -114,12 +114,19 @@ const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
 
                     {/* Description Section */}
                     <div className="space-y-4">
-                        <h3 className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-[0.2em] px-1">Job Description</h3>
+                        <h3 className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-[0.2em] px-1">Job Details & Requests</h3>
                         <div className="bg-gray-50/50 p-6 md:p-8 rounded-[2rem] border border-gray-100 relative group transition-colors hover:bg-gray-50">
                             <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600/10 rounded-l-[2rem]"></div>
-                            <p className="text-sm md:text-lg text-gray-700 leading-relaxed font-medium italic">
-                                "{lead.description}"
-                            </p>
+                            <div className="space-y-4">
+                                {lead.servicePlan && (
+                                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-700 rounded-lg border border-amber-100 text-[10px] font-black uppercase tracking-widest">
+                                        Plan: {lead.servicePlan}
+                                    </div>
+                                )}
+                                <p className="text-sm md:text-lg text-gray-700 leading-relaxed font-medium italic">
+                                    "{lead.description || 'No specific description provided.'}"
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>

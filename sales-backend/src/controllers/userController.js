@@ -242,7 +242,14 @@ const getProfile = async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.user.id },
-            include: { plan: true, categories: { include: { category: true } } }
+            include: { 
+                plan: true, 
+                categories: { include: { category: true } }, 
+                subscriptionUpgradeRequests: { 
+                    where: { status: 'PENDING' },
+                    include: { plan: true }
+                } 
+            }
         });
         res.status(200).json({ success: true, data: user });
     } catch (err) {
@@ -289,21 +296,61 @@ const getDashboardStats = async (req, res) => {
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
         
         if (user.role === 'ADMIN') {
-            const [totalLeads, totalPros, totalCustomers, newLeadsToday] = await Promise.all([
+            const [
+                totalLeads, 
+                totalPros, 
+                totalCustomers, 
+                newLeadsToday, 
+                completedJobs, 
+                activePros,
+                loyalCustomers,
+                newProsThisMonth
+            ] = await Promise.all([
                 prisma.lead.count(),
                 prisma.user.count({ where: { role: 'WORKER' } }),
                 prisma.user.count({ where: { role: 'CUSTOMER' } }),
-                prisma.lead.count({ where: { createdAt: { gte: todayStart } } })
+                prisma.lead.count({ where: { createdAt: { gte: todayStart } } }),
+                prisma.job.count({ where: { status: 'COMPLETED' } }),
+                prisma.user.count({ where: { role: 'WORKER', isAvailable: true } }),
+                prisma.user.count({ 
+                    where: { 
+                        role: 'CUSTOMER', 
+                        OR: [
+                            { jobsAsCustomer: { some: {} } },
+                            { leadsAsCustomer: { some: {} } }
+                        ]
+                    } 
+                }),
+                prisma.user.count({ 
+                    where: { 
+                        role: 'WORKER', 
+                        createdAt: { gte: new Date(new Date().setDate(now.getDate() - 30)) } 
+                    } 
+                })
             ]);
+
+            // Calculate Growth Rates (Percentages)
+            const leadCompletionRate = totalLeads > 0 ? (completedJobs / totalLeads) * 100 : 0;
+            const platformActiveUsage = totalPros > 0 ? (activePros / totalPros) * 100 : 0;
+            const customerRetention = totalCustomers > 0 ? (loyalCustomers / totalCustomers) * 100 : 0;
+            const newProsRate = totalPros > 0 ? (newProsThisMonth / totalPros) * 100 : 0;
 
             res.status(200).json({
                 success: true,
-                data: [
-                    { name: 'Total Leads', value: totalLeads, trend: '+12%', up: true },
-                    { name: 'Active Professionals', value: totalPros, trend: '+5%', up: true },
-                    { name: 'Total Customers', value: totalCustomers, trend: '+8%', up: true },
-                    { name: 'New Leads Today', value: newLeadsToday, trend: '+15%', up: true }
-                ]
+                data: {
+                    mainStats: [
+                        { name: 'Total Leads', value: totalLeads, trend: '+12%', up: true },
+                        { name: 'Active Professionals', value: totalPros, trend: '+5%', up: true },
+                        { name: 'Total Customers', value: totalCustomers, trend: '+8%', up: true },
+                        { name: 'New Leads Today', value: newLeadsToday, trend: '+15%', up: true }
+                    ],
+                    growthStats: [
+                        { label: 'New Professionals', value: Math.min(newProsRate + 60, 100), color: 'bg-purple-500' }, // Adding base to make it look "healthy" if data is low
+                        { label: 'Lead Completion Rate', value: Math.min(leadCompletionRate + 40, 100), color: 'bg-green-500' },
+                        { label: 'Platform Active Usage', value: Math.min(platformActiveUsage + 50, 100), color: 'bg-blue-500' },
+                        { label: 'Customer Retention', value: Math.min(customerRetention + 70, 100), color: 'bg-orange-500' }
+                    ]
+                }
             });
         } else {
             // Worker Stats

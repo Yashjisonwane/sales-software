@@ -1,40 +1,44 @@
-import React from 'react';
-import { Check, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, ArrowRight, Zap, Shield, Crown } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import * as apiService from '../apiService';
 
 const PricingSection = () => {
-  const plans = [
-    {
-      id: 'starter',
-      name: 'Starter Service Plan',
-      price: '99',
-      features: [
-        'General System Diagnostics',
-        'Standard Role Allocation',
-        'Basic Documentation',
-        'Email Support',
-        'Standard Response Time'
-      ],
-      isPopular: false
-    },
-    {
-      id: 'premium',
-      name: 'Premium Care Plan',
-      price: '249',
-      features: [
-        'Full System Inspection',
-        'Priority Technical Roles',
-        'Enhanced Documentation (Photos/Notes)',
-        'Full Digital Invoice Generation',
-        '24/7 Priority Support',
-        'Emergency Response (2-4 Hours)'
-      ],
-      isPopular: true
-    }
-  ];
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    
+    const loadPlans = async () => {
+      try {
+        const res = await apiService.fetchSubscriptions();
+        if (res.success) {
+          setPlans(res.data.map((p, index) => ({
+            ...p,
+            isPopular: index === 1, // Second plan is popular by default
+            icon: p.name.toLowerCase().includes('starter') ? Zap : p.name.toLowerCase().includes('care') || p.name.toLowerCase().includes('pro') ? Shield : Crown
+          })));
+        }
+      } catch (err) {
+        console.error("Failed to load plans:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadPlans();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  if (loading) return (
+    <div className="py-20 text-center font-bold text-gray-400">Loading dynamic plans...</div>
+  );
 
   return (
-    <section className="section-padding" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #F3F4F6' }}>
+    <section id="pricing" className="section-padding" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #F3F4F6' }}>
       <div className="container-max" style={{ maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 60, padding: '0 24px' }}>
           <h2 style={{ 
@@ -52,15 +56,15 @@ const PricingSection = () => {
             fontSize: 16,
             lineHeight: 1.6
           }}>
-            Select a pre-configured service plan created from your dashboard or proceed with a manual setup.
+            Select a service tier tailored to your needs. These plans are managed live from our administration dashboard.
           </p>
         </div>
 
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
+          gridTemplateColumns: windowWidth > 992 ? 'repeat(3, 1fr)' : 'repeat(auto-fit, minmax(300px, 1fr))', 
           gap: 32, 
-          maxWidth: 1000, 
+          maxWidth: 1200, 
           margin: '0 auto',
           padding: '0 24px'
         }}>
@@ -96,15 +100,20 @@ const PricingSection = () => {
               )}
               
               <div style={{ marginBottom: 32 }}>
-                <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a', marginBottom: 8 }}>{plan.name}</h3>
+                <div className="flex items-center gap-3 mb-4">
+                   <div style={{ p: 8, borderRadius: 12, backgroundColor: plan.isPopular ? '#F5F3FF' : '#F9FAFB', color: plan.isPopular ? '#7C3AED' : '#6B7280' }}>
+                      <plan.icon size={22} />
+                   </div>
+                   <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>{plan.name}</h3>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                   <span style={{ fontSize: 42, fontWeight: 800, color: '#1a1a1a' }}>${plan.price}</span>
-                  <span style={{ fontSize: 14, color: '#6B7280' }}>/ job</span>
+                  <span style={{ fontSize: 14, color: '#6B7280' }}>/ job {plan.leads > 0 && `(Limited to ${plan.leads} leads)`}</span>
                 </div>
               </div>
 
               <div style={{ flex: 1, marginBottom: 40 }}>
-                {plan.features.map((feature, i) => (
+                {(Array.isArray(plan.features) ? plan.features : []).map((feature, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
                     <div style={{ 
                       marginTop: 4, 
@@ -119,7 +128,7 @@ const PricingSection = () => {
               </div>
 
               <Link 
-                to="/job-details" 
+                to={`/become-professional?plan=${encodeURIComponent(plan.name)}`} 
                 className={plan.isPopular ? "btn-blue" : "btn-black"}
                 style={{ 
                   width: '100%', 
@@ -138,6 +147,11 @@ const PricingSection = () => {
               </Link>
             </div>
           ))}
+          {plans.length === 0 && !loading && (
+             <div className="col-span-full text-center p-12 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200 text-gray-400 font-bold">
+                No active service plans found in the dashboard.
+             </div>
+          )}
         </div>
       </div>
     </section>

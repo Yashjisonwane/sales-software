@@ -5,7 +5,7 @@ const { protect, authorize } = require('../middlewares/authMiddleware');
 
 // @route   GET/POST /api/v1/jobs
 router.get('/', protect, getJobs);
-router.post('/', protect, authorize('ADMIN'), createJob);
+router.post('/', protect, authorize('ADMIN', 'WORKER'), createJob);
 
 // @route   PATCH /api/v1/jobs/:id
 router.patch('/:id', protect, updateJob);

@@ -23,7 +23,7 @@ const MarketplaceDashboard = () => {
         'New Leads Today': 'text-green-600 bg-green-50'
     };
 
-    const stats = (dashboardStats && dashboardStats.length > 0) ? dashboardStats.map(s => ({
+    const stats = (dashboardStats && dashboardStats.mainStats) ? dashboardStats.mainStats.map(s => ({
         ...s,
         icon: statIcons[s.name] || Activity,
         color: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[0],
@@ -36,8 +36,13 @@ const MarketplaceDashboard = () => {
     ];
 
     // Mock chart data for visualization
-    const leadsToday = (dashboardStats && Array.isArray(dashboardStats)) ? (dashboardStats.find(s => s.name === 'New Leads Today')?.value || 0) : 0;
-    const conversionRate = 89.2;
+    const leadsToday = (dashboardStats && dashboardStats.mainStats) ? (dashboardStats.mainStats.find(s => s.name === 'New Leads Today')?.value || 0) : 0;
+    const growthStats = (dashboardStats && dashboardStats.growthStats) ? dashboardStats.growthStats : [
+        { label: 'New Professionals', value: 78, max: 100, color: 'bg-purple-500' },
+        { label: 'Lead Completion Rate', value: 89.2, max: 100, color: 'bg-green-500' },
+        { label: 'Platform Active Usage', value: 83, max: 100, color: 'bg-blue-500' },
+        { label: 'Customer Retention', value: 91, max: 100, color: 'bg-orange-500' },
+    ];
 
     // Mock chart data based on filter
     const weeklyData = [40, 70, 55, 90, 65, 80, leadsToday * 10 || 50];
@@ -129,12 +134,7 @@ const MarketplaceDashboard = () => {
                     </div>
 
                     <div className="space-y-5 flex-1">
-                        {[
-                            { label: 'New Professionals', value: 78, max: 100, color: 'bg-purple-500' },
-                            { label: 'Lead Completion Rate', value: conversionRate, max: 100, color: 'bg-green-500' },
-                            { label: 'Platform Active Usage', value: 83, max: 100, color: 'bg-blue-500' },
-                            { label: 'Customer Retention', value: 91, max: 100, color: 'bg-orange-500' },
-                        ].map((item, i) => (
+                        {growthStats.map((item, i) => (
                             <div key={i}>
                                 <div className="flex justify-between mb-2">
                                     <span className="text-sm font-medium text-gray-700">{item.label}</span>
