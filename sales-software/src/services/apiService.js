@@ -240,6 +240,15 @@ export const updateProfessionalStatus = async (isAvailable) => {
     }
 };
 
+export const updateProfessionalTracking = async (enabled) => {
+    try {
+        const response = await apiClient.put('/users/profile', { trackingEnabled: enabled });
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};
+
 // ─── OTHER DASHBOARD DATA ───────────────────────────────────
 
 export const fetchDashboardStats = async () => {

@@ -382,10 +382,21 @@ export const MarketplaceProvider = ({ children }) => {
     const updateProfessionalStatus = async (isAvailable) => {
         const res = await apiService.updateProfessionalStatus(isAvailable);
         if (res.success) {
+            // Update BOTH the local list AND the current user state
+            setCurrentUser(prev => ({ ...prev, isAvailable }));
             setProfessionals(prev => prev.map(p => p.id === currentUser?.id ? { ...p, isAvailable, onlineStatus: isAvailable ? 'Online' : 'Offline' } : p));
+            showToast(`Status set to ${isAvailable ? 'Online' : 'Offline'}`, 'info');
             return res;
         }
         return res;
+    };
+
+    const toggleTrackingSetting = async (userId, enabled) => {
+        const res = await apiService.updateProfessionalTracking(enabled);
+        if (res.success) {
+            setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled }));
+            showToast(`Tracking ${enabled ? 'Enabled' : 'Disabled'}`, 'info');
+        }
     };
 
     const addProfessional = async (userData) => {
@@ -448,9 +459,6 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    const toggleTrackingSetting = (enabled) => {
-        showToast(`Tracking ${enabled ? 'Enabled' : 'Disabled'}`, 'info');
-    };
 
     // --- CATEGORIES ---
     const addCategory = async (data) => {
