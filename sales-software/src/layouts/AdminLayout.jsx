@@ -8,7 +8,7 @@ import Toast from '../components/Toast';
 import Sidebar from '../components/Sidebar';
 
 const AdminLayout = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const [notifMenuOpen, setNotifMenuOpen] = useState(false);
     const { notifications, toast, showToast, markNotificationRead, clearNotifications, currentUser } = useMarketplace();
@@ -68,8 +68,9 @@ const AdminLayout = () => {
                 <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shrink-0 sticky top-0 z-30">
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                         <button
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
-                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors shrink-0"
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSidebarOpen(!sidebarOpen); }}
+                            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all shrink-0 cursor-pointer active:scale-95"
                         >
                             <Menu size={20} className="sm:w-[22px]" />
                         </button>

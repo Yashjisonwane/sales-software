@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Clock, ChevronRight, X, Briefcase, Tag, Map, Eye, Edit2, Trash2, CheckCircle2, Download } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, User, Phone, MapPin, Calendar, Clock, ChevronRight, X, Briefcase, Tag, Map, Eye, Edit2, Trash2, CheckCircle2, Download, ChevronDown } from 'lucide-react';
 
 const AdminJobs = () => {
     const navigate = useNavigate();
@@ -28,21 +28,41 @@ const AdminJobs = () => {
         status: 'Scheduled'
     });
 
-    const filteredJobs = jobs.filter(job => {
-        const matchesSearch = 
-            job?.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job?.displayId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job?.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            job?.category?.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        // Normalize status for comparison (handle 'In Progress' vs 'IN_PROGRESS' etc if needed)
-        const jobStatus = (job?.status || '').toUpperCase().replace(/_/g, ' ');
-        const filterStatus = statusFilter.toUpperCase();
-        
-        const matchesStatus = statusFilter === 'All' || jobStatus === filterStatus;
-        
-        return matchesSearch && matchesStatus;
-    });
+    const counts = useMemo(() => {
+        const c = { All: jobs.length, Scheduled: 0, 'In Progress': 0, Estimated: 0, Invoiced: 0, Completed: 0 };
+        jobs.forEach(job => {
+            const s = (job?.status || '').toUpperCase().replace(/_/g, ' ');
+            if (s === 'SCHEDULED' || s === 'ACCEPTED') c.Scheduled++;
+            else if (s === 'IN PROGRESS') c['In Progress']++;
+            else if (s === 'ESTIMATED') c.Estimated++;
+            else if (s === 'INVOICED') c.Invoiced++;
+            else if (s === 'COMPLETED') c.Completed++;
+        });
+        return c;
+    }, [jobs]);
+
+    const filteredJobs = useMemo(() => {
+        return jobs.filter(job => {
+            const matchesSearch = 
+                (job?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (job?.displayId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (job?.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (job?.category || '').toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const jobStatus = (job?.status || '').toUpperCase().replace(/_/g, ' ');
+            
+            if (statusFilter === 'All') return matchesSearch;
+            
+            let matchStatus = false;
+            if (statusFilter === 'Scheduled') matchStatus = jobStatus === 'SCHEDULED' || jobStatus === 'ACCEPTED';
+            else if (statusFilter === 'In Progress') matchStatus = jobStatus === 'IN PROGRESS';
+            else if (statusFilter === 'Estimated') matchStatus = jobStatus === 'ESTIMATED';
+            else if (statusFilter === 'Invoiced') matchStatus = jobStatus === 'INVOICED';
+            else if (statusFilter === 'Completed') matchStatus = jobStatus === 'COMPLETED';
+            
+            return matchesSearch && matchStatus;
+        });
+    }, [jobs, searchTerm, statusFilter]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -132,19 +152,21 @@ const AdminJobs = () => {
                     />
                 </div>
                 
-                <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
-                    {['All', 'Scheduled', 'In Progress', 'Estimated', 'Invoiced', 'Completed'].map(status => (
-                        <button
-                            key={status}
-                            onClick={() => setStatusFilter(status)}
-                            className={`px-5 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all border ${statusFilter === status ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'}`}
-                        >
-                            {status}
-                        </button>
-                    ))}
+                <div className="relative min-w-[200px]">
+                    <Filter className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <select
+                        className="w-full pl-11 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer hover:bg-gray-100 transition-all text-gray-700"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                        {['All', 'Scheduled', 'In Progress', 'Estimated', 'Invoiced', 'Completed'].map(status => (
+                            <option key={status} value={status}>{status} ({counts[status]})</option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 </div>
                 
-                <button className="hidden xl:flex items-center justify-center px-5 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-gray-700 transition shadow-sm gap-2">
+                <button className="hidden xl:flex items-center justify-center px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-gray-700 transition shadow-sm gap-2">
                      <Download size={14} /> Export
                 </button>
             </div>
