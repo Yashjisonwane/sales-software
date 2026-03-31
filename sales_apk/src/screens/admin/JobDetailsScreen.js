@@ -86,12 +86,12 @@ const JobDetailsScreen = ({ navigation, route }) => {
         >
           <View style={styles.mainInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.workerName}>Alistair Hughes</Text>
-              <View style={styles.newBadge}><Text style={styles.newBadgeText}>New</Text></View>
-              <Text style={styles.priceText}>$43 <Text style={styles.perHour}>per hour</Text></Text>
+              <Text style={styles.workerName}>{route.params?.job?.customerName || 'Active Job'}</Text>
+              <View style={styles.newBadge}><Text style={styles.newBadgeText}>{route.params?.job?.status || 'Active'}</Text></View>
+              <Text style={styles.priceText}>${route.params?.job?.amount || '250'}</Text>
             </View>
-            <Text style={styles.address}>123 E Market St Boulder, CO 80304,USA</Text>
-            <Text style={styles.distTime}>4.5 mi  •  12 m</Text>
+            <Text style={styles.address}>{route.params?.job?.location || 'No location provided'}</Text>
+            <Text style={styles.distTime}>{route.params?.job?.categoryName || 'Service'}</Text>
 
             <View style={styles.actionRow}>
               <TouchableOpacity style={styles.blueActionBtn}>
@@ -141,15 +141,15 @@ const JobDetailsScreen = ({ navigation, route }) => {
             <View style={styles.detailsList}>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Service Type</Text>
-                <Text style={styles.detailValue}>Roof Repair</Text>
+                <Text style={styles.detailValue}>{route.params?.job?.categoryName || 'N/A'}</Text>
               </View>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Preferred Schedule</Text>
-                <Text style={styles.detailValue}>ASAP - Within 48 hours</Text>
+                <Text style={styles.detailLabel}>Scheduled Time</Text>
+                <Text style={styles.detailValue}>{route.params?.job?.scheduledTime || 'Not set'}</Text>
               </View>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Budget Range</Text>
-                <Text style={styles.detailValue}>$2,000 - $3,500</Text>
+                <Text style={styles.detailLabel}>Budget</Text>
+                <Text style={styles.detailValue}>${route.params?.job?.amount || '0'}</Text>
               </View>
             </View>
           </View>

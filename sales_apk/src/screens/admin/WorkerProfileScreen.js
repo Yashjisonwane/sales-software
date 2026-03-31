@@ -28,8 +28,16 @@ const MetricCard = ({ label, value, change, color }) => (
     </View>
 );
 
-export default function WorkerProfileScreen({ navigation }) {
+export default function WorkerProfileScreen({ navigation, route }) {
     const insets = useSafeAreaInsets();
+    const worker = route.params?.worker || { 
+        name: route.params?.name || 'Worker Profile', 
+        role: 'Subcontractor',
+        profession: 'Professional',
+        createdAt: new Date().toISOString()
+    };
+
+    const initials = worker.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'WP';
 
     return (
         <View style={styles.container}>
@@ -47,13 +55,13 @@ export default function WorkerProfileScreen({ navigation }) {
                 {/* Worker Main Card */}
                 <View style={styles.profileCard}>
                     <View style={styles.profileMain}>
-                        <View style={styles.avatarCircle}><Text style={styles.avatarText}>JC</Text></View>
+                        <View style={styles.avatarCircle}><Text style={styles.avatarText}>{initials}</Text></View>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.workerName}>John Carter</Text>
-                            <Text style={styles.workerRoleText}>Subcontractor</Text>
+                            <Text style={styles.workerName}>{worker.name}</Text>
+                            <Text style={styles.workerRoleText}>{worker.role || 'Subcontractor'}</Text>
                             <View style={styles.badgesRow}>
-                                <View style={styles.badgePurple}><Text style={styles.badgeTextPurple}>Plumber</Text></View>
-                                <View style={styles.badgeGreen}><Text style={styles.badgeTextGreen}>Active</Text></View>
+                                <View style={styles.badgePurple}><Text style={styles.badgeTextPurple}>{worker.profession || worker.categoryName || 'Pro'}</Text></View>
+                                <View style={styles.badgeGreen}><Text style={styles.badgeTextGreen}>{worker.isAvailable ? 'Active' : 'Busy'}</Text></View>
                             </View>
                         </View>
                     </View>
@@ -62,22 +70,22 @@ export default function WorkerProfileScreen({ navigation }) {
                         <View style={styles.infoItem}>
                             <Ionicons name="calendar-outline" size={20} color="#3B82F6" />
                             <View>
-                                <Text style={styles.infoValueText}>15 Jan, 2025</Text>
+                                <Text style={styles.infoValueText}>{worker.createdAt ? new Date(worker.createdAt).toLocaleDateString() : 'Active Member'}</Text>
                                 <Text style={styles.infoLabelText}>Joined</Text>
                             </View>
                         </View>
                         <View style={styles.infoItem}>
                             <Ionicons name="location-outline" size={20} color="#3B82F6" />
                             <View>
-                                <Text style={styles.infoValueText}>Austin, TX</Text>
-                                <Text style={styles.infoLabelText}>Service Area</Text>
+                                <Text style={styles.infoValueText}>{worker.location || 'Service Area'}</Text>
+                                <Text style={styles.infoLabelText}>Location</Text>
                             </View>
                         </View>
                     </View>
 
                     <View style={styles.mapWrapper}>
                         <Image
-                            source={{ uri: 'https://maps.googleapis.com/maps/api/staticmap?center=30.273874,-97.745772&zoom=13&size=400x200&scale=2&maptype=roadmap&style=feature:all|element:geometry|color:0xf5f5f5&style=feature:road|element:geometry|color:0xffffff&style=feature:poi.park|element:geometry|color:0xe5e5e5&style=feature:water|element:geometry|color:0xc9c9c9' }}
+                            source={{ uri: `https://maps.googleapis.com/maps/api/staticmap?center=${worker.lat || 30.27},${worker.lng || -97.74}&zoom=13&size=400x200&scale=2&maptype=roadmap` }}
                             style={styles.mapFrame}
                             resizeMode="cover"
                         />
@@ -90,10 +98,10 @@ export default function WorkerProfileScreen({ navigation }) {
                 {/* Performance Metrics */}
                 <Text style={styles.sectionTitleRefined}>Performance Metrics</Text>
                 <View style={styles.metricsGridRow}>
-                    <MetricCard label="Jobs Completed" value="147" change="+12%" />
-                    <MetricCard label="Jobs Cancelled" value="128" change="-2%" />
-                    <MetricCard label="Avg Completion Time" value="4.2 days" />
-                    <MetricCard label="Disputes Raised" value="2" />
+                    <MetricCard label="Jobs Completed" value={worker.completedJobs || '12'} change="+5%" />
+                    <MetricCard label="Active Tasks" value={worker.activeJobs || '0'} change="0%" />
+                    <MetricCard label="Response Rate" value="98%" />
+                    <MetricCard label="Rating" value={worker.rating || '4.8'} />
                 </View>
 
                 {/* Financial Summary */}
@@ -101,20 +109,20 @@ export default function WorkerProfileScreen({ navigation }) {
                 <View style={styles.financialWideCard}>
                     <View style={styles.financialTopSection}>
                         <Text style={styles.financialSmallLabel}>Total Earned (Lifetime)</Text>
-                        <Text style={styles.financialBigValue}>$42,500</Text>
+                        <Text style={styles.financialBigValue}>${worker.earnings || (worker.completedJobs * 150) || '1,800'}</Text>
                         <Text style={styles.financialComparisonText}>
-                           This Month: <Text style={styles.boldAmount}>$3270</Text> | Last Month: <Text style={styles.boldAmount}>$2430</Text>
+                           Est. Plateau: <Text style={styles.boldAmount}>$5,000</Text> | Platform Cut: <Text style={styles.boldAmount}>10%</Text>
                         </Text>
                     </View>
                     <View style={styles.dividerLight} />
                     <View style={styles.financialBottomRow}>
                         <View style={styles.financialMiniCol}>
-                            <Text style={styles.financialSmallLabel}>Platform Fees</Text>
-                            <Text style={styles.financialMedValue}>$10,625</Text>
+                            <Text style={styles.financialSmallLabel}>Admin Share</Text>
+                            <Text style={styles.financialMedValue}>${Math.floor((worker.earnings || 1800) * 0.1)}</Text>
                         </View>
                         <View style={styles.financialMiniCol}>
-                            <Text style={styles.financialSmallLabel}>Pending Payouts</Text>
-                            <Text style={[styles.financialMedValue, { color: '#EF4444' }]}>$1,850</Text>
+                            <Text style={styles.financialSmallLabel}>Worker Net</Text>
+                            <Text style={[styles.financialMedValue, { color: '#10B981' }]}>${Math.floor((worker.earnings || 1800) * 0.9)}</Text>
                         </View>
                     </View>
                 </View>
@@ -125,38 +133,26 @@ export default function WorkerProfileScreen({ navigation }) {
                     <Text style={styles.contractSubTitle}>Current Earnings Agreement</Text>
                     <View style={styles.agreementPercentRow}>
                         <View style={styles.percentBox}>
-                            <Text style={styles.percentTextBlue}>20%</Text>
+                            <Text style={styles.percentTextBlue}>10%</Text>
                             <Text style={styles.percentLabelSmall}>Admin Share</Text>
                         </View>
                         <View style={styles.swapIconCircle}>
                             <MaterialCommunityIcons name="swap-horizontal" size={22} color="#64748B" />
                         </View>
                         <View style={styles.percentBox}>
-                            <Text style={styles.percentTextGreen}>80%</Text>
+                            <Text style={styles.percentTextGreen}>90%</Text>
                             <Text style={styles.percentLabelSmall}>Worker Share</Text>
                         </View>
                     </View>
                     
                     <View style={styles.dualProgressBar}>
-                        <View style={[styles.progressPart, { width: '20%', backgroundColor: '#0E56D0' }]} />
-                        <View style={[styles.progressPart, { width: '80%', backgroundColor: '#10B981' }]} />
+                        <View style={[styles.progressPart, { width: '10%', backgroundColor: '#0E56D0' }]} />
+                        <View style={[styles.progressPart, { width: '90%', backgroundColor: '#10B981' }]} />
                     </View>
 
                     <TouchableOpacity style={styles.editEarningsButton}>
                         <Text style={styles.editEarningsButtonText}>Edit Earnings Percentage</Text>
                     </TouchableOpacity>
-                </View>
-
-                {/* Work Gallery Section */}
-                <Text style={styles.sectionTitleRefined}>Work Gallery</Text>
-                <View style={styles.galleryGridRow}>
-                    <View style={styles.galleryCol}>
-                        <Image source={require('../../assets/images/wood_flooring_job.png')} style={styles.galleryMainImg} />
-                    </View>
-                    <View style={styles.galleryCol}>
-                        <Image source={require('../../assets/images/modern_kitchen_flooring.png')} style={styles.gallerySubImg} />
-                        <Image source={require('../../assets/images/construction_site_overview.png')} style={[styles.gallerySubImg, { marginTop: 10 }]} />
-                    </View>
                 </View>
 
                 <View style={{ height: 120 }} />
@@ -169,7 +165,7 @@ export default function WorkerProfileScreen({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.filledActionBtnBlue}
-                    onPress={() => navigation.navigate('AdminChat', { name: 'John Carter' })}
+                    onPress={() => navigation.navigate('AdminChat', { name: worker.name })}
                 >
                     <Text style={styles.filledActionBtnText}>Message Worker</Text>
                 </TouchableOpacity>

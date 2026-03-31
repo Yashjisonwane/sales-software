@@ -11,7 +11,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const AgendaItem = ({ name, type, time, color, status }) => (
+import { getAllJobs } from '../../api/apiService';
+
+const AgendaItem = ({ name, type, time, color, status, location, navigation, item }) => (
     <View style={styles.agendaItem}>
         <View style={styles.agendaTimeline}>
             <View style={[styles.agendaDot, { borderColor: color, backgroundColor: status === 'active' ? color : COLORS.white }]} />
@@ -19,21 +21,27 @@ const AgendaItem = ({ name, type, time, color, status }) => (
         </View>
         <View style={styles.agendaContent}>
             <View style={[styles.agendaCard, status === 'active' && styles.activeAgendaCard]}>
-                <Text style={styles.agendaName}>{name}</Text>
-                <Text style={styles.agendaType}>{type}</Text>
+                <Text style={styles.agendaName}>{name || 'Unknown Client'}</Text>
+                <Text style={styles.agendaType}>{type || 'Service'}</Text>
                 <View style={styles.agendaInfo}>
                     <Ionicons name="time-outline" size={16} color={COLORS.textTertiary} />
-                    <Text style={styles.agendaInfoText}>{time}</Text>
+                    <Text style={styles.agendaInfoText}>{time || 'Not set'}</Text>
                 </View>
                 <View style={styles.agendaInfo}>
                     <Ionicons name="location-outline" size={16} color={COLORS.textTertiary} />
-                    <Text style={styles.agendaInfoText}>123 E Market St Boulder, CO 80304, USA</Text>
+                    <Text style={styles.agendaInfoText} numberOfLines={1}>{location || 'Address not available'}</Text>
                 </View>
                 <View style={styles.agendaButtons}>
-                    <TouchableOpacity style={styles.rescheduleBtn}>
+                    <TouchableOpacity 
+                        style={styles.rescheduleBtn} 
+                        onPress={() => navigation.navigate('Reschedule', { job: item })}
+                    >
                         <Text style={styles.rescheduleBtnText}>Reschedule</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.detailsBtn}>
+                    <TouchableOpacity 
+                        style={styles.detailsBtn}
+                        onPress={() => navigation.navigate('LeadDetails', { job: item })}
+                    >
                         <Text style={styles.detailsBtnText}>Details</Text>
                     </TouchableOpacity>
                 </View>
@@ -44,6 +52,20 @@ const AgendaItem = ({ name, type, time, color, status }) => (
 
 export default function ScheduleScreen({ navigation }) {
     const insets = useSafeAreaInsets();
+    const [jobs, setJobs] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+
+    const fetchJobs = async () => {
+        setLoading(true);
+        const res = await getAllJobs();
+        if (res.success) setJobs(res.data);
+        setLoading(false);
+    };
+
+    React.useEffect(() => {
+        fetchJobs();
+    }, []);
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
@@ -57,14 +79,32 @@ export default function ScheduleScreen({ navigation }) {
                 <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            <ScrollView 
+                showsVerticalScrollIndicator={false} 
+                contentContainerStyle={styles.scrollContent}
+                refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchJobs} />}
+            >
                 <Text style={styles.sectionTitle}>Today's Agenda</Text>
 
                 <View style={{ marginTop: 20 }}>
-                    <AgendaItem name="Sarah Miller" type="Pre-Inspection" time="09:00 AM" color="#0062E1" status="active" />
-                    <AgendaItem name="The Johnson Family" type="HVAC Repair" time="11:30 AM" color="#E2E8F0" status="pending" />
-                    <AgendaItem name="John Smith" type="Quote Follow-Up" time="02:30 PM" color="#E2E8F0" status="pending" />
-                    <AgendaItem name="Acme Corp" type="Contract Signing" time="04:30 PM" color="#E2E8F0" status="pending" />
+                    {jobs.length > 0 ? jobs.map((job, idx) => (
+                        <AgendaItem 
+                            key={job.id}
+                            item={job}
+                            name={job.customerName} 
+                            type={job.categoryName} 
+                            time={job.scheduledTime} 
+                            location={job.location}
+                            color={idx === 0 ? "#0062E1" : "#E2E8F0"} 
+                            status={idx === 0 ? "active" : "pending"} 
+                            navigation={navigation}
+                        />
+                    )) : (
+                        <View style={{ alignItems: 'center', marginTop: 40 }}>
+                            <Ionicons name="calendar-outline" size={48} color="#CBD5E0" />
+                            <Text style={{ marginTop: 16, color: '#718096' }}>No jobs scheduled for today</Text>
+                        </View>
+                    )}
                 </View>
 
                 <View style={{ height: 40 }} />
@@ -72,6 +112,8 @@ export default function ScheduleScreen({ navigation }) {
         </View>
     );
 }
+
+import { RefreshControl } from 'react-native';
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFC' },

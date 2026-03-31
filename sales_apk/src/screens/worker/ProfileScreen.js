@@ -14,22 +14,45 @@ import { Ionicons } from '@expo/vector-icons';
 import { CommonActions } from '@react-navigation/native';
 import { SHADOWS } from '../../constants/theme';
 import MenuItem from '../../components/MenuItem';
+import { getProfile } from '../../api/apiService';
+import { useState, useEffect } from 'react';
+import storage from '../../api/storage';
 
 
 
 export default function ProfileScreen({ navigation }) {
-  const handleLogout = () => {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const res = await getProfile();
+      if (res.success) {
+        setUser(res.data);
+      } else {
+        // Fallback to local storage if API fails
+        const local = await storage.getItem('userData');
+        if (local) setUser(JSON.parse(local));
+      }
+    };
+    fetchUserData();
+  }, []);
+
+  const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Logout',
         style: 'destructive',
-        onPress: () => navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Welcome' }],
-          })
-        )
+        onPress: async () => {
+          await storage.removeItem('userToken');
+          await storage.removeItem('userData');
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Welcome' }],
+            })
+          );
+        }
       },
     ]);
   };
@@ -53,8 +76,8 @@ export default function ProfileScreen({ navigation }) {
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Zain Worker</Text>
-            <Text style={styles.profileEmail}>zain.worker@hinesq.com</Text>
+            <Text style={styles.profileName}>{user?.name || 'Loading...'}</Text>
+            <Text style={styles.profileEmail}>{user?.email || 'worker@paired.com'}</Text>
           </View>
           <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
             <Ionicons name="create-outline" size={20} color="#0E56D0" />

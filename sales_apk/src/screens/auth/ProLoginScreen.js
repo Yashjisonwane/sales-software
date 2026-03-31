@@ -14,6 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { loginWorker } from '../../api/apiService';
 
 export default function ProLoginScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -82,8 +83,16 @@ export default function ProLoginScreen({ navigation }) {
           </View>
 
           <TouchableOpacity
-            style={styles.loginBtn}
-            onPress={() => navigation.replace('AdminTabs')}
+            style={[styles.loginBtn, email && password ? { opacity: 1 } : { opacity: 0.7 }]}
+            onPress={async () => {
+                if (!email || !password) return;
+                const res = await loginWorker(email, password);
+                if (res.success) {
+                    navigation.replace('AdminTabs');
+                } else {
+                    alert(res.message || 'Login failed');
+                }
+            }}
           >
             <Text style={styles.loginBtnText}>Log In</Text>
           </TouchableOpacity>

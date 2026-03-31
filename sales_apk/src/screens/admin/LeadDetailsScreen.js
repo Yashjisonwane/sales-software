@@ -87,28 +87,28 @@ export default function LeadDetailsScreen({ navigation }) {
           <View style={styles.mainCardContent}>
             <View style={styles.mainHeader}>
               <View>
-                <Text style={styles.customerName}>Sarah Johnson</Text>
-                <Text style={styles.jobId}>Job ID #1024</Text>
+                <Text style={styles.customerName}>{route.params?.job?.customerName || route.params?.job?.clientName || 'Unknown Job'}</Text>
+                <Text style={styles.jobId}>Job ID #{route.params?.job?.id?.slice(-4).toUpperCase() || '1000'}</Text>
               </View>
-              <Text style={styles.priceText}>$450</Text>
+              <Text style={styles.priceText}>${route.params?.job?.amount || '450'}</Text>
             </View>
 
             <View style={styles.badgeRow}>
               <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}>
-                <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>Lead Job</Text>
+                <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{route.params?.job?.categoryName || 'Service'}</Text>
               </View>
               <View style={[styles.badge, { backgroundColor: '#EFF6FF' }]}>
-                <Text style={[styles.badgeText, { color: '#0062E1' }]}>In Progress</Text>
+                <Text style={[styles.badgeText, { color: '#0062E1' }]}>{route.params?.job?.status || 'New'}</Text>
               </View>
             </View>
 
             <View style={styles.infoRow}>
               <Ionicons name="time-outline" size={18} color={COLORS.textTertiary} />
-              <Text style={styles.infoText}>09:00 AM</Text>
+              <Text style={styles.infoText}>{route.params?.job?.scheduledTime || 'Not set'}</Text>
             </View>
             <View style={styles.infoRow}>
               <Ionicons name="location-outline" size={18} color={COLORS.textTertiary} />
-              <Text style={styles.infoText}>123 E Market St Boulder, CO 80304, USA</Text>
+              <Text style={styles.infoText}>{route.params?.job?.location || route.params?.job?.address || 'No address'}</Text>
             </View>
 
             <Text style={styles.sectionTitle}>Job Photos</Text>
@@ -124,33 +124,29 @@ export default function LeadDetailsScreen({ navigation }) {
             </View>
 
             {/* Assigned Worker Section */}
-            <Text style={styles.sectionTitle}>Assigned Worker</Text>
-            <View style={styles.workerCard}>
-              <View style={styles.workerHeader}>
-                <View style={styles.workerAvatar}>
-                  <Text style={styles.avatarText}>JC</Text>
-                </View>
-                <View style={styles.workerInfo}>
-                  <Text style={styles.workerName}>John Carter</Text>
-                  <View style={styles.badgeRow}>
-                    <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}>
-                      <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>Plumber</Text>
+            {route.params?.job?.worker && (
+              <>
+                <Text style={styles.sectionTitle}>Assigned Worker</Text>
+                <View style={styles.workerCard}>
+                  <View style={styles.workerHeader}>
+                    <View style={styles.workerAvatar}>
+                      <Text style={styles.avatarText}>{route.params?.job?.worker?.name?.charAt(0) || 'W'}</Text>
                     </View>
-                    <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}>
-                      <Text style={[styles.badgeText, { color: '#10B981' }]}>Active</Text>
+                    <View style={styles.workerInfo}>
+                      <Text style={styles.workerName}>{route.params?.job?.worker?.name}</Text>
+                      <View style={styles.badgeRow}>
+                        <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}>
+                          <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{route.params?.job?.worker?.profession || 'Pro'}</Text>
+                        </View>
+                        <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}>
+                          <Text style={[styles.badgeText, { color: '#10B981' }]}>Active</Text>
+                        </View>
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
-
-              <View style={styles.metricsRow}>
-                <MetricBox label="Active Jobs" value="3" />
-                <View style={styles.metricDivider} />
-                <MetricBox label="Jobs Completed" value="32" />
-                <View style={styles.metricDivider} />
-                <MetricBox label="Completion" value="92%" color="#10B981" />
-              </View>
-            </View>
+              </>
+            )}
           </View>
         </BottomSheetScrollView>
       </BottomSheet>

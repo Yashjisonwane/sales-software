@@ -31,6 +31,54 @@ const IMAGE_GAP = 10;
 const IMAGE_WIDTH = (width - (CARD_MARGIN * 2) - (SCROLL_PADDING * 2) - IMAGE_GAP) / 2;
 const SNAP_INTERVAL = IMAGE_WIDTH + IMAGE_GAP;
 
+const getImgSource = (img) => {
+  if (!img) return require('../../assets/images/wood_flooring_job.png');
+  if (typeof img === 'number') return img;
+  if (typeof img === 'string') return { uri: img.startsWith('http') ? img : 'https://images.unsplash.com/photo-1517646272486-a2c99afd9538?q=80&w=500' };
+  if (img.uri) return img;
+  return require('../../assets/images/wood_flooring_job.png');
+};
+
+const getCategoryImages = (category) => {
+  const cat = (category || '').toLowerCase();
+  
+  // High-quality professional mapping
+  if (cat.includes('floor')) return [
+    require('../../assets/images/wood_flooring_job.png'), 
+    require('../../assets/images/modern_kitchen_flooring.png')
+  ];
+  if (cat.includes('garden') || cat.includes('landscap')) return [
+    { uri: 'https://images.unsplash.com/photo-1558905619-1af480bdd634?auto=format&fit=crop&q=80&w=500' }, 
+    require('../../assets/images/construction_site_overview.png')
+  ];
+  if (cat.includes('paint')) return [
+    { uri: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&q=80&w=500' }, 
+    { uri: 'https://images.unsplash.com/photo-1595844730298-b960ff98fee0?auto=format&fit=crop&q=80&w=500' }
+  ];
+  if (cat.includes('carpenter') || cat.includes('wood')) return [
+    require('../../assets/images/wood_flooring_job.png'),
+    { uri: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=500' }
+  ];
+  if (cat.includes('plumb')) return [
+    { uri: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=500' },
+    { uri: 'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?auto=format&fit=crop&q=80&w=500' }
+  ];
+  if (cat.includes('electric')) return [
+    { uri: 'https://images.unsplash.com/photo-1621905181192-299e4d2b1bf6?auto=format&fit=crop&q=80&w=500' },
+    { uri: 'https://images.unsplash.com/photo-1558449028-b53a39d100fc?auto=format&fit=crop&q=80&w=500' }
+  ];
+  if (cat.includes('roof')) return [
+    { uri: 'https://images.unsplash.com/photo-1632759162402-9993358825d1?auto=format&fit=crop&q=80&w=500' },
+    require('../../assets/images/construction_site_overview.png')
+  ];
+  
+  // Universal Fallback array to ensure no blanks
+  return [
+    require('../../assets/images/wood_flooring_job.png'),
+    require('../../assets/images/construction_site_overview.png')
+  ];
+};
+
 const JobCard = ({ name, id, tag, time, images, address, jobType, onPress }) => (
   <View style={styles.jobCard}>
     <ScrollView
@@ -42,7 +90,12 @@ const JobCard = ({ name, id, tag, time, images, address, jobType, onPress }) => 
       decelerationRate="fast"
     >
       {images.map((img, i) => (
-        <Image key={i} source={{ uri: img }} style={[styles.jobImage, { width: IMAGE_WIDTH }]} />
+        <Image 
+          key={i} 
+          source={getImgSource(img)} 
+          style={[styles.jobImage, { width: IMAGE_WIDTH }]} 
+          defaultSource={require('../../assets/images/wood_flooring_job.png')}
+        />
       ))}
     </ScrollView>
 
@@ -87,13 +140,16 @@ const JobCard = ({ name, id, tag, time, images, address, jobType, onPress }) => 
   </View>
 );
 
-export default function JobsListScreen({ navigation }) {
+
+export default function JobsListScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const worker = route.params?.worker;
   const bottomSheetRef = React.useRef(null);
   const snapPoints = React.useMemo(() => ['18%', '40%', '92%'], []);
   const [activeTab, setActiveTab] = React.useState('All');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchFocused, setIsSearchFocused] = React.useState(false);
+  const [allJobs, setAllJobs] = React.useState([]);
   const [mapUrl, setMapUrl] = React.useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin');
   const animatedIndex = useSharedValue(0);
 
@@ -112,40 +168,34 @@ export default function JobsListScreen({ navigation }) {
     return { bottom, opacity };
   });
 
-  const workers_jobs = [
-    {
-      name: "Sarah Johnson",
-      id: "#J-1024",
-      tag: "In Progress",
-      time: "Submitted: 30 mins ago",
-      address: "123 E Market St Boulder, CO 80304, USA",
-      jobType: "Plumbing Repair",
-      images: [
-        'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1517646280104-a63870634676?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1521783985778-319597148507?auto=format&fit=crop&q=80&w=600'
-      ]
-    },
-    {
-      name: "Michael Chen",
-      id: "#J-1025",
-      tag: "Quoted",
-      time: "Submitted: 2 hours ago",
-      address: "123 E Market St Boulder, CO 80304, USA",
-      jobType: "Roof Repair",
-      images: [
-        'https://images.unsplash.com/photo-1595844730298-b960ff98fee0?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1517646280104-a63870634676?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&q=80&w=600',
-        'https://images.unsplash.com/photo-1521783985778-319597148507?auto=format&fit=crop&q=80&w=600'
-      ]
-    }
-  ];
+  React.useEffect(() => {
+    const fetchAllJobs = async () => {
+      try {
+        const { getAllJobs } = require('../../api/apiService');
+        const res = await getAllJobs();
+        if (res.success) {
+          // If a worker was passed, filter for that worker. Else show all.
+          let filtered = res.data;
+          if (worker) {
+            filtered = res.data.filter(j => j.workerId === worker.id);
+          }
+          setAllJobs(filtered);
+        }
+      } catch (err) {
+        console.log('Error fetching jobs:', err);
+      }
+    };
+    fetchAllJobs();
+  }, [worker]);
+
+  const filteredJobs = allJobs.filter(j => {
+    const matchesSearch = j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         j.location?.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeTab === 'All') return matchesSearch;
+    // Map UI tabs to backend status
+    const statusMap = { 'New': 'ACCEPTED', 'Assigned': 'ACCEPTED', 'Quoted': 'QUOTED', 'In Progress': 'IN_PROGRESS' };
+    return matchesSearch && j.status === statusMap[activeTab];
+  });
 
   return (
     <View style={styles.container}>
@@ -255,16 +305,16 @@ export default function JobsListScreen({ navigation }) {
             )}
           </View>
 
-          {workers_jobs.map((job, index) => (
+          {filteredJobs.map((job, index) => (
             <JobCard
-              key={index}
-              name={job.name}
-              id={job.id}
-              tag={job.tag}
-              time={job.time}
-              address={job.address}
-              jobType={job.jobType}
-              images={job.images}
+              key={job.id}
+              name={job.customerName || 'Customer'}
+              id={`#J-${job.id.slice(-4).toUpperCase()}`}
+              tag={job.status}
+              time={`Scheduled: ${new Date(job.scheduledDate).toLocaleDateString()}`}
+              address={job.location}
+              jobType={job.categoryName}
+              images={getCategoryImages(job.categoryName)}
               onPress={() => navigation.navigate('JobDetails', { job })}
             />
           ))}

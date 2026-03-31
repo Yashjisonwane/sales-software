@@ -26,9 +26,11 @@ apiClient.interceptors.request.use(
 // RESPONSE INTERCEPTOR: Global Error Handling
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401) {
       console.log('Unauthorized - Token expired or invalid.');
+      await storage.removeItem('userToken');
+      await storage.removeItem('userData');
     }
     return Promise.reject(error);
   }

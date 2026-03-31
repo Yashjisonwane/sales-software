@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { CommonActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import storage from '../../api/storage';
+import { getProfile } from '../../api/apiService';
 
 const MODULES = [
   {
@@ -55,10 +57,32 @@ const MODULES = [
 
 export default function AdminProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const handleLogout = () => {
+  const [user, setUser] = React.useState(null);
+
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      const res = await getProfile();
+      if (res.success) {
+        setUser(res.data);
+      }
+    };
+    fetchProfile();
+  }, []);
+  const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: () => navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] })) },
+      { 
+        text: 'Logout', 
+        style: 'destructive', 
+        onPress: async () => {
+          await storage.removeItem('userToken');
+          await storage.removeItem('userData');
+          navigation.dispatch(CommonActions.reset({ 
+            index: 0, 
+            routes: [{ name: 'Welcome' }] 
+          }));
+        } 
+      },
     ]);
   };
 
@@ -81,10 +105,13 @@ export default function AdminProfileScreen({ navigation }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
         <View style={styles.profileHeaderCard}>
           <View style={styles.profileRow}>
-            <Image source={{ uri: 'https://i.pravatar.cc/100?u=admin' }} style={styles.profileAvatar} />
+            <Image 
+              source={{ uri: user?.avatar || 'https://i.pravatar.cc/100?u=admin' }} 
+              style={styles.profileAvatar} 
+            />
             <View style={{ flex: 1 }}>
-              <Text style={styles.profileName}>Admin User</Text>
-              <Text style={styles.profileTeam}>Team Alpha</Text>
+              <Text style={styles.profileName}>{user?.name || 'Admin User'}</Text>
+              <Text style={styles.profileTeam}>{user?.email || 'System Admin'}</Text>
             </View>
             <View style={styles.roleBadge}>
               <Text style={styles.roleBadgeText}>Manager Account</Text>
