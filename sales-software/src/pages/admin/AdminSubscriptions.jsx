@@ -193,53 +193,47 @@ const AdminSubscriptions = () => {
             )}
 
             {/* Plan Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {plans.map((plan) => {
                     const Icon = plan.icon;
                     return (
                         <div key={plan.id} className="relative group/card">
-                            <div className="bg-white rounded-[2.5rem] border-2 border-transparent hover:border-blue-600 shadow-xl shadow-gray-100 transition-all duration-500 p-8 flex flex-col h-full overflow-hidden">
-                                <div className="flex justify-between items-start mb-10">
-                                    <div className={`${plan.bg} ${plan.color} p-5 rounded-3xl shadow-inner transition-transform group-hover/card:scale-110 duration-500`}>
-                                        <Icon size={32} />
+                            <div className="bg-white rounded-[2rem] border-2 border-transparent hover:border-blue-600 shadow-xl shadow-gray-100 transition-all duration-500 p-6 flex flex-col h-full overflow-hidden">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className={`${plan.bg} ${plan.color} p-4 rounded-2xl shadow-inner transition-transform group-hover/card:scale-110 duration-500`}>
+                                        <Icon size={24} />
                                     </div>
                                     <div className="flex gap-2">
-                                        <button onClick={() => { setSelectedPlan(plan); setShowEditPlanModal(true); }} className="p-3 bg-gray-50 text-amber-600 hover:bg-amber-100 rounded-2xl transition-all" title="Edit Plan">
-                                            <Edit size={18} />
+                                        <button onClick={() => { setSelectedPlan(plan); setShowEditPlanModal(true); }} className="p-2.5 bg-gray-50 text-amber-600 hover:bg-amber-100 rounded-xl transition-all" title="Edit Plan">
+                                            <Edit size={16} />
                                         </button>
-                                        <button onClick={() => { setSelectedPlan(plan); setShowDeletePlanConfirm(true); }} className="p-3 bg-gray-50 text-rose-600 hover:bg-rose-100 rounded-2xl transition-all" title="Delete Plan">
-                                            <Trash2 size={18} />
+                                        <button onClick={() => { setSelectedPlan(plan); setShowDeletePlanConfirm(true); }} className="p-2.5 bg-gray-50 text-rose-600 hover:bg-rose-100 rounded-xl transition-all" title="Delete Plan">
+                                            <Trash2 size={16} />
                                         </button>
                                     </div>
                                 </div>
 
-                                <div className="mb-8">
-                                    <h3 className="text-2xl font-black text-gray-900 mb-1">{plan.name} Plan</h3>
+                                <div className="mb-6">
+                                    <h3 className="text-xl font-black text-gray-900 mb-1">{plan.name} Plan</h3>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-black text-gray-900">${plan.price}</span>
-                                        <span className="text-gray-400 font-bold text-xs uppercase tracking-widest italic">/ mo</span>
+                                        <span className="text-3xl font-black text-gray-900">${plan.price}</span>
+                                        <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest italic">/ mo</span>
                                     </div>
                                 </div>
 
-                                <div className="space-y-5 mb-10 flex-1">
-                                    <div className="flex items-center gap-3 text-sm font-bold text-blue-600 italic">
+                                <div className="space-y-4 mb-2 flex-1">
+                                    <div className="flex items-center gap-3 text-xs font-bold text-blue-600 italic">
                                         {plan.leads || 'Unlimited'} Leads Included
                                     </div>
                                     {plan.featureList?.map((feature, idx) => (
-                                        <div key={idx} className="flex items-center gap-4">
-                                            <div className="w-6 h-6 rounded-full bg-green-50 flex items-center justify-center text-green-500 shadow-sm border border-green-100">
-                                                <Check size={12} strokeWidth={3} />
+                                        <div key={idx} className="flex items-center gap-3">
+                                            <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center text-green-500 shadow-sm border border-green-100 font-bold">
+                                                <Check size={10} strokeWidth={4} />
                                             </div>
-                                            <span className="text-xs font-bold text-gray-600">{feature}</span>
+                                            <span className="text-[10px] font-bold text-gray-600">{feature}</span>
                                         </div>
                                     ))}
                                 </div>
-
-                                <button 
-                                    className="w-full py-5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-slate-100 group-hover/card:bg-blue-600 group-hover/card:shadow-blue-200 transition-all active:scale-95"
-                                >
-                                    Select Plan
-                                </button>
                             </div>
                         </div>
                     );
