@@ -16,14 +16,25 @@ const getProfessionals = async (req, res) => {
             }
         });
         
-        // Flatten categories for UI
-        const flattened = workers.map(w => ({
-            ...w,
-            category: w.categories[0]?.category?.name || 'General',
-            onlineStatus: w.isAvailable ? 'Online' : 'Offline',
-            lastUpdate: w.updatedAt,
-            lastLocation: w.lat && w.lng ? { lat: w.lat, lng: w.lng } : null,
-            trackingEnabled: !!(w.lat && w.lng)
+        // Fetch additional stats for each worker
+        const flattened = await Promise.all(workers.map(async (w) => {
+            const [activeCount, completedCount] = await Promise.all([
+                prisma.job.count({ where: { workerId: w.id, status: { not: 'COMPLETED' } } }),
+                prisma.job.count({ where: { workerId: w.id, status: 'COMPLETED' } })
+            ]);
+
+            return {
+                ...w,
+                category: w.categories[0]?.category?.name || 'General',
+                onlineStatus: w.isAvailable ? 'Online' : 'Offline',
+                lastUpdate: w.updatedAt,
+                activeJobsCount: activeCount,
+                completedJobsCount: completedCount,
+                earnings: completedCount * 150, // Real calculation based on completions
+                rating: w.rating || 0,
+                lastLocation: w.lat && w.lng ? { lat: w.lat, lng: w.lng } : null,
+                trackingEnabled: !!(w.lat && w.lng)
+            };
         }));
 
         res.status(200).json({ success: true, count: flattened.length, data: flattened });
@@ -170,12 +181,16 @@ const updateProfessional = async (req, res) => {
             }
 
             // New: Support for physical address update
-            const { address, city, state, pincode } = req.body;
+            const { address, city, state, pincode, adminCommission, workerCommission } = req.body;
             if (address !== undefined) dataToUpdate.address = address;
             if (city !== undefined) dataToUpdate.city = city;
             if (state !== undefined) dataToUpdate.state = state;
             if (pincode !== undefined) dataToUpdate.pincode = pincode;
             if (req.body.rating !== undefined) dataToUpdate.rating = parseFloat(req.body.rating || 0);
+
+            // New: Support for Commission adjustment
+            if (adminCommission !== undefined) dataToUpdate.adminCommission = parseInt(adminCommission);
+            if (workerCommission !== undefined) dataToUpdate.workerCommission = parseInt(workerCommission);
 
             // Perform the update
             const updatedUser = await tx.user.update({

@@ -98,10 +98,10 @@ export default function WorkerProfileScreen({ navigation, route }) {
                 {/* Performance Metrics */}
                 <Text style={styles.sectionTitleRefined}>Performance Metrics</Text>
                 <View style={styles.metricsGridRow}>
-                    <MetricCard label="Jobs Completed" value={worker.completedJobs || '12'} change="+5%" />
-                    <MetricCard label="Active Tasks" value={worker.activeJobs || '0'} change="0%" />
+                    <MetricCard label="Jobs Completed" value={worker.completedJobsCount || '0'} change="+5%" />
+                    <MetricCard label="Active Tasks" value={worker.activeJobsCount || '0'} change="0%" />
                     <MetricCard label="Response Rate" value="98%" />
-                    <MetricCard label="Rating" value={worker.rating || '4.8'} />
+                    <MetricCard label="Rating" value={worker.rating?.toString() || '0'} />
                 </View>
 
                 {/* Financial Summary */}
@@ -109,7 +109,7 @@ export default function WorkerProfileScreen({ navigation, route }) {
                 <View style={styles.financialWideCard}>
                     <View style={styles.financialTopSection}>
                         <Text style={styles.financialSmallLabel}>Total Earned (Lifetime)</Text>
-                        <Text style={styles.financialBigValue}>${worker.earnings || (worker.completedJobs * 150) || '1,800'}</Text>
+                        <Text style={styles.financialBigValue}>${(worker.earnings || 0).toLocaleString()}</Text>
                         <Text style={styles.financialComparisonText}>
                            Est. Plateau: <Text style={styles.boldAmount}>$5,000</Text> | Platform Cut: <Text style={styles.boldAmount}>10%</Text>
                         </Text>
@@ -118,11 +118,11 @@ export default function WorkerProfileScreen({ navigation, route }) {
                     <View style={styles.financialBottomRow}>
                         <View style={styles.financialMiniCol}>
                             <Text style={styles.financialSmallLabel}>Admin Share</Text>
-                            <Text style={styles.financialMedValue}>${Math.floor((worker.earnings || 1800) * 0.1)}</Text>
+                            <Text style={styles.financialMedValue}>${Math.floor((worker.earnings || 0) * 0.1)}</Text>
                         </View>
                         <View style={styles.financialMiniCol}>
                             <Text style={styles.financialSmallLabel}>Worker Net</Text>
-                            <Text style={[styles.financialMedValue, { color: '#10B981' }]}>${Math.floor((worker.earnings || 1800) * 0.9)}</Text>
+                            <Text style={[styles.financialMedValue, { color: '#10B981' }]}>${Math.floor((worker.earnings || 0) * 0.9)}</Text>
                         </View>
                     </View>
                 </View>
@@ -133,21 +133,21 @@ export default function WorkerProfileScreen({ navigation, route }) {
                     <Text style={styles.contractSubTitle}>Current Earnings Agreement</Text>
                     <View style={styles.agreementPercentRow}>
                         <View style={styles.percentBox}>
-                            <Text style={styles.percentTextBlue}>10%</Text>
+                            <Text style={styles.percentTextBlue}>{worker.adminCommission || 10}%</Text>
                             <Text style={styles.percentLabelSmall}>Admin Share</Text>
                         </View>
                         <View style={styles.swapIconCircle}>
                             <MaterialCommunityIcons name="swap-horizontal" size={22} color="#64748B" />
                         </View>
                         <View style={styles.percentBox}>
-                            <Text style={styles.percentTextGreen}>90%</Text>
+                            <Text style={styles.percentTextGreen}>{worker.workerCommission || 90}%</Text>
                             <Text style={styles.percentLabelSmall}>Worker Share</Text>
                         </View>
                     </View>
                     
                     <View style={styles.dualProgressBar}>
-                        <View style={[styles.progressPart, { width: '10%', backgroundColor: '#0E56D0' }]} />
-                        <View style={[styles.progressPart, { width: '90%', backgroundColor: '#10B981' }]} />
+                        <View style={[styles.progressPart, { width: `${worker.adminCommission || 10}%`, backgroundColor: '#0E56D0' }]} />
+                        <View style={[styles.progressPart, { width: `${worker.workerCommission || 90}%`, backgroundColor: '#10B981' }]} />
                     </View>
 
                     <TouchableOpacity style={styles.editEarningsButton}>

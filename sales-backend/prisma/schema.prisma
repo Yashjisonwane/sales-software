@@ -8,41 +8,44 @@ datasource db {
 }
 
 model User {
-  id              String           @id @default(uuid())
-  name            String
-  email           String           @unique
-  phone           String           @unique
-  password        String
-  role            Role             @default(CUSTOMER)
-  isAvailable     Boolean          @default(true) @map("is_available")
-  lat             Float?
-  lng             Float?
-  fcmToken        String?          @map("fcm_token")
-  address         String?          @db.Text
-  city            String?
-  state           String?
-  pincode         String?
-  rating          Float            @default(0.0)
-  completedJobs   Int              @default(0) @map("completed_jobs")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  jobsAsCustomer  Job[]            @relation("CustomerJobs")
-  jobsAsWorker    Job[]            @relation("WorkerJobs")
-  leadsAsCustomer Lead[]           @relation("CustomerLeads")
-  categories      WorkerCategory[]
-  planId          String?          @map("plan_id")
-  subscriptionExpiresAt DateTime?    @map("subscription_expires_at")
-  plan            SubscriptionPlan? @relation(fields: [planId], references: [id])
-  businessName    String?          @map("business_name")
-  bio             String?          @db.Text
-  availability    String?
-  experience      String?
-  serviceRadius   Int?             @default(15) @map("service_radius")
-
-  @@map("users")
-  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
+  id                          String                       @id @default(uuid())
+  name                        String
+  email                       String                       @unique
+  phone                       String                       @unique
+  password                    String
+  role                        Role                         @default(CUSTOMER)
+  isAvailable                 Boolean                      @default(true) @map("is_available")
+  lat                         Float?
+  lng                         Float?
+  fcmToken                    String?                      @map("fcm_token")
+  address                     String?                      @db.Text
+  city                        String?
+  state                       String?
+  pincode                     String?
+  createdAt                   DateTime                     @default(now()) @map("created_at")
+  updatedAt                   DateTime                     @updatedAt @map("updated_at")
+  planId                      String?                      @map("plan_id")
+  subscriptionExpiresAt       DateTime?                    @map("subscription_expires_at")
+  completedJobs               Int                          @default(0) @map("completed_jobs")
+  rating                      Float                        @default(0)
+  availability                String?
+  bio                         String?                      @db.Text
+  businessName                String?                      @map("business_name")
+  experience                  String?
+  serviceRadius               Int?                         @default(15) @map("service_radius")
+  jobsAsCustomer              Job[]                        @relation("CustomerJobs")
+  jobsAsWorker                Job[]                        @relation("WorkerJobs")
+  leadsAsCustomer             Lead[]                       @relation("CustomerLeads")
+  messagesSent                Message[]                    @relation("MessageSender")
   notifications               Notification[]
-  messagesSent                Message[]        @relation("MessageSender")
+  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
+  adminCommission             Int                          @default(10) @map("admin_commission")
+  workerCommission            Int                          @default(90) @map("worker_commission")
+  plan                        SubscriptionPlan?            @relation(fields: [planId], references: [id])
+  categories                  WorkerCategory[]
+
+  @@index([planId], map: "users_plan_id_fkey")
+  @@map("users")
 }
 
 model Category {
@@ -69,20 +72,20 @@ model WorkerCategory {
 }
 
 model Lead {
-  id          String     @id @default(uuid())
-  leadNo      String     @unique @default(cuid()) @map("lead_no") // Short friendly ID
-  customerId  String     @map("customer_id")
-  categoryId  String     @map("category_id")
-  location    String
-  description String?    @db.Text
-  servicePlan String     @default("Starter") @map("service_plan")
-  preferredDate String?  @map("preferred_date")
-  status      LeadStatus @default(OPEN)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  updatedAt   DateTime   @updatedAt @map("updated_at")
-  job         Job?
-  category    Category   @relation(fields: [categoryId], references: [id])
-  customer    User       @relation("CustomerLeads", fields: [customerId], references: [id])
+  id            String     @id @default(uuid())
+  leadNo        String     @unique @default(cuid()) @map("lead_no")
+  customerId    String     @map("customer_id")
+  categoryId    String     @map("category_id")
+  location      String
+  description   String?    @db.Text
+  servicePlan   String     @default("Starter") @map("service_plan")
+  status        LeadStatus @default(OPEN)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  preferredDate String?    @map("preferred_date")
+  job           Job?
+  category      Category   @relation(fields: [categoryId], references: [id])
+  customer      User       @relation("CustomerLeads", fields: [customerId], references: [id])
 
   @@index([categoryId], map: "leads_category_id_fkey")
   @@index([customerId], map: "leads_customer_id_fkey")
@@ -91,7 +94,7 @@ model Lead {
 
 model Job {
   id            String         @id @default(uuid())
-  jobNo         String         @unique @default(cuid()) @map("job_no") // Short friendly ID
+  jobNo         String         @unique @default(cuid()) @map("job_no")
   leadId        String?        @unique @map("lead_id")
   customerId    String         @map("customer_id")
   workerId      String         @map("worker_id")
@@ -99,11 +102,12 @@ model Job {
   status        JobStatus      @default(SCHEDULED)
   location      String
   description   String?        @db.Text
-  preferredDate String?        @map("preferred_date")
   scheduledDate DateTime       @map("scheduled_date")
   scheduledTime String         @map("scheduled_time")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
+  preferredDate String?        @map("preferred_date")
+  chat          Chat?
   contract      JobContract?
   estimate      JobEstimate?
   inspection    JobInspection?
@@ -113,7 +117,6 @@ model Job {
   lead          Lead?          @relation(fields: [leadId], references: [id])
   worker        User           @relation("WorkerJobs", fields: [workerId], references: [id])
   review        Review?
-  chat          Chat?
 
   @@index([customerId], map: "jobs_customer_id_fkey")
   @@index([workerId], map: "jobs_worker_id_fkey")
@@ -179,6 +182,117 @@ model JobInvoice {
   @@map("job_invoices")
 }
 
+model Location {
+  id        String   @id @default(uuid())
+  name      String
+  city      String
+  state     String
+  country   String   @default("USA")
+  status    String   @default("Active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("locations")
+}
+
+model SubscriptionPlan {
+  id              String                       @id @default(uuid())
+  name            String                       @unique
+  price           Float
+  leads           Int                          @default(0)
+  features        String?                      @db.Text
+  createdAt       DateTime                     @default(now()) @map("created_at")
+  upgradeRequests SubscriptionUpgradeRequest[]
+  users           User[]
+
+  @@map("subscription_plans")
+}
+
+model SubscriptionUpgradeRequest {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  planId    String           @map("plan_id")
+  status    String           @default("PENDING")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([planId], map: "subscription_upgrade_requests_plan_id_fkey")
+  @@index([userId], map: "subscription_upgrade_requests_user_id_fkey")
+  @@map("subscription_upgrade_requests")
+}
+
+model ProfessionalRequest {
+  id            String   @id @default(uuid())
+  name          String
+  businessName  String?  @map("business_name")
+  email         String   @unique
+  phone         String
+  category      String
+  address       String?  @db.Text
+  city          String?
+  state         String?
+  pincode       String?
+  preferredPlan String   @map("preferred_plan")
+  status        String   @default("PENDING")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("professional_requests")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  title     String
+  message   String   @db.Text
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  jobId     String   @unique @map("job_id")
+  rating    Int      @default(5)
+  comment   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model Chat {
+  id          String    @id @default(uuid())
+  jobId       String    @unique @map("job_id")
+  lastMessage String?   @map("last_message") @db.Text
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@map("chats")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String   @map("chat_id")
+  senderId  String   @map("sender_id")
+  text      String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([chatId], map: "messages_chat_id_fkey")
+  @@index([senderId], map: "messages_sender_id_fkey")
+  @@map("messages")
+}
+
 enum Role {
   ADMIN
   WORKER
@@ -200,111 +314,4 @@ enum LeadStatus {
   OPEN
   ASSIGNED
   REJECTED
-}
-
-model Location {
-  id        String   @id @default(uuid())
-  name      String
-  city      String
-  state     String
-  country   String   @default("USA")
-  status    String   @default("Active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("locations")
-}
-
-model SubscriptionPlan {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  price     Float
-  leads     Int      @default(0) // 0 for unlimited
-  features  String?  @db.Text // JSON string of features
-  createdAt DateTime @default(now()) @map("created_at")
-  users     User[]
-
-  @@map("subscription_plans")
-  upgradeRequests SubscriptionUpgradeRequest[]
-}
-
-model SubscriptionUpgradeRequest {
-  id              String           @id @default(uuid())
-  userId          String           @map("user_id")
-  planId          String           @map("plan_id")
-  status          String           @default("PENDING") // PENDING, APPROVED, REJECTED
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  plan            SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
-  @@map("subscription_upgrade_requests")
-}
-
-model ProfessionalRequest {
-  id              String   @id @default(uuid())
-  name            String
-  businessName    String?  @map("business_name")
-  email           String   @unique
-  phone           String
-  category        String
-  address         String?  @db.Text
-  city            String?
-  state           String?
-  pincode         String?
-  preferredPlan   String   @map("preferred_plan")
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  @@map("professional_requests")
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String?  @map("user_id") // null means system-wide or admin-targeted
-  title     String
-  message   String   @db.Text
-  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR, LEAD, ASSIGNMENT
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("notifications")
-}
-
-model Review {
-  id          String   @id @default(uuid())
-  jobId       String   @unique @map("job_id")
-  rating      Int      @default(5)
-  comment     String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@map("reviews")
-}
-
-model Chat {
-  id          String    @id @default(uuid())
-  jobId       String    @unique @map("job_id")
-  lastMessage String?   @db.Text @map("last_message")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  messages    Message[]
-
-  @@map("chats")
-}
-
-model Message {
-  id        String   @id @default(uuid())
-  chatId    String   @map("chat_id")
-  senderId  String   @map("sender_id")
-  text      String   @db.Text
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
-
-  @@map("messages")
 }
