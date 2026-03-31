@@ -244,6 +244,38 @@ const deleteJob = async (req, res) => {
     }
 };
 
+const getEstimates = async (req, res) => {
+    try {
+        const estimates = await prisma.jobEstimate.findMany({
+            include: { job: { include: { customer: { select: { name: true } } } } }
+        });
+        const formatted = estimates.map(e => ({
+            ...e,
+            customerName: e.job.customer?.name || 'Valued Customer',
+            categoryName: e.job.categoryName
+        }));
+        res.status(200).json({ success: true, data: formatted });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch estimates' });
+    }
+};
+
+const getInvoices = async (req, res) => {
+    try {
+        const invoices = await prisma.jobInvoice.findMany({
+            include: { job: { include: { customer: { select: { name: true } } } } }
+        });
+        const formatted = invoices.map(i => ({
+            ...i,
+            customerName: i.job.customer?.name || 'Valued Customer',
+            categoryName: i.job.categoryName
+        }));
+        res.status(200).json({ success: true, data: formatted });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch invoices' });
+    }
+};
+
 module.exports = {
     getJobs,
     updateJob,
@@ -251,5 +283,7 @@ module.exports = {
     createEstimate,
     createInvoice,
     createJob,
-    deleteJob
+    deleteJob,
+    getEstimates,
+    getInvoices
 };

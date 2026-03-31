@@ -15,10 +15,31 @@ import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
+import { rescheduleJob } from '../../api/apiService';
+import { ActivityIndicator } from 'react-native';
+
 const RescheduleScreen = ({ navigation, route }) => {
+  const job = route.params?.job;
   const [selectedDate, setSelectedDate] = useState(16);
   const [selectedTime, setSelectedTime] = useState('09:00 AM');
+  const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
+
+  const handleReschedule = async () => {
+    if (!job?.id) return;
+    
+    setLoading(true);
+    const dateStr = `2025-01-${selectedDate < 10 ? '0' + selectedDate : selectedDate}`;
+    const res = await rescheduleJob(job.id, dateStr, selectedTime);
+    setLoading(false);
+
+    if (res.success) {
+      Alert.alert('Success', 'Job successfully rescheduled!');
+      navigation.goBack();
+    } else {
+      Alert.alert('Error', res.message || 'Reschedule failed');
+    }
+  };
 
   const timeSlots = [
     '09:00 AM', '11:00 AM', '12:00 PM',
@@ -48,25 +69,25 @@ const RescheduleScreen = ({ navigation, route }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Job Info */}
         <View style={styles.jobInfoCard}>
-          <Text style={styles.customerName}>Sarah Miller</Text>
-          <Text style={styles.jobType}>Pre-Inspection</Text>
+          <Text style={styles.customerName}>{job?.customerName || 'Active Job'}</Text>
+          <Text style={styles.jobType}>{job?.categoryName || 'Service'}</Text>
 
           <View style={styles.infoRow}>
             <Ionicons name="time-outline" size={20} color="#4A5568" />
-            <Text style={styles.infoText}>09:00 AM</Text>
+            <Text style={styles.infoText}>{job?.scheduledTime || 'Not set'}</Text>
           </View>
 
           <View style={styles.infoRow}>
             <Ionicons name="location-outline" size={20} color="#4A5568" />
-            <Text style={styles.infoText}>123 E Market St Boulder, CO 80304,USA</Text>
+            <Text style={styles.infoText}>{job?.location || 'No address'}</Text>
           </View>
 
           <View style={styles.currentDateBox}>
-            <Text style={styles.currentDateText}>Friday, 16 Jan, 2025</Text>
+            <Text style={styles.currentDateText}>Re-assigning for Job #{job?.id?.slice(-4).toUpperCase()}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Select Your Preferred Date & Time</Text>
+        <Text style={styles.sectionTitle}>Select New Date & Time</Text>
 
         {/* Calendar Card */}
         <View style={styles.calendarCard}>
@@ -119,27 +140,16 @@ const RescheduleScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           ))}
         </View>
-
-        <View style={{ marginBottom: 20 }}>
-          <Text style={styles.specificTimeText}>Choose Specific Time</Text>
-          <TouchableOpacity style={styles.timeInputBox}>
-            <Text style={styles.timeInputText}>Select Time</Text>
-            <Ionicons name="time-outline" size={24} color="#1A202C" />
-          </TouchableOpacity>
-        </View>
-
       </ScrollView>
 
       {/* Footer Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
         <TouchableOpacity
-          style={styles.rescheduleBtn}
-          onPress={() => {
-            Alert.alert('Success', 'Job successfully rescheduled!');
-            navigation.goBack();
-          }}
+          style={[styles.rescheduleBtn, loading && { opacity: 0.7 }]}
+          onPress={handleReschedule}
+          disabled={loading}
         >
-          <Text style={styles.rescheduleBtnText}>Reschedule</Text>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.rescheduleBtnText}>Update Schedule</Text>}
         </TouchableOpacity>
       </View>
     </View>

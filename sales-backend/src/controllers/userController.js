@@ -355,10 +355,10 @@ const getDashboardStats = async (req, res) => {
                 success: true,
                 data: {
                     mainStats: [
-                        { name: 'Total Leads', value: totalLeads, trend: '+12%', up: true },
                         { name: 'Active Professionals', value: totalPros, trend: '+5%', up: true },
-                        { name: 'Total Customers', value: totalCustomers, trend: '+8%', up: true },
-                        { name: 'New Leads Today', value: newLeadsToday, trend: '+15%', up: true }
+                        { name: 'Jobs In Progress', value: totalLeads - completedJobs, trend: 'Lead: ' + totalLeads, up: true },
+                        { name: 'Completed Jobs', value: completedJobs, trend: '+8%', up: true },
+                        { name: 'Total Revenue', value: '$' + (completedJobs * 150), trend: '+12%', up: true } // Mocking revenue based on completions
                     ],
                     leadActivity: leadActivity,
                     growthStats: [

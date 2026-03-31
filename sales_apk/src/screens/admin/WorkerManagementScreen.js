@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,47 +9,38 @@ import {
   TextInput,
   Image,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS } from '../../constants/theme';
+import { getProfessionals } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
 const WorkerManagementScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const [workers, setWorkers] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const workers = [
-    {
-      id: 1,
-      name: 'John Carter',
-      initials: 'JC',
-      role: 'Subcontractor',
-      type: 'Plumber',
-      status: 'Active',
-      stats: {
-        active: 3,
-        completed: 32,
-        completion: '92%',
-        earnings: '$12,500'
+  const fetchWorkers = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await getProfessionals();
+      if (res.success) {
+        setWorkers(res.data);
       }
-    },
-    {
-      id: 2,
-      name: 'Sarah Willson',
-      initials: 'SW',
-      role: 'Lead',
-      type: 'Plumber',
-      status: 'Active',
-      stats: {
-        active: 3,
-        completed: 32,
-        completion: '92%',
-        earnings: '$12,500'
-      }
+    } catch (e) {
+      console.log('Error fetching workers:', e);
+    } finally {
+      setIsRefreshing(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchWorkers();
+  }, []);
 
   const ActionButton = ({ icon, label, color, onPress }) => (
     <TouchableOpacity style={styles.actionBtn} onPress={onPress}>
@@ -61,34 +52,34 @@ const WorkerManagementScreen = ({ navigation }) => {
   const WorkerCard = ({ worker }) => (
     <View style={styles.workerCard}>
       <View style={styles.cardHeader}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{worker.initials}</Text></View>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{worker.name?.charAt(0) || 'W'}</Text></View>
         <View style={styles.workerInfo}>
           <Text style={styles.workerName}>{worker.name}</Text>
-          <Text style={styles.workerRole}>{worker.role}</Text>
+          <Text style={styles.workerRole}>{worker.role || 'Worker'}</Text>
           <View style={styles.tagRow}>
-            <View style={[styles.tag, { backgroundColor: '#F5F3FF' }]}><Text style={[styles.tagText, { color: '#8B5CF6' }]}>{worker.type}</Text></View>
-            <View style={[styles.tag, { backgroundColor: '#ECFDF5' }]}><Text style={[styles.tagText, { color: '#10B981' }]}>{worker.status}</Text></View>
+            <View style={[styles.tag, { backgroundColor: '#F5F3FF' }]}><Text style={[styles.tagText, { color: '#8B5CF6' }]}>{worker.profession || 'Pro'}</Text></View>
+            <View style={[styles.tag, { backgroundColor: '#ECFDF5' }]}><Text style={[styles.tagText, { color: '#10B981' }]}>{worker.isAvailable ? 'Active' : 'Busy'}</Text></View>
           </View>
         </View>
       </View>
 
       <View style={styles.statsGrid}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{worker.stats.active}</Text>
+          <Text style={styles.statValue}>{worker.activeJobsCount || 0}</Text>
           <Text style={styles.statLabel}>Active Jobs</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{worker.stats.completed}</Text>
-          <Text style={styles.statLabel}>Jobs Completed</Text>
+          <Text style={styles.statValue}>{worker.completedJobsCount || 0}</Text>
+          <Text style={styles.statLabel}>Completed</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: '#10B981' }]}>{worker.stats.completion}</Text>
-          <Text style={styles.statLabel}>Completion</Text>
+          <Text style={[styles.statValue, { color: '#10B981' }]}>{worker.rating || 'N/A'}</Text>
+          <Text style={styles.statLabel}>Rating</Text>
         </View>
       </View>
 
       <View style={styles.earningsRow}>
-        <Text style={styles.earningsLabel}>Total Earnings: <Text style={styles.earningsValue}>{worker.stats.earnings}</Text></Text>
+        <Text style={styles.earningsLabel}>Phone: <Text style={styles.earningsValue}>{worker.phone || 'N/A'}</Text></Text>
       </View>
 
       <View style={styles.actionsRow}>
@@ -130,7 +121,13 @@ const WorkerManagementScreen = ({ navigation }) => {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={fetchWorkers} />
+          }
+        >
           <View style={styles.introSection}>
             <Text style={styles.introTitle}>Workers Overview</Text>
             <Text style={styles.introSub}>View activity, performance metrics, and job status across your workforce.</Text>
@@ -149,9 +146,19 @@ const WorkerManagementScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {workers.map(worker => (
+          {workers.filter(w => 
+            w.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            w.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            w.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+          ).length > 0 ? workers.filter(w => 
+            w.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            w.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            w.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+          ).map(worker => (
             <WorkerCard key={worker.id} worker={worker} />
-          ))}
+          )) : (
+            <Text style={{ textAlign: 'center', color: '#718096', marginTop: 40 }}>No workers found matching your search</Text>
+          )}
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>

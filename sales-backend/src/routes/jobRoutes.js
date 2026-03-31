@@ -1,11 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { getJobs, updateJob, submitCompliance, createEstimate, createInvoice, deleteJob, createJob } = require('../controllers/jobController');
+const { getJobs, updateJob, submitCompliance, createEstimate, createInvoice, deleteJob, createJob, getEstimates, getInvoices } = require('../controllers/jobController');
 const { protect, authorize } = require('../middlewares/authMiddleware');
 
-// @route   GET/POST /api/v1/jobs
+// @route   GET /POST /api/v1/jobs
 router.get('/', protect, getJobs);
 router.post('/', protect, authorize('ADMIN', 'WORKER'), createJob);
+
+// @route   GET /api/v1/jobs/estimates
+router.get('/estimates', protect, authorize('ADMIN'), getEstimates);
+
+// @route   GET /api/v1/jobs/invoices
+router.get('/invoices', protect, authorize('ADMIN'), getInvoices);
 
 // @route   PATCH /api/v1/jobs/:id
 router.patch('/:id', protect, updateJob);

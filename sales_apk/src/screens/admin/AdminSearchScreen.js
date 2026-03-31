@@ -38,8 +38,49 @@ const ShortcutItem = ({ label, sub, icon, color, isCustomIcon = false }) => (
     </TouchableOpacity>
 );
 
+import { getAvailableLeads, getAllJobs, getProfessionals } from '../../api/apiService';
+
 export default function AdminSearchScreen({ navigation }) {
     const [search, setSearch] = useState('');
+    const [results, setResults] = useState({ leads: [], jobs: [], workers: [] });
+    const [loading, setLoading] = useState(false);
+
+    const performSearch = async (query) => {
+        if (!query || query.length < 2) {
+            setResults({ leads: [], jobs: [], workers: [] });
+            return;
+        }
+        setLoading(true);
+        try {
+            const [leadsRes, jobsRes, workersRes] = await Promise.all([
+                getAvailableLeads(),
+                getAllJobs(),
+                getProfessionals()
+            ]);
+
+            const filterFn = (item, fields) => 
+                fields.some(f => (item[f] || '').toLowerCase().includes(query.toLowerCase()));
+
+            setResults({
+                leads: leadsRes.success ? leadsRes.data.filter(l => filterFn(l, ['clientName', 'categoryName'])) : [],
+                jobs: jobsRes.success ? jobsRes.data.filter(j => filterFn(j, ['customerName', 'categoryName', 'location'])) : [],
+                workers: workersRes.success ? workersRes.data.filter(w => filterFn(w, ['name', 'profession'])) : []
+            });
+        } catch (e) {
+            console.log('Search error:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    React.useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            performSearch(search);
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }, [search]);
+
+    const hasResults = results.leads.length > 0 || results.jobs.length > 0 || results.workers.length > 0;
 
     return (
         <SafeAreaView style={styles.container}>
@@ -52,88 +93,82 @@ export default function AdminSearchScreen({ navigation }) {
                     </TouchableOpacity>
                     <TextInput
                         style={styles.input}
-                        placeholder="Search workers or jobs"
+                        placeholder="Search workers, jobs or leads"
                         placeholderTextColor="#718096"
                         value={search}
                         onChangeText={setSearch}
                         autoFocus
                     />
-                    <TouchableOpacity>
-                        <Ionicons name="mic" size={22} color="#4A5568" />
-                    </TouchableOpacity>
+                    {loading ? <ActivityIndicator size="small" color="#0E56D0" /> : (
+                        <TouchableOpacity>
+                            <Ionicons name="mic" size={22} color="#4A5568" />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-                {/* Shortcuts */}
-                <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false} 
-                    contentContainerStyle={styles.shortcutsRow}
-                >
-                    <ShortcutItem
-                        label="Office"
-                        sub="Main HQ"
-                        icon="business"
-                        color="#3B82F6"
-                    />
-                    <ShortcutItem
-                        label="Active Jobs"
-                        sub="Check status"
-                        icon="briefcase"
-                        color="#10B981"
-                    />
-                    <ShortcutItem
-                        label="Top Rated"
-                        sub="5 workers"
-                        icon="star"
-                        color="#F59E0B"
-                    />
-                </ScrollView>
-
-                {/* Recent Searches */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Recent Searches</Text>
-                    <TouchableOpacity>
-                        <Ionicons name="information-circle-outline" size={20} color="#718096" />
-                    </TouchableOpacity>
-                </View>
-
-                <RecentSearchItem
-                    title="John Carter (Worker)"
-                    sub="Plumber • 92% Completion"
-                />
-                <RecentSearchItem
-                    title="Sarah Miller (Job #128)"
-                    sub="123 E Market St Boulder"
-                />
-                <RecentSearchItem
-                    title="Roof Repair Project"
-                    sub="Due in 2 days"
-                />
-                <RecentSearchItem
-                    title="Elite Plumbings"
-                    sub="Top subcontractor"
-                    icon="shield-checkmark-outline"
-                    isTealIcon={true}
-                />
-                <RecentSearchItem
-                    title="Pending Invoices"
-                />
-                <RecentSearchItem
-                    title="Michael Thompson"
-                />
-
+                {search.length < 2 ? (
+                    <>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shortcutsRow}>
+                            <ShortcutItem label="Office" sub="Main HQ" icon="business" color="#3B82F6" />
+                            <ShortcutItem label="Active Jobs" sub="Check status" icon="briefcase" color="#10B981" />
+                            <ShortcutItem label="Top Rated" sub="5 workers" icon="star" color="#F59E0B" />
+                        </ScrollView>
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>Recent Context</Text>
+                        </View>
+                        <Text style={{ marginHorizontal: 16, color: '#A0AEC0' }}>Start typing to search across your business database...</Text>
+                    </>
+                ) : (
+                    <>
+                        {results.workers.length > 0 && (
+                            <View>
+                                <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Workers</Text></View>
+                                {results.workers.map(w => (
+                                    <TouchableOpacity key={w.id} onPress={() => navigation.navigate('WorkerProfile', { worker: w })}>
+                                        <RecentSearchItem title={w.name} sub={`${w.profession || 'Worker'} • ${w.isAvailable ? 'Available' : 'Busy'}`} icon="person-outline" />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                        {results.jobs.length > 0 && (
+                            <View>
+                                <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>Active Jobs</Text></View>
+                                {results.jobs.map(j => (
+                                    <TouchableOpacity key={j.id} onPress={() => navigation.navigate('AdminJobs', { job: j })}>
+                                        <RecentSearchItem title={j.customerName} sub={j.location} icon="briefcase-outline" />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                        {results.leads.length > 0 && (
+                            <View>
+                                <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>New Leads</Text></View>
+                                {results.leads.map(l => (
+                                    <TouchableOpacity key={l.id} onPress={() => navigation.navigate('LeadDetails', { job: l })}>
+                                        <RecentSearchItem title={l.clientName} sub={l.categoryName} icon="flash-outline" isTealIcon={true} />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                        {!hasResults && !loading && (
+                            <View style={{ alignItems: 'center', marginTop: 40 }}>
+                                <Ionicons name="search-outline" size={48} color="#CBD5E0" />
+                                <Text style={{ marginTop: 16, color: '#718096' }}>No results found for "{search}"</Text>
+                            </View>
+                        )}
+                    </>
+                )}
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : null}
-                style={styles.keyboardHelper}
-            />
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : null} style={styles.keyboardHelper} />
         </SafeAreaView>
     );
 }
+
+import { ActivityIndicator } from 'react-native';
 
 const styles = StyleSheet.create({
     container: {

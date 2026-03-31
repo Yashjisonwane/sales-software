@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Dimensions,
   FlatList,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,74 +18,71 @@ import { Ionicons } from '@expo/vector-icons';
 import { Keyboard, Image, StyleSheet as RNStyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
+import { getAvailableLeads, getWorkerJobs, getDashboardStats, getCategories } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
-const SERVICES = [
-  { id: '1', name: 'Plumbing', icon: 'water', color: '#3B82F6', bg: '#EFF6FF' },
-  { id: '2', name: 'Electrical', icon: 'flash', color: '#F59E0B', bg: '#FFFBEB' },
-  { id: '3', name: 'Cleaning', icon: 'sparkles', color: '#10B981', bg: '#ECFDF5' },
-  { id: '4', name: 'HVAC', icon: 'snow', color: '#06B6D4', bg: '#ECFEFF' },
-  { id: '5', name: 'Painting', icon: 'color-palette', color: '#EC4899', bg: '#FDF2F8' },
-  { id: '6', name: 'Roofing', icon: 'home', color: '#8B5CF6', bg: '#F5F3FF' },
-];
-
-const PROFESSIONALS = [
-  {
-    id: '1',
-    name: 'John Wilson',
-    service: 'Plumbing Expert',
-    rating: 4.7,
-    reviews: 128,
-    distance: '2.1 km',
-    price: '$40/hr',
-    available: true,
-    avatar: 'JW',
-    avatarColor: '#3B82F6',
-  },
-  {
-    id: '2',
-    name: 'Sarah Martinez',
-    service: 'Electrician',
-    rating: 4.9,
-    reviews: 95,
-    distance: '1.5 km',
-    price: '$55/hr',
-    available: true,
-    avatar: 'SM',
-    avatarColor: '#F59E0B',
-  },
-  {
-    id: '3',
-    name: 'Mike Chen',
-    service: 'House Cleaning',
-    rating: 4.6,
-    reviews: 210,
-    distance: '3.2 km',
-    price: '$35/hr',
-    available: false,
-    avatar: 'MC',
-    avatarColor: '#10B981',
-  },
-  {
-    id: '4',
-    name: 'Lisa Brown',
-    service: 'HVAC Specialist',
-    rating: 4.8,
-    reviews: 67,
-    distance: '4.0 km',
-    price: '$60/hr',
-    available: true,
-    avatar: 'LB',
-    avatarColor: '#06B6D4',
-  },
-];
+const CATEGORY_STYLE_MAP = {
+  'Plumbing': { icon: 'water', color: '#3B82F6', bg: '#EFF6FF' },
+  'Electrical': { icon: 'flash', color: '#F59E0B', bg: '#FFFBEB' },
+  'Cleaning': { icon: 'sparkles', color: '#10B981', bg: '#ECFDF5' },
+  'HVAC': { icon: 'snow', color: '#06B6D4', bg: '#ECFEFF' },
+  'Painting': { icon: 'color-palette', color: '#EC4899', bg: '#FDF2F8' },
+  'Roofing': { icon: 'home', color: '#8B5CF6', bg: '#F5F3FF' },
+};
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin');
+  
+  const [services, setServices] = useState([]);
+  const [activeJobs, setActiveJobs] = useState([]);
+  const [stats, setStats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [leadsRes, jobsRes, statsRes, catsRes] = await Promise.all([
+        getAvailableLeads(),
+        getWorkerJobs(),
+        getDashboardStats(),
+        getCategories()
+      ]);
+
+      if (catsRes.success) {
+        const enrichedCats = catsRes.data.map(cat => ({
+          ...cat,
+          ...(CATEGORY_STYLE_MAP[cat.name] || { icon: 'settings', color: '#718096', bg: '#EDF2F7' })
+        }));
+        setServices(enrichedCats);
+      }
+
+      if (jobsRes.success) {
+        setActiveJobs(jobsRes.data || []);
+      }
+
+      if (statsRes.success) {
+        setStats(statsRes.data || []);
+      }
+    } catch (error) {
+      console.error('Home Fetch Error:', error);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
   const renderServiceCard = ({ item }) => (
     <TouchableOpacity
@@ -95,41 +93,31 @@ export default function HomeScreen({ navigation }) {
       <View style={[styles.serviceIconBg, { backgroundColor: item.bg }]}>
         <Ionicons name={item.icon} size={24} color={item.color} />
       </View>
-      <Text style={styles.serviceName}>{item.name}</Text>
+      <Text style={styles.serviceName} numberOfLines={1}>{item.name}</Text>
     </TouchableOpacity>
   );
 
-  const renderProCard = (pro) => (
+  const renderProCard = (job) => (
     <TouchableOpacity
-      key={pro.id}
+      key={job.id}
       style={styles.proCard}
       activeOpacity={0.7}
-      onPress={() => navigation.navigate('Providers')}
+      onPress={() => navigation.navigate('MyRequests')}
     >
-      <View style={[styles.proAvatar, { backgroundColor: pro.avatarColor }]}>
-        <Text style={styles.proAvatarText}>{pro.avatar}</Text>
+      <View style={[styles.proAvatar, { backgroundColor: COLORS.primary }]}>
+        <Text style={styles.proAvatarText}>{job.customer?.name?.charAt(0) || 'C'}</Text>
       </View>
       <View style={styles.proInfo}>
         <View style={styles.proNameRow}>
-          <Text style={styles.proName}>{pro.name}</Text>
-          {pro.available && (
-            <View style={styles.availBadge}>
-              <Text style={styles.availText}>Available</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.proService}>{pro.service}</Text>
-        <View style={styles.proMeta}>
-          <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={12} color="#F59E0B" />
-            <Text style={styles.ratingText}>{pro.rating}</Text>
-            <Text style={styles.reviewCount}>({pro.reviews})</Text>
+          <Text style={styles.proName}>{job.customer?.name || 'Valued Customer'}</Text>
+          <View style={[styles.availBadge, { backgroundColor: '#DBEAFE' }]}>
+            <Text style={[styles.availText, { color: '#1E40AF' }]}>{job.status}</Text>
           </View>
-          <View style={styles.metaDot} />
+        </View>
+        <Text style={styles.proService}>{job.categoryName}</Text>
+        <View style={styles.proMeta}>
           <Ionicons name="location" size={12} color={COLORS.textTertiary} />
-          <Text style={styles.metaText}>{pro.distance}</Text>
-          <View style={styles.metaDot} />
-          <Text style={styles.priceText}>{pro.price}</Text>
+          <Text style={styles.metaText} numberOfLines={1}>{job.location}</Text>
         </View>
       </View>
       <TouchableOpacity style={styles.proArrow}>
@@ -210,40 +198,43 @@ export default function HomeScreen({ navigation }) {
          )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} bounces={false} style={{ marginTop: 120 }}>
+      <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          bounces={true} 
+          style={{ marginTop: 120 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+          }
+        >
 
         {/* Quick Stats */}
-        <View style={styles.quickStats}>
-          <View style={styles.statCard}>
-            <LinearGradient
-              colors={['#EEF2FF', '#E0E7FF']}
-              style={styles.statGradient}
-            >
-              <Ionicons name="briefcase" size={20} color={COLORS.primary} />
-              <Text style={styles.statNumber}>8</Text>
-              <Text style={styles.statLabel}>Available</Text>
-            </LinearGradient>
-          </View>
-          <View style={styles.statCard}>
-            <LinearGradient
-              colors={['#ECFDF5', '#D1FAE5']}
-              style={styles.statGradient}
-            >
-              <Ionicons name="cash" size={20} color={COLORS.success} />
-              <Text style={styles.statNumber}>$420</Text>
-              <Text style={styles.statLabel}>Earnings</Text>
-            </LinearGradient>
-          </View>
-          <View style={styles.statCard}>
-            <LinearGradient
-              colors={['#FFFBEB', '#FEF3C7']}
-              style={styles.statGradient}
-            >
-              <Ionicons name="calendar" size={20} color={COLORS.accent} />
-              <Text style={styles.statNumber}>4</Text>
-              <Text style={styles.statLabel}>Today</Text>
-            </LinearGradient>
-          </View>
+         <View style={styles.quickStats}>
+          {stats.length > 0 ? (
+            stats.slice(0, 3).map((stat, idx) => (
+              <View key={idx} style={styles.statCard}>
+                <LinearGradient
+                  colors={
+                    idx === 0 ? ['#EEF2FF', '#E0E7FF'] : 
+                    idx === 1 ? ['#ECFDF5', '#D1FAE5'] : 
+                    ['#FFFBEB', '#FEF3C7']
+                  }
+                  style={styles.statGradient}
+                >
+                  <Ionicons 
+                    name={idx === 0 ? "briefcase" : idx === 1 ? "cash" : "calendar"} 
+                    size={20} 
+                    color={idx === 0 ? COLORS.primary : idx === 1 ? COLORS.success : COLORS.accent} 
+                  />
+                  <Text style={styles.statNumber}>{stat.value}</Text>
+                  <Text style={styles.statLabel}>{stat.name}</Text>
+                </LinearGradient>
+              </View>
+            ))
+          ) : (
+            <View style={{ flex: 1, padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: COLORS.textTertiary }}>Loading Stats...</Text>
+            </View>
+          )}
         </View>
 
         {/* Popular Services */}
@@ -255,12 +246,15 @@ export default function HomeScreen({ navigation }) {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={SERVICES}
+            data={services}
             renderItem={renderServiceCard}
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.serviceList}
+            ListEmptyComponent={() => (
+              <Text style={{ color: COLORS.textTertiary, padding: 10 }}>No categories available</Text>
+            )}
           />
         </View>
 
@@ -298,7 +292,13 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.seeAll}>View All</Text>
             </TouchableOpacity>
           </View>
-          {PROFESSIONALS.map(renderProCard)}
+          {activeJobs.length > 0 ? (
+            activeJobs.map(renderProCard)
+          ) : (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+               <Text style={{ color: COLORS.textTertiary }}>No active jobs assigned to you yet.</Text>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>

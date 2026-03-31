@@ -1,14 +1,14 @@
 // Centralized API Configuration for APK Professionals
 // Aligned with Website and Software versions
 
-export const API_BASE_URL = 'http://192.168.1.22:4000/api/v1';
+export const API_BASE_URL = 'http://192.168.1.21:4000/api/v1';
 
 export const ENDPOINTS = {
-    PROFILE: '/professionals/profile',
+    PROFILE: '/users/profile',
     LEADS: '/leads',
-    MY_ASSIGNMENTS: '/assignments/me',
+    MY_ASSIGNMENTS: '/jobs',
     UPDATE_JOB: '/jobs',
-    TRACKING: '/professionals/location',
+    TRACKING: '/users/location',
     AUTH: '/auth/login'
 };
 

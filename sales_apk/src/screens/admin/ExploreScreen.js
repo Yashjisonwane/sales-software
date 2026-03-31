@@ -16,11 +16,6 @@ import {
   FlatList as RNFlatList,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-
-const getImgSource = (img) => {
-  if (!img) return require('../../assets/images/wood_flooring_job.png');
-  return typeof img === 'number' ? img : { uri: img };
-};
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { ScrollView as GestureHandlerScrollView, FlatList as GestureHandlerFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,27 +23,103 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
+import { RefreshControl } from 'react-native';
+
 const { width, height } = Dimensions.get('window');
 
-const PINS = [
-  { id: 1024, type: 'lead', color: '#8250DF', top: '30%', left: '25%', name: 'Sarah Mitchell', amount: '$850', status: 'New' },
-  { id: 1025, type: 'subcontract', color: '#004D40', top: '45%', left: '60%', name: 'Michael Chen', amount: '$1,200', status: 'Quoted' },
-  { id: 1026, type: 'lead', color: '#8250DF', top: '55%', left: '35%', name: 'John Miller', amount: '$650', status: 'In Progress' },
-  { id: 1027, type: 'delayed', color: '#E53935', top: '35%', left: '70%', name: 'Emma Davis', amount: '$2,100', status: 'Delayed' },
-  { id: 1028, type: 'lead', color: '#8250DF', top: '20%', left: '45%', name: 'Robert Wilson', amount: '$900', status: 'New' },
-  { id: 1029, type: 'subcontract', color: '#004D40', top: '65%', left: '30%', name: 'Lisa Ray', amount: '$1,500', status: 'Active' },
-  { id: 1030, type: 'delayed', color: '#E53935', top: '15%', left: '75%', name: 'David Jones', amount: '$3,400', status: 'Delayed' },
-  { id: 1031, type: 'subcontract', color: '#004D40', top: '40%', left: '33%', name: 'Kevin Hart', amount: '$1,100', status: 'Pending' },
-  { id: 1032, type: 'lead', color: '#8250DF', top: '10%', left: '42%', name: 'Alice Wong', amount: '$2,500', status: 'New' },
-  { id: 1033, type: 'subcontract', color: '#004D40', top: '75%', left: '60%', name: 'Marcus Aurelius', amount: '$800', status: 'Active' },
-];
+const getImgSource = (img) => {
+  if (!img) return require('../../assets/images/wood_flooring_job.png');
+  if (typeof img === 'number') return img;
+  if (typeof img === 'string') return { uri: img.startsWith('http') ? img : 'https://images.unsplash.com/photo-1517646272486-a2c99afd9538?q=80&w=500' };
+  if (img.uri) return img;
+  return require('../../assets/images/wood_flooring_job.png');
+};
 
-const AGENDA_DATA = [
-  { id: '1', name: 'Sarah Miller', type: 'Pre-Inspection', time: '09:00 AM', location: '123 E Market St Boulder, CO 80304,USA', status: 'active' },
-  { id: '2', name: 'The Johnson Family', type: 'HVAC Repair', time: '11:30 AM', location: '123 E Market St Boulder, CO 80304,USA', status: 'pending' },
-  { id: '3', name: 'John Smith', type: 'Quote Follow-Up', time: '02:30 PM', location: '123 E Market St Boulder, CO 80304,USA', status: 'pending' },
-  { id: '4', name: 'Acme Corp', type: 'Contract Signing', time: '04:30 AM', location: '123 E Market St Boulder, CO 80304,USA', status: 'pending' },
-];
+const getCategoryImages = (category) => {
+  const cat = (category || '').toLowerCase();
+  
+  if (cat.includes('floor')) return [
+    require('../../assets/images/wood_flooring_job.png'),
+    require('../../assets/images/modern_kitchen_flooring.png'),
+    require('../../assets/images/flooring_worker_action.png'),
+    require('../../assets/images/construction_site_overview.png'),
+  ];
+  
+  if (cat.includes('garden') || cat.includes('landscap')) return [
+    { uri: 'https://images.unsplash.com/photo-1558905619-1af480bdd634?auto=format&fit=crop&q=80&w=500' },
+    require('../../assets/images/flooring_worker_action.png'),
+    { uri: 'https://images.unsplash.com/photo-1558904541-efa8c19681e0?q=80&w=500' },
+    require('../../assets/images/construction_site_overview.png')
+  ];
+  
+  if (cat.includes('paint')) return [
+    { uri: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&q=80&w=500' },
+    { uri: 'https://images.unsplash.com/photo-1516156008625-3a9d606776ec?q=80&w=500' },
+    require('../../assets/images/construction_site_overview.png')
+  ];
+
+  if (cat.includes('plumb')) return [
+    { uri: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=500' },
+    { uri: 'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?auto=format&fit=crop&q=80&w=500' }
+  ];
+
+  if (cat.includes('electric')) return [
+    { uri: 'https://images.unsplash.com/photo-1621905181192-299e4d2b1bf6?auto=format&fit=crop&q=80&w=500' },
+    { uri: 'https://images.unsplash.com/photo-1558449028-b53a39d100fc?auto=format&fit=crop&q=80&w=500' }
+  ];
+
+  if (cat.includes('carpent') || cat.includes('wood')) return [
+    require('../../assets/images/wood_flooring_job.png'),
+    { uri: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?auto=format&fit=crop&q=80&w=500' }
+  ];
+
+  if (cat.includes('roof')) return [
+    { uri: 'https://images.unsplash.com/photo-1632759145351-1d592919f522?auto=format&fit=crop&q=80&w=500' },
+    { uri: 'https://images.unsplash.com/photo-1632759162402-9993358825d1?auto=format&fit=crop&q=80&w=500' }
+  ];
+  
+  if (cat.includes('clean')) return [
+    { uri: 'https://images.unsplash.com/photo-1581578731548-c64695cc6954?q=80&w=400' },
+    { uri: 'https://images.unsplash.com/photo-1528740561666-dc2479dc08ab?q=80&w=400' },
+    require('../../assets/images/wood_flooring_job.png')
+  ];
+  
+  // Default fallback array
+  return [
+    require('../../assets/images/wood_flooring_job.png'),
+    require('../../assets/images/construction_site_overview.png'),
+    { uri: 'https://images.unsplash.com/photo-1517646272486-a2c99afd9538?q=80&w=300' }
+  ];
+};
+
+import { getDashboardStats, getAvailableLeads, getAllJobs, getEstimates, getInvoices, getProfessionals } from '../../api/apiService';
+
+// Dynamic Pins calculation
+const getDynamicPins = (leads = [], jobs = []) => {
+  const leadPins = leads.map(l => ({
+    id: l.id,
+    type: 'lead',
+    color: '#8250DF',
+    top: `${Math.random() * 40 + 20}%`,
+    left: `${Math.random() * 40 + 20}%`,
+    name: l.clientName || 'New Lead',
+    amount: `$${l.budget || 250}`,
+    status: 'New'
+  }));
+
+  const jobPins = jobs.map(j => ({
+    id: j.id,
+    type: j.status === 'IN_PROGRESS' ? 'subcontract' : 'delayed',
+    color: j.status === 'IN_PROGRESS' ? '#004D40' : '#E53935',
+    top: `${Math.random() * 40 + 40}%`,
+    left: `${Math.random() * 40 + 40}%`,
+    name: j.customerName || 'Active Job',
+    amount: `$${j.amount || 1200}`,
+    status: j.status
+  }));
+
+  return [...leadPins, ...jobPins].slice(0, 10);
+};
 
 const mapStyle = [
   {
@@ -187,8 +258,8 @@ const ProgressBar = ({ label, value, progress, color, labelColor }) => (
   </View>
 );
 
-const PerformerItem = ({ name, role, status, initials, color }) => (
-  <View style={styles.performerItem}>
+const PerformerItem = ({ name, role, status, initials, color, onPress }) => (
+  <TouchableOpacity style={styles.performerItem} onPress={onPress}>
     <View style={[styles.performerAvatar, { backgroundColor: color }]}>
       <Text style={styles.performerInitials}>{initials}</Text>
     </View>
@@ -199,7 +270,7 @@ const PerformerItem = ({ name, role, status, initials, color }) => (
         <View style={styles.activeStatusBadge}><Text style={styles.activeStatusBadgeText}>{status}</Text></View>
       </View>
     </View>
-  </View>
+  </TouchableOpacity>
 );
 
 const ActivityItem = ({ icon, label, sub, time, iconColor, iconBg }) => (
@@ -234,14 +305,14 @@ const CurrentLocationMarker = () => (
   </View>
 );
 
-const JobCard = ({ name, id, tag, time, images, navigation, onPress }) => (
+const JobCard = ({ name, id, tag, time, images, location, category, navigation, onPress }) => (
   <View style={styles.jobCard}>
     <GestureHandlerScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.jobImages}
       contentContainerStyle={{ gap: 10, paddingRight: 20, paddingLeft: 16 }}
-      snapToInterval={150} // 140 (img width) + 10 (gap)
+      snapToInterval={150} 
       decelerationRate="fast"
       snapToAlignment="start"
       disallowInterruption={true}
@@ -266,13 +337,13 @@ const JobCard = ({ name, id, tag, time, images, navigation, onPress }) => (
         </View>
         <Text style={styles.jobId}>{id}</Text>
       </View>
-      <Text style={styles.jobSubText}>123 E Market St Boulder, CO 80304,USA</Text>
+      <Text style={styles.jobSubText}>{location || 'Indore, MP, India'}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
         <Text style={styles.jobDistTime}>4.5 mi</Text>
         <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#64748B' }} />
         <Text style={styles.jobDistTime}>12 m</Text>
       </View>
-      <Text style={styles.jobTime}><Text style={{ color: '#0E56D0' }}>Roof Repair</Text> • {time}</Text>
+      <Text style={styles.jobTime}><Text style={{ color: '#0E56D0' }}>{category || 'Service'}</Text> • {time}</Text>
 
       <View style={styles.jobActions}>
         <ActionButton icon="navigate" label="Directions" />
@@ -318,12 +389,12 @@ const AgendaItem = ({ item, index, isLast, navigation }) => (
           <Text style={styles.agendaInfoValue} numberOfLines={1}>{item.location}</Text>
         </View>
         <View style={styles.agendaActionButtons}>
-          <TouchableOpacity style={styles.agendaBtnSecondaryClean} onPress={() => navigation.navigate('Reschedule')}>
+          <TouchableOpacity style={styles.agendaBtnSecondaryClean} onPress={() => navigation.navigate('Reschedule', { job: item })}>
             <Text style={styles.agendaBtnSecondaryText}>Reschedule</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.agendaBtnPrimaryClean}
-            onPress={() => navigation.navigate('LeadDetails')}
+            onPress={() => navigation.navigate('LeadDetails', { job: item })}
           >
             <Text style={styles.agendaBtnPrimaryText}>Details</Text>
           </TouchableOpacity>
@@ -432,6 +503,8 @@ const generateMapHTML = (pins) => `
 </html>
 `;
 
+
+
 export default function ExploreScreen({ navigation, route }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [selectedPin, setSelectedPin] = useState(null);
@@ -439,29 +512,63 @@ export default function ExploreScreen({ navigation, route }) {
   const [quoteStep, setQuoteStep] = useState(0);
   const [showQuoteSuccess, setShowQuoteSuccess] = useState(false);
   const [overlayTab, setOverlayTab] = useState('Job Details');
+  const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin&hl=en&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9');
   const [activeTab, setActiveTab] = useState('Overview');
   const [timeFilter, setTimeFilter] = useState('All');
   const [invoiceFilter, setInvoiceFilter] = useState('All');
   const [quoteFilter, setQuoteFilter] = useState('All');
+  const [stats, setStats] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [allJobs, setAllJobs] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [quotes, setQuotes] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  // Clean 'Silver' style Map URL matching the screenshot
-  const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin&hl=en&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9');
+  const [jobStatusFilter, setJobStatusFilter] = useState('All');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    setIsRefreshing(true);
+    console.log('[DASHBOARD] Fetching data...');
+    try {
+      const [statsRes, leadsRes, jobsRes, quotesRes, invoicesRes, workersRes] = await Promise.all([
+        getDashboardStats(),
+        getAvailableLeads(),
+        getAllJobs(),
+        getEstimates(),
+        getInvoices(),
+        getProfessionals()
+      ]);
+      
+      console.log(`[DASHBOARD] Data received: Stats:${statsRes.success}, Leads:${leadsRes.data?.length}, Jobs:${jobsRes.data?.length}, Workers:${workersRes.data?.length}`);
+      
+      if (statsRes.success) setStats(statsRes.data);
+      if (leadsRes.success) setLeads(leadsRes.data);
+      if (jobsRes.success) setAllJobs(jobsRes.data);
+      if (quotesRes.success) setQuotes(quotesRes.data);
+      if (invoicesRes.success) setInvoices(invoicesRes.data);
+      if (workersRes.success) setWorkers(workersRes.data);
+    } catch (e) {
+      console.log('[DASHBOARD] Error:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const tabs = ['Overview', 'Jobs', 'Schedule', 'Invoice', 'Quote'];
-  const timeFilters = ['All', 'Weekly', 'Monthly', 'Yearly'];
-
-
-
   const bottomSheetRef = useRef(null);
-  const snapPoints = useMemo(() => ['18%', '40%', '92%'], []);
+  const snapPoints = useMemo(() => ['18%', '45%', '92%'], []);
   const insets = useSafeAreaInsets();
-
   const animatedIndex = useSharedValue(0);
 
   React.useEffect(() => {
+    fetchData();
+  }, []);
+
+  React.useEffect(() => {
     if (route.params?.activeTab) {
-      setActiveTab(route.params.activeTab);
+      setActiveTab(route.params.activeTab || 'Overview');
     }
   }, [route.params?.activeTab]);
 
@@ -490,14 +597,9 @@ export default function ExploreScreen({ navigation, route }) {
     const bottom = interpolate(
       animatedIndex.value,
       [0, 1, 2],
-      [height * 0.18 + 10, height * 0.40 + 10, height * 0.92 + 10]
+      [height * 0.18 + 5, height * 0.45 + 5, height * 0.92 + 5]
     );
-    const opacity = interpolate(
-      animatedIndex.value,
-      [1.4, 1.8],
-      [1, 0],
-      Extrapolate.CLAMP
-    );
+    const opacity = 1;
     return {
       bottom,
       opacity
@@ -509,7 +611,7 @@ export default function ExploreScreen({ navigation, route }) {
     const bottom = interpolate(
       animatedIndex.value,
       [0, 1, 2],
-      [height * 0.18 + 65, height * 0.40 + 65, height * 0.92 + 65]
+      [height * 0.18 + 100, height * 0.45 + 100, height * 0.92 + 100]
     );
     const opacity = interpolate(
       animatedIndex.value,
@@ -538,13 +640,30 @@ export default function ExploreScreen({ navigation, route }) {
         {/* All Map Pins - fade out when sheet scrolls up */}
         <Animated.View style={[StyleSheet.absoluteFill, pinsAnimatedStyle]} pointerEvents="box-none">
           {/* Job Location Pins */}
-          {!selectedJob && !selectedPin && PINS.map(pin => (
+          {!selectedJob && !selectedPin && leads.filter(l => 
+            l.clientName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (l.address || '').toLowerCase().includes(searchQuery.toLowerCase())
+          ).map(pin => (
             <TouchableOpacity
               key={pin.id}
-              style={[styles.pin, { top: pin.top, left: pin.left }]}
+              style={[styles.pin, { top: pin.latitude ? `${(parseFloat(pin.latitude) % 100)}%` : `${Math.random() * 40 + 20}%`, left: pin.longitude ? `${(parseFloat(pin.longitude) % 100)}%` : `${Math.random() * 40 + 20}%` }]}
               onPress={() => setSelectedPin(pin)}
             >
-              <LocationPin color={pin.color} />
+              <LocationPin color={pin.status === 'OPEN' ? '#8B5CF6' : '#10B981'} />
+            </TouchableOpacity>
+          ))}
+
+          {/* Jobs Map Pins */}
+          {!selectedJob && !selectedPin && allJobs.filter(j => 
+            j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            (j.location || '').toLowerCase().includes(searchQuery.toLowerCase())
+          ).map(job => (
+            <TouchableOpacity
+              key={job.id}
+              style={[styles.pin, { top: job.latitude ? `${(parseFloat(job.latitude) % 100)}%` : `${Math.random() * 40 + 40}%`, left: job.longitude ? `${(parseFloat(job.longitude) % 100)}%` : `${Math.random() * 40 + 40}%` }]}
+              onPress={() => setSelectedJob({ ...job, name: job.customerName, images: getCategoryImages(job.categoryName) })}
+            >
+              <LocationPin color={job.status === 'IN_PROGRESS' ? '#0E56D0' : '#004D40'} />
             </TouchableOpacity>
           ))}
 
@@ -698,11 +817,11 @@ export default function ExploreScreen({ navigation, route }) {
                         <Text style={styles.newBadgeTextRefined}>New</Text>
                       </View>
                     </View>
-                    <Text style={styles.jobAddressRefined}>123 E Market St Boulder, CO 80304,USA</Text>
+                    <Text style={styles.jobAddressRefined}>{selectedJob?.location || 'Indore, MP, India'}</Text>
                     <Text style={styles.jobDistTime}>4.5 mi  •  12 m</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.jobRateValue}>$43 <Text style={styles.jobRateSub}>per hour</Text></Text>
+                    <Text style={styles.jobRateValue}>${selectedJob?.amount || '0'} <Text style={styles.jobRateSub}>{selectedJob?.status === 'OPEN' ? 'Estimate' : 'Budget'}</Text></Text>
                   </View>
                 </View>
 
@@ -724,25 +843,25 @@ export default function ExploreScreen({ navigation, route }) {
                     <Text style={styles.shortcutBtnText}>Share</Text>
                   </TouchableOpacity>
                 </View>
-
                 <View style={styles.imageGridRefined}>
                   <View style={styles.largeImageWrapper}>
                     <Image source={getImgSource(selectedJob?.images?.[0])} style={styles.largeImageDetail} />
-                    <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>2 days ago</Text></View>
+                    <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>Recent</Text></View>
                   </View>
                   <View style={styles.smallImagesColumn}>
                     <View style={{ gap: 10 }}>
                       <View style={styles.smallImageWrapper}>
-                        <Image source={getImgSource(selectedJob?.images?.[1] || require('../../assets/images/modern_kitchen_flooring.png'))} style={styles.smallImageDetail} />
-                        <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>2 days ago</Text></View>
+                        <Image source={getImgSource(selectedJob?.images?.[1])} style={styles.smallImageDetail} />
+                        <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>Recent</Text></View>
                       </View>
                       <View style={styles.smallImageWrapper}>
-                        <Image source={getImgSource(selectedJob?.images?.[2] || require('../../assets/images/construction_site_overview.png'))} style={styles.smallImageDetail} />
-                        <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>2 days ago</Text></View>
+                        <Image source={getImgSource(selectedJob?.images?.[2])} style={styles.smallImageDetail} />
+                        <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>Recent</Text></View>
                       </View>
                     </View>
                   </View>
                 </View>
+
 
                 <View style={styles.overlayTabsRow}>
                   {['Job Details', 'Description', 'Photos', 'Updates'].map(t => (
@@ -757,23 +876,66 @@ export default function ExploreScreen({ navigation, route }) {
                 </View>
 
                 <View style={styles.detailsContentBody}>
-                  <InfoRow label="Service Type" value="Roof Repair" />
-                  <InfoRow label="Preferred Schedule" value="ASAP - Within 48 hours" />
-                  <InfoRow label="Budget Range" value="$2,000 - $3,500" />
-                  <InfoRow label="Urgency Level" value="High Priority" />
-                  <View style={{ marginTop: 24, marginBottom: 16 }}>
-                    <Text style={[styles.breakdownCardTitle, { marginBottom: 12 }]}>Site Details</Text>
-                  </View>
-                  <InfoRow label="Area Zone" value="Backyard / West Side" />
-                  <View style={{ marginTop: 16 }}>
-                    <Text style={styles.infoLabelRefined}>Progress Photo</Text>
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-                      <Image source={require('../../assets/images/construction_site_overview.png')} style={{ width: 100, height: 100, borderRadius: 12 }} />
-                      <View style={{ width: 100, height: 100, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#CBD5E0' }}>
-                        <Ionicons name="add" size={24} color="#94A3B8" />
+                  {overlayTab === 'Job Details' && (
+                    <>
+                      <InfoRow label="Service Type" value={selectedJob?.categoryName || 'Service'} />
+                      <InfoRow label="Preferred Schedule" value={selectedJob?.scheduledDate ? new Date(selectedJob.scheduledDate).toLocaleDateString() : 'ASAP'} />
+                      <InfoRow label="Budget Range" value={selectedJob?.budget || "$2,000 - $5,000"} />
+                      <InfoRow label="Urgency Level" value={selectedJob?.priority || "High Priority"} />
+                      <View style={{ marginTop: 24, marginBottom: 16 }}>
+                        <Text style={[styles.breakdownCardTitle, { marginBottom: 12 }]}>Site Details</Text>
                       </View>
+                      <InfoRow label="Area Zone" value={selectedJob?.location || "Main Site"} />
+                    </>
+                  )}
+
+                  {overlayTab === 'Description' && (
+                    <View style={{ padding: 10 }}>
+                      <Text style={{ fontSize: 16, color: '#4A5568', lineHeight: 24 }}>
+                        {selectedJob?.description || "No detailed description available for this job yet. Standard service protocols are being followed."}
+                      </Text>
                     </View>
-                  </View>
+                  )}
+
+                  {overlayTab === 'Photos' && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+                      {selectedJob?.images?.map((img, idx) => (
+                        <Image key={idx} source={getImgSource(img)} style={{ width: (width - 60) / 2, height: 120, borderRadius: 12 }} />
+                      ))}
+                      <TouchableOpacity style={{ width: (width - 60) / 2, height: 120, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#CBD5E0' }}>
+                        <Ionicons name="add" size={24} color="#94A3B8" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {overlayTab === 'Updates' && (
+                    <View style={{ gap: 16 }}>
+                      <ActivityItem 
+                        icon="checkmark-circle" 
+                        label="Job Accepted" 
+                        sub={`Worker ${selectedJob?.workerName || 'assigned'} started the process.`}
+                        time="2h ago"
+                        iconColor="#10B981"
+                        iconBg="#ECFDF5"
+                      />
+                      <ActivityItem 
+                        icon="camera" 
+                        label="Progress Photo Uploaded" 
+                        sub="Front backyard area survey completed."
+                        time="5h ago"
+                        iconColor="#3B82F6"
+                        iconBg="#EFF6FF"
+                      />
+                      <ActivityItem 
+                        icon="document-text" 
+                        label="Estimate Created" 
+                        sub="Initial consultation done."
+                        time="Yesterday"
+                        iconColor="#8B5CF6"
+                        iconBg="#F5F3FF"
+                      />
+                    </View>
+                  )}
                 </View>
                 <View style={{ height: 100 }} />
               </ScrollView>
@@ -850,8 +1012,9 @@ export default function ExploreScreen({ navigation, route }) {
                   </View>
                   <Text style={styles.pinSectionLabelSmall}>Job Photos</Text>
                   <View style={styles.pinPhotoRow}>
-                    <Image source={require('../../assets/images/flooring_worker_action.png')} style={styles.pinSquareImageDetail} />
-                    <Image source={require('../../assets/images/modern_kitchen_flooring.png')} style={styles.pinSquareImageDetail} />
+                    {getCategoryImages(selectedPin?.categoryName).slice(0, 2).map((img, idx) => (
+                      <Image key={idx} source={getImgSource(img)} style={styles.pinSquareImageDetail} />
+                    ))}
                   </View>
                 </View>
 
@@ -875,7 +1038,13 @@ export default function ExploreScreen({ navigation, route }) {
                     </View>
                     <TouchableOpacity
                       style={styles.viewProfileBtnOutline}
-                      onPress={() => { setSelectedPin(null); navigation.navigate('WorkerProfile', { workerId: 'JC101', name: 'John Carter' }); }}
+                      onPress={() => { 
+                        setSelectedPin(null); 
+                        navigation.navigate('WorkerProfile', { 
+                          workerId: selectedPin?.workerId || 'W001', 
+                          name: selectedPin?.workerName || 'Assigned Worker' 
+                        }); 
+                      }}
                     >
                       <Text style={styles.viewProfileBtnText}>View Worker Profile</Text>
                     </TouchableOpacity>
@@ -916,27 +1085,34 @@ export default function ExploreScreen({ navigation, route }) {
         >
           {/* Tabs */}
           <View style={styles.tabsContainer}>
-            <GestureHandlerScrollView 
+            <ScrollView 
               horizontal 
               showsHorizontalScrollIndicator={false} 
               contentContainerStyle={styles.tabsInner}
-              disallowInterruption={true}
             >
               {tabs.map(tab => (
                 <TouchableOpacity
                   key={tab}
-                  onPress={() => setActiveTab(tab)}
+                  onPress={() => {
+                    console.log(`[DASHBOARD] Tab switched to: ${tab}`);
+                    setActiveTab(tab);
+                  }}
                   style={[styles.tabItem, activeTab === tab && styles.activeTabItem]}
                 >
                   <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
                 </TouchableOpacity>
               ))}
-            </GestureHandlerScrollView>
+            </ScrollView>
           </View>
 
 
 
-          <BottomSheetScrollView contentContainerStyle={[styles.sheetContent, { paddingBottom: 200 }]}>
+          <BottomSheetScrollView 
+            contentContainerStyle={[styles.sheetContent, { paddingBottom: 380 }]}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={fetchData} />
+            }
+          >
             {activeTab === 'Overview' && (
               <View style={styles.overviewContainer}>
                 <GestureHandlerScrollView 
@@ -961,43 +1137,111 @@ export default function ExploreScreen({ navigation, route }) {
                   <Text style={styles.dashboardSub}>Platform Overview & Metrics</Text>
 
                   <View style={styles.statsGridRefined}>
-                    <StatCard icon="people-outline" label="Active Workers" value="342" change="+12% this month" color="#3B82F6" />
-                    <StatCard icon="briefcase-outline" label="Jobs In Progress" value="128" change="Lead: 72 | Sub: 56" color="#8B5CF6" />
-                    <StatCard icon="checkmark-circle-outline" label="Completed Jobs" value="1,284" change="+8.5%" color="#10B981" />
-                    <StatCard icon="cash-outline" label="Total Revenue" value="$149K" change="+12.3%" color="#0062E1" />
+                    <StatCard 
+                      icon="people-outline" 
+                      label="Active Workers" 
+                      value={stats?.mainStats?.[0]?.value?.toString() || "0"} 
+                      change={stats?.mainStats?.[0]?.trend || "+0%"} 
+                      color="#3B82F6" 
+                    />
+                    <StatCard 
+                      icon="briefcase-outline" 
+                      label="Jobs In Progress" 
+                      value={stats?.mainStats?.[1]?.value?.toString() || "0"} 
+                      change={stats?.mainStats?.[1]?.trend || "Lead: 0 | Sub: 0"} 
+                      color="#8B5CF6" 
+                    />
+                    <StatCard 
+                      icon="checkmark-circle-outline" 
+                      label="Completed Jobs" 
+                      value={stats?.mainStats?.[2]?.value?.toString() || "0"} 
+                      change={stats?.mainStats?.[2]?.trend || "+0%"} 
+                      color="#10B981" 
+                    />
+                    <StatCard 
+                      icon="cash-outline" 
+                      label="Total Revenue" 
+                      value={stats?.mainStats?.[3]?.value?.toString() || "$0"} 
+                      change={stats?.mainStats?.[3]?.trend || "+0%"} 
+                      color="#0062E1" 
+                    />
                   </View>
                 </View>
 
                 <View style={styles.revenueBreakdownSection}>
                   <Text style={styles.breakdownCardTitle}>Revenue Breakdown</Text>
-                  <ProgressBar label="Platform Fees" value="$42.3K" progress={0.4} color="#8B5CF6" labelColor="#718096" />
-                  <ProgressBar label="Subcontract Revenue" value="$106.2K" progress={0.35} color="#10B981" labelColor="#718096" />
+                  <ProgressBar 
+                    label="Platform Fees (Est. 10%)" 
+                    value={`$${((stats?.totalRevenue || 0) * 0.1).toLocaleString()}`} 
+                    progress={0.1} 
+                    color="#8B5CF6" 
+                    labelColor="#718096" 
+                  />
+                  <ProgressBar 
+                    label="Worker Revenue (Est. 90%)" 
+                    value={`$${((stats?.totalRevenue || 0) * 0.9).toLocaleString()}`} 
+                    progress={0.9} 
+                    color="#10B981" 
+                    labelColor="#718096" 
+                  />
                 </View>
 
                 <View style={styles.performersSection}>
                   <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.breakdownCardTitle}>Top Performers</Text>
-                    <TouchableOpacity><Text style={styles.viewAllText}>View all</Text></TouchableOpacity>
+                    <Text style={styles.breakdownCardTitle}>Active Workers</Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('WorkerManagement')}><Text style={styles.viewAllText}>View all</Text></TouchableOpacity>
                   </View>
-                  <PerformerItem name="Sarah Johnson" role="Technician" status="Active" initials="SJ" color="#3B82F6" />
-                  <View style={styles.itemDivider} />
-                  <PerformerItem name="Mike Kolsun" role="Plumber" status="Active" initials="MK" color="#3B82F6" />
-                  <View style={styles.itemDivider} />
-                  <PerformerItem name="David Vas" role="Electrician" status="Active" initials="DV" color="#3B82F6" />
+                  {stats?.growthStats ? (
+                    // Show actual workers here if available, or a fallback
+                    stats.mainStats[0].value > 0 ? (
+                      <Text style={{ fontSize: 13, color: '#718096', marginBottom: 10 }}>Displaying top registered professionals</Text>
+                    ) : null
+                  ) : null}
+                  {/* Using available workers instead of dummy ones */}
+                  {workers && workers.length > 0 ? workers.slice(0, 3).map(w => (
+                    <PerformerItem 
+                      key={w.id} 
+                      name={w.name} 
+                      role={w.role} 
+                      status={w.isAvailable ? 'Active' : 'Busy'} 
+                      initials={w.name.charAt(0)} 
+                      color="#3B82F6" 
+                      onPress={() => navigation.navigate('WorkerProfile', { workerId: w.id, name: w.name })}
+                    />
+                  )) : (
+                    <Text style={{ textAlign: 'center', color: '#718096', padding: 10 }}>No workers registered yet</Text>
+                  )}
                 </View>
 
                 <View style={styles.activitySection}>
-                  <Text style={styles.breakdownCardTitle}>Recent Activity</Text>
-                  <ActivityItem icon="build-outline" label="John Carter completed #1024" sub="Job ID #1024  •  Today, 9:30 AM" iconColor="#1D4ED8" iconBg="#EFF6FF" />
-                  <ActivityItem icon="checkmark-outline" label="Sarah Wilson joined the platform" sub="10 mins ago" iconColor="#059669" iconBg="#ECFDF5" />
-                  <ActivityItem icon="cash-outline" label="Payment of $850 to Mike Davis" sub="2 hours ago" iconColor="#7C3AED" iconBg="#F5F3FF" />
+                  <Text style={styles.breakdownCardTitle}>Latest Available Leads</Text>
+                  {leads.filter(l => 
+                    (l.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                     l.location?.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ).length > 0 ? leads.filter(l => 
+                    (l.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                     l.location?.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ).map(lead => (
+                    <TouchableOpacity 
+                      key={lead.id} 
+                      style={styles.availableLeadRow}
+                      onPress={() => setSelectedPin(lead)}
+                    >
+                      <View style={[styles.leadIcon, { backgroundColor: '#F5F3FF' }]}>
+                        <Ionicons name="flash-outline" size={18} color="#7C3AED" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.leadName}>{lead.customerName || 'New Client'}</Text>
+                        <Text style={styles.leadSub}>{lead.categoryName} • {lead.location}</Text>
+                      </View>
+                      <Text style={styles.leadStatus}>OPEN</Text>
+                    </TouchableOpacity>
+                  )) : (
+                    <Text style={{ textAlign: 'center', color: '#718096', padding: 10 }}>No new leads</Text>
+                  )}
                 </View>
 
-
-
-
-
-                <TouchableOpacity style={styles.manageWorkersStickyBtn} onPress={() => navigation.navigate('WorkerManagement')}>
+                <TouchableOpacity style={[styles.manageWorkersStickyBtn, { marginTop: 20 }]} onPress={() => navigation.navigate('WorkerManagement')}>
                   <Text style={styles.manageWorkersStickyBtnText}>Manage Workers</Text>
                 </TouchableOpacity>
               </View>
@@ -1011,6 +1255,8 @@ export default function ExploreScreen({ navigation, route }) {
                     style={styles.jobsSearchPlaceholder} 
                     placeholder="Search here"
                     placeholderTextColor="#718096"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
                   />
                   <Ionicons name="mic" size={20} color="#64748B" />
                 </View>
@@ -1023,49 +1269,57 @@ export default function ExploreScreen({ navigation, route }) {
                   disallowInterruption={true}
                 >
                   {['All', 'New', 'Assigned', 'Quoted', 'In Progress'].map(s => (
-                    <TouchableOpacity key={s} style={[styles.jobFilterChip, s === 'All' && styles.jobFilterChipActive]}>
-                      <Text style={[styles.jobFilterText, s === 'All' && styles.jobFilterTextActive]}>{s}</Text>
+                    <TouchableOpacity 
+                      key={s} 
+                      onPress={() => setJobStatusFilter(s)}
+                      style={[styles.jobFilterChip, jobStatusFilter === s && styles.jobFilterChipActive]}
+                    >
+                      <Text style={[styles.jobFilterText, jobStatusFilter === s && styles.jobFilterTextActive]}>{s}</Text>
                     </TouchableOpacity>
                   ))}
                 </GestureHandlerScrollView>
 
                 <View style={[styles.jobListVertical, { paddingBottom: 100 }]}>
-                  {PINS.map(pin => {
-                    // Give ALL job cards 15 photos for a rich experience
-                    const photoList = [
-                      require('../../assets/images/wood_flooring_job.png'),
-                      require('../../assets/images/modern_kitchen_flooring.png'),
-                      require('../../assets/images/flooring_worker_action.png'),
-                      require('../../assets/images/construction_site_overview.png'),
-                      require('../../assets/images/modern_kitchen_flooring.png'),
-                      require('../../assets/images/wood_flooring_job.png'),
-                      require('../../assets/images/construction_site_overview.png'),
-                      require('../../assets/images/flooring_worker_action.png'),
-                      require('../../assets/images/wood_flooring_job.png'),
-                      require('../../assets/images/modern_kitchen_flooring.png'),
-                      require('../../assets/images/flooring_worker_action.png'),
-                      require('../../assets/images/construction_site_overview.png'),
-                      require('../../assets/images/modern_kitchen_flooring.png'),
-                      require('../../assets/images/wood_flooring_job.png'),
-                      require('../../assets/images/construction_site_overview.png')
-                    ];
+                  {(() => {
+                    const filtered = allJobs.filter(j => {
+                      const matchesSearch = (j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                            j.location?.toLowerCase().includes(searchQuery.toLowerCase()));
+                      if (jobStatusFilter === 'All') return matchesSearch;
+                      const statusMap = {
+                        'New': 'ACCEPTED',
+                        'Assigned': 'ACCEPTED',
+                        'Quoted': 'QUOTED',
+                        'In Progress': 'IN_PROGRESS'
+                      };
+                      return matchesSearch && j.status === statusMap[jobStatusFilter];
+                    });
 
-                    return (
-                      <JobCard
-                        key={pin.id}
-                        navigation={navigation}
-                        name={pin.name}
-                        id={`#J-${pin.id}`}
-                        tag={pin.status}
-                        time="Submitted: 2 hours ago"
-                        images={photoList}
-                        onPress={() => setSelectedJob({
-                          ...pin,
-                          images: photoList
-                        })}
-                      />
-                    );
-                  })}
+                    if (filtered.length === 0) {
+                      return <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No jobs found</Text>;
+                    }
+
+                    return filtered.map(job => {
+                      const photoList = getCategoryImages(job.categoryName);
+                      return (
+                        <JobCard
+                          key={job.id}
+                          navigation={navigation}
+                          name={job.customerName || 'Active Job'}
+                          id={`#JB-${job.id.slice(-4).toUpperCase()}`}
+                          tag={job.status}
+                          location={job.location}
+                          category={job.categoryName}
+                          time={`Scheduled: ${new Date(job.scheduledDate).toLocaleDateString()}`}
+                          images={photoList}
+                          onPress={() => setSelectedJob({
+                            ...job,
+                            name: job.customerName,
+                            images: photoList
+                          })}
+                        />
+                      );
+                    });
+                  })()}
                 </View>
               </View>
             )}
@@ -1074,115 +1328,101 @@ export default function ExploreScreen({ navigation, route }) {
               <View style={styles.scheduleContainer}>
                 <Text style={styles.sectionTitle}>Today's Agenda</Text>
                 <View style={{ marginTop: 24 }}>
-                  {AGENDA_DATA.map((item, index) => (
+                  {allJobs.filter(j => 
+                    j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    j.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).length > 0 ? allJobs.filter(j => 
+                    j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    j.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((item, index, filteredArr) => (
                     <AgendaItem
                       key={item.id}
-                      item={item}
+                      item={{
+                        ...item,
+                        name: item.customerName,
+                        type: item.categoryName,
+                        time: item.scheduledTime
+                      }}
                       index={index}
-                      isLast={index === AGENDA_DATA.length - 1}
+                      isLast={index === filteredArr.length - 1}
                       navigation={navigation}
                     />
-                  ))}
+                  )) : (
+                    <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No items scheduled for today</Text>
+                  )}
                 </View>
               </View>
             )}
 
             {activeTab === 'Invoice' && (
               <View style={styles.billingContainer}>
-                <TouchableOpacity
-                  style={styles.inlineSearch}
-                  onPress={() => navigation.navigate('AdminSearch')}
-                >
+                <TouchableOpacity style={styles.inlineSearch} onPress={() => navigation.navigate('AdminSearch')}>
                   <Ionicons name="search" size={20} color={COLORS.textTertiary} />
                   <Text style={[styles.inlineSearchInput, { color: COLORS.textTertiary, marginLeft: 8 }]}>Search here</Text>
                   <Ionicons name="mic-outline" size={20} color={COLORS.textTertiary} />
                 </TouchableOpacity>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusChipsRow}>
-                  {['All', 'Draft', 'Sent', 'Paid', 'Pending'].map(s => (
-                    <TouchableOpacity
-                      key={s}
-                      onPress={() => setInvoiceFilter(s)}
-                      style={[styles.statusChip, invoiceFilter === s && styles.activeStatusChipDark]}
-                    >
-                      <Text style={[styles.statusChipText, invoiceFilter === s && styles.activeStatusChipTextWhite]}>{s}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
 
                 <View style={styles.billingSummaryCard}>
                   <View style={styles.summaryHeader}>
                     <View>
                       <Text style={styles.summaryTitle}>Billing Summary</Text>
-                      <Text style={styles.summarySub}>Invoices and payments in one place.</Text>
+                      <Text style={styles.summarySub}>Total Billed: ${invoices.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}</Text>
                     </View>
-                    <TouchableOpacity style={styles.monthPicker}>
-                      <Text style={styles.monthPickerText}>January</Text>
-                      <Ionicons name="chevron-down" size={14} color={COLORS.textPrimary} />
-                    </TouchableOpacity>
                   </View>
-                  <View style={styles.divider} />
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Total Billed</Text>
-                    <Text style={styles.summaryValue}>$148,500</Text>
-                  </View>
-                  <View style={styles.divider} />
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Pending</Text>
-                    <Text style={styles.summaryValue}>$12,450</Text>
-                  </View>
-                  <View style={styles.divider} />
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Paid Invoices</Text>
-                    <Text style={styles.summaryValue}>186</Text>
-                  </View>
-                  <View style={styles.divider} />
-                  <View style={styles.summaryRow}>
-                    <Text style={styles.summaryLabel}>Overdue</Text>
-                    <Text style={[styles.summaryValue, { color: '#EF4444' }]}>8</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.primaryActionBtn}
-                    onPress={() => navigation.navigate('CreateInvoice')}
-                  >
-                    <Ionicons name="add" size={24} color={COLORS.white} />
-                    <Text style={styles.primaryActionBtnText}>New Invoice</Text>
-                  </TouchableOpacity>
                 </View>
 
-                <Text style={styles.sectionTitleSmall}>Invoices</Text>
-                <InvoiceCard navigation={navigation} id="#INV-1024" customer="Maggie Bradley" type="Roof Repair" amount="1,500.00" status="Paid" />
-                <InvoiceCard navigation={navigation} id="#INV-1025" customer="John Doe" type="Pipe Repair" amount="450.00" status="Overdue" />
+                <Text style={styles.sectionTitleSmall}>Recent Invoices</Text>
+                {invoices.filter(inv => 
+                  inv.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  inv.status?.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length > 0 ? invoices.filter(inv => 
+                  inv.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  inv.status?.toLowerCase().includes(searchQuery.toLowerCase())
+                ).map(inv => (
+                  <InvoiceCard 
+                    key={inv.id}
+                    navigation={navigation} 
+                    id={`#INV-${inv.id.slice(-4).toUpperCase()}`} 
+                    customer={inv.customerName} 
+                    type={inv.categoryName} 
+                    amount={inv.amount.toLocaleString()} 
+                    status={inv.status} 
+                  />
+                )) : (
+                  <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No invoices found</Text>
+                )}
               </View>
             )}
 
             {activeTab === 'Quote' && (
               <View style={styles.billingContainer}>
-                <TouchableOpacity
-                  style={styles.inlineSearch}
-                  onPress={() => navigation.navigate('AdminSearch')}
-                >
+                <TouchableOpacity style={styles.inlineSearch} onPress={() => navigation.navigate('AdminSearch')}>
                   <Ionicons name="search" size={20} color={COLORS.textTertiary} />
                   <Text style={[styles.inlineSearchInput, { color: COLORS.textTertiary, marginLeft: 8 }]}>Search here</Text>
                   <Ionicons name="mic-outline" size={20} color={COLORS.textTertiary} />
                 </TouchableOpacity>
 
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusChipsRow}>
-                  {['All', 'Draft', 'Sent', 'Approved', 'Rejected'].map(s => (
-                    <TouchableOpacity
-                      key={s}
-                      onPress={() => setQuoteFilter(s)}
-                      style={[styles.statusChip, quoteFilter === s && styles.activeStatusChipDark]}
-                    >
-                      <Text style={[styles.statusChipText, quoteFilter === s && styles.activeStatusChipTextWhite]}>{s}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
                 <Text style={styles.sectionTitleSmall}>All Quotes</Text>
-                <QuoteCard navigation={navigation} id="#QT-2045" customer="Alistair Hughes" type="HVAC Installation" date="Jan 14, 2026" amount="1,896.15" status="Approved" />
-                <QuoteCard navigation={navigation} id="#QT-2046" customer="Alistair Hughes" type="HVAC Installation" date="Jan 14, 2026" amount="1,896.15" status="Sent" />
-                <QuoteCard navigation={navigation} id="#QT-2048" customer="Alistair Hughes" type="HVAC Installation" date="Jan 14, 2026" amount="1,896.15" status="Rejected" />
+                {quotes.filter(q => 
+                  q.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  q.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length > 0 ? quotes.filter(q => 
+                  q.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  q.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+                ).map(q => (
+                  <QuoteCard 
+                    key={q.id}
+                    navigation={navigation} 
+                    id={`#QT-${q.id.slice(-4).toUpperCase()}`} 
+                    customer={q.customerName} 
+                    type={q.categoryName} 
+                    date={new Date(q.createdAt).toLocaleDateString()} 
+                    amount={q.amount.toLocaleString()} 
+                    status={q.isApproved ? 'Approved' : 'Sent'} 
+                  />
+                )) : (
+                  <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No quotes found</Text>
+                )}
               </View>
             )}
           </BottomSheetScrollView>
@@ -1453,7 +1693,7 @@ const styles = StyleSheet.create({
   activeFilterChipText: { color: '#fff' },
 
   overviewContainerNoTitle: { paddingTop: 0, paddingHorizontal: 16 },
-  sheetContent: { flex: 1, padding: 0 },
+  sheetContent: { padding: 0 },
   timeFiltersContainerOverview: { flexDirection: 'row', marginBottom: 20 },
   timeFilterChipOverview: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 25, backgroundColor: COLORS.white, borderWidth: 1, borderColor: '#E2E8F0', marginRight: 10 },
   activeTimeFilterChipOverview: { backgroundColor: '#1F2937', borderColor: '#1F2937' },
@@ -1513,7 +1753,12 @@ const styles = StyleSheet.create({
   activitySub: { fontSize: 12, color: '#718096' },
 
   manageWorkersStickyBtn: { backgroundColor: '#0E56D0', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 40, ...SHADOWS.medium },
-  manageWorkersStickyBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+  manageWorkersStickyBtnText: { color: COLORS.white, fontSize: 13, fontWeight: '700' },
+  availableLeadRow: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: '#F8FAFC', borderRadius: 12, marginBottom: 8 },
+  leadIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  leadName: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary },
+  leadSub: { fontSize: 12, color: COLORS.textTertiary, marginTop: 1 },
+  leadStatus: { fontSize: 11, fontWeight: '800', color: '#7C3AED' },
 
   homeLeadsSettingSection: { marginBottom: 24 },
   settingCardInnerPadded: { backgroundColor: COLORS.white, borderRadius: 24, padding: 20, ...SHADOWS.small, borderWidth: 1, borderColor: '#F1F5F9' },
@@ -1864,11 +2109,22 @@ const styles = StyleSheet.create({
   mapButtonsRight: { position: 'absolute', right: 20, zIndex: 110, gap: 15, alignItems: 'center' },
   navCircleBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6 },
   dirSquareBtn: { width: 56, height: 52, borderRadius: 16, backgroundColor: '#007A8A', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6 },
-  legendContainer: { position: 'absolute', left: 0, right: 0, zIndex: 100 },
-  legendWrapper: { flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 10, gap: 8 },
-  legendChipSheet: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, ...SHADOWS.small },
-  legendChip: { flex: 1, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 2 },
-  legendText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  legendContainer: { position: 'absolute', left: 0, right: 0, zIndex: 1000, height: 80, justifyContent: 'center' },
+  legendWrapper: { flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 10, gap: 8, alignItems: 'center' },
+  legendChip: { 
+    flex: 1, 
+    height: 52, 
+    borderRadius: 26, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    elevation: 8, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.25, 
+    shadowRadius: 5,
+    paddingHorizontal: 2
+  },
+  legendText: { color: '#FFF', fontSize: 13, fontWeight: '900', fontFamily: FONTS.bold },
 
   // Quote Modal Styles
   quoteModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },

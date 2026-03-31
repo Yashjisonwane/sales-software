@@ -8,13 +8,44 @@ import {
   ScrollView,
   Switch,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getProfessionals, assignLeadToWorker } from '../../api/apiService';
+import { Alert, ActivityIndicator } from 'react-native';
 
-const AssignJobScreen = ({ navigation }) => {
+const AssignJobScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const [method, setMethod] = useState('auto');
+  const job = route.params?.job;
+  const [method, setMethod] = useState('manual');
   const [isTimerEnabled, setIsTimerEnabled] = useState(false);
+  const [workers, setWorkers] = useState([]);
+  const [selectedWorker, setSelectedWorker] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    const fetchWorkers = async () => {
+      const res = await getProfessionals();
+      if (res.success) setWorkers(res.data);
+    };
+    fetchWorkers();
+  }, []);
+
+  const handleAssign = async () => {
+    if (!job) return;
+    if (method === 'manual' && !selectedWorker) {
+      Alert.alert('Selection Error', 'Please select a worker first.');
+      return;
+    }
+
+    setLoading(true);
+    const workerId = method === 'auto' ? null : selectedWorker.id;
+    const res = await assignLeadToWorker(job.id, workerId);
+    setLoading(false);
+
+    if (res.success) {
+      navigation.navigate('JobSuccess');
+    } else {
+      Alert.alert('Assignment Error', res.message);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -61,11 +92,26 @@ const AssignJobScreen = ({ navigation }) => {
             />
             <View style={styles.optionInfo}>
               <Text style={styles.optionTitle}>Manual Assign</Text>
-              <Text style={styles.optionDesc}>
-                Select a specific worker from the list based on your preference.
-              </Text>
+              <Text style={styles.optionDesc}>Select a specific worker from the list.</Text>
             </View>
           </TouchableOpacity>
+
+          {method === 'manual' && workers.map(w => (
+            <TouchableOpacity 
+              key={w.id} 
+              style={[styles.workerRow, selectedWorker?.id === w.id && styles.activeWorkerRow]} 
+              onPress={() => setSelectedWorker(w)}
+            >
+              <View style={styles.workerAvatarPlaceholder}>
+                <Text style={styles.workerInitials}>{w.name?.charAt(0)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.workerName}>{w.name}</Text>
+                <Text style={styles.workerStatus}>{w.isAvailable ? 'Available' : 'Busy'}</Text>
+              </View>
+              {selectedWorker?.id === w.id && <Ionicons name="checkmark-circle" size={20} color="#0E56D0" />}
+            </TouchableOpacity>
+          ))}
         </View>
 
         <View style={styles.timerSection}>
@@ -85,10 +131,11 @@ const AssignJobScreen = ({ navigation }) => {
 
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
-          style={styles.assignBtn}
-          onPress={() => navigation.navigate('JobSuccess')}
+          style={[styles.assignBtn, loading && { opacity: 0.7 }]}
+          onPress={handleAssign}
+          disabled={loading}
         >
-          <Text style={styles.assignBtnText}>Assign Job</Text>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.assignBtnText}>Assign Job</Text>}
         </TouchableOpacity>
       </View>
     </View>
@@ -147,6 +194,12 @@ const styles = StyleSheet.create({
   bottomContainer: { padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F1F5F9' },
   assignBtn: { height: 56, backgroundColor: '#0E56D0', borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   assignBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  workerRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, backgroundColor: '#F8FAFC', marginBottom: 8, borderWidth: 1, borderColor: '#F1F5F9' },
+  activeWorkerRow: { borderColor: '#0E56D0', backgroundColor: '#EFF6FF' },
+  workerAvatarPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  workerInitials: { fontSize: 16, fontWeight: '700', color: '#475569' },
+  workerName: { fontSize: 14, fontWeight: '600', color: '#1A202C' },
+  workerStatus: { fontSize: 12, color: '#718096', marginTop: 2 },
 });
 
 export default AssignJobScreen;
