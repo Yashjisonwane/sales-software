@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useMarketplace } from '../../context/MarketplaceContext';
 import { Briefcase, Users, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Globe } from 'lucide-react';
 
 const MarketplaceDashboard = () => {
-    const { leads, professionals, dashboardStats } = useMarketplace();
+    const { leads, professionals, dashboardStats, refreshData } = useMarketplace();
+
+    useEffect(() => {
+        refreshData();
+    }, [refreshData]);
     const [chartFilter, setChartFilter] = useState('Weekly');
     const [timeRange, setTimeRange] = useState('Last 30 Days');
 
@@ -35,19 +39,30 @@ const MarketplaceDashboard = () => {
         { name: 'Leads Today', value: 0, icon: Activity, color: 'text-green-600', bg: 'bg-green-50', trend: '+5%', up: true },
     ];
 
-    // Mock chart data for visualization
-    const leadsToday = (dashboardStats && dashboardStats.mainStats) ? (dashboardStats.mainStats.find(s => s.name === 'New Leads Today')?.value || 0) : 0;
+    // Chart data calculation
+    const apiLeadActivity = dashboardStats?.leadActivity || [];
+    const maxLeadCount = Math.max(...apiLeadActivity, 5);
+    
+    const weeklyData = apiLeadActivity.length === 7
+        ? apiLeadActivity.map(count => Math.max((count / maxLeadCount) * 100, 5)) // Min 5% for visibility
+        : [40, 70, 55, 90, 65, 80, 50];
+        
+    const monthlyData = [60, 45, 80, 95, 70, 85, 90];
+    const chartData = chartFilter === 'Weekly' ? weeklyData : monthlyData;
+
+    // Day labels for last 7 days
+    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    const todayIdx = new Date().getDay();
+    const chartLabels = chartFilter === 'Weekly' 
+        ? [6, 5, 4, 3, 2, 1, 0].map(diff => dayNames[(todayIdx - diff + 7) % 7])
+        : ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'];
+
     const growthStats = (dashboardStats && dashboardStats.growthStats) ? dashboardStats.growthStats : [
         { label: 'New Professionals', value: 78, max: 100, color: 'bg-purple-500' },
         { label: 'Lead Completion Rate', value: 89.2, max: 100, color: 'bg-green-500' },
         { label: 'Platform Active Usage', value: 83, max: 100, color: 'bg-blue-500' },
         { label: 'Customer Retention', value: 91, max: 100, color: 'bg-orange-500' },
     ];
-
-    // Mock chart data based on filter
-    const weeklyData = [40, 70, 55, 90, 65, 80, leadsToday * 10 || 50];
-    const monthlyData = [60, 45, 80, 95, 70, 85, 90];
-    const chartData = chartFilter === 'Weekly' ? weeklyData : monthlyData;
 
     return (
         <div className="space-y-8">
@@ -116,9 +131,7 @@ const MarketplaceDashboard = () => {
                                     style={{ height: `${h}%`, minHeight: '8px' }}
                                 ></div>
                                 <span className="text-[10px] font-bold text-gray-400">
-                                    {chartFilter === 'Weekly' 
-                                        ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]
-                                        : ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'][i]}
+                                    {chartLabels[i]}
                                 </span>
                             </div>
                         ))}

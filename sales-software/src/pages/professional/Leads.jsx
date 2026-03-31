@@ -85,7 +85,7 @@ const Leads = () => {
             (statusFilter === 'Rejected' && s === 'rejected' || s === 'Rejected');
 
         return matchesSearch && matchesStatus;
-    });
+    }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
     // ── Action handler ────────────────────────────────────────
     const handleAction = (type, lead) => {

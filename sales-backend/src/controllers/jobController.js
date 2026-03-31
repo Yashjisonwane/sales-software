@@ -13,13 +13,15 @@ const getJobs = async (req, res) => {
 
         if (user.role === 'ADMIN') {
             jobs = await prisma.job.findMany({
-                include: { customer: { select: { name: true } }, worker: { select: { name: true } } }
+                include: { customer: { select: { name: true } }, worker: { select: { name: true } } },
+                orderBy: { createdAt: 'desc' }
             });
         } else {
             // Workers only see their own assigned jobs
             jobs = await prisma.job.findMany({
                 where: { workerId: user.id },
-                include: { customer: { select: { name: true } }, worker: { select: { name: true } } }
+                include: { customer: { select: { name: true } }, worker: { select: { name: true } } },
+                orderBy: { createdAt: 'desc' }
             });
         }
 
