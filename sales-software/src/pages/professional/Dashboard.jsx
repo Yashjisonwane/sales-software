@@ -22,7 +22,7 @@ import LeadDetailModal from '../../components/professional/LeadDetailModal';
 import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-    const { leads, assignments, currentUser, respondToLead, showToast, dashboardStats } = useMarketplace();
+    const { leads, assignments, currentUser, respondToLead, showToast, dashboardStats, startJob, completeJob } = useMarketplace();
     const navigate = useNavigate();
     const [selectedLead, setSelectedLead] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,7 +97,7 @@ const Dashboard = () => {
                 assignmentStatus: assignment?.status || 'Sent',
                 assignmentId: assignment?.id // Real Job UUID
             };
-        });
+        }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
     const handleAction = (type, lead) => {
         if (type === 'view') {
@@ -107,6 +107,25 @@ const Dashboard = () => {
         }
 
         const assignment = proAssignments.find(a => a.leadId === lead.id);
+
+        if (type === 'contact') {
+            const assignmentId = lead.assignmentId || assignment?.id;
+            navigate('/professional/messages', { state: { jobId: assignmentId } });
+            return;
+        }
+
+        if (type === 'start') {
+            const assignmentId = lead.assignmentId || assignment?.id;
+            if (assignmentId) startJob(assignmentId);
+            return;
+        }
+
+        if (type === 'complete') {
+            const assignmentId = lead.assignmentId || assignment?.id;
+            if (assignmentId) completeJob(assignmentId);
+            return;
+        }
+
         if (assignment && (type === 'accept' || type === 'reject')) {
             respondToLead(assignment.id, type);
             showToast(`Lead ${type === 'accept' ? 'Accepted' : 'Rejected'}`, type === 'accept' ? 'success' : 'info');
@@ -114,25 +133,18 @@ const Dashboard = () => {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-5">
-                <div className="w-full">
-                    <h1 className="text-2xl font-bold text-slate-900">Professional Overview</h1>
-                    <p className="text-sm md:text-base text-gray-500 mt-1 font-medium leading-relaxed">Welcome back, {currentUser.name}! Here's your business performance today.</p>
-                    {currentUser.plan && (
-                        <div className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-purple-50 text-purple-700 rounded-lg border border-purple-100 shadow-sm transition-all hover:shadow-md animate-in fade-in slide-in-from-top-1 duration-500">
-                            <Crown size={14} className="text-purple-600" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">{currentUser.plan.name} Tier</span>
-                        </div>
-                    )}
+        <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Marketplace Dashboard</h1>
+                    <p className="text-sm text-gray-500 mt-1">Monitor your leads, active jobs, and platform performance.</p>
                 </div>
-                <div className="w-full md:w-auto px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-bold text-gray-600 flex items-center justify-between md:justify-start gap-2">
-                    <div className="flex items-center gap-2">
-                        <Clock size={16} className="text-blue-600" />
-                        <span className="hidden sm:inline">Current Date:</span>
+                {currentUser.plan && (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold border border-blue-100">
+                        <Crown size={14} fill="currentColor" />
+                        <span>{currentUser.plan.name} Member</span>
                     </div>
-                    <span>{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                </div>
+                )}
             </div>
 
             {/* Stats Cards */}
@@ -149,44 +161,35 @@ const Dashboard = () => {
                             </div>
                         </div>
                         <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider truncate">{stat.name}</p>
-                        <p className="text-xl sm:text-2xl 2xl:text-3xl font-bold text-gray-900 mt-1 tracking-tight truncate">{stat.value}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight truncate">{stat.value}</p>
                     </div>
                 ))}
             </div>
 
             {/* Interactive Lead Map */}
             <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2">
-                    <div>
-                        <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Lead Explorer</h2>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Geo-Intelligence Visualization</p>
-                    </div>
+                <div className="flex justify-between items-center px-1">
+                    <h2 className="text-lg font-bold text-gray-900 px-1">Job Locations</h2>
                 </div>
-                <div className="w-full overflow-hidden">
+                <div className="w-full rounded-2xl sm:rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100">
                     <LeadMap leads={mapLeads} onAction={handleAction} />
                 </div>
             </div>
 
             {/* Recent Leads Section */}
-            <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-2">
-                    <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Recent Lead Opportunities</h2>
+            <div className="space-y-4 pt-4">
+                <div className="flex justify-between items-center px-1">
+                    <h2 className="text-lg font-bold text-gray-900">Recent Assignments</h2>
                     <button
                         onClick={() => navigate('/professional/leads')}
-                        className="w-full sm:w-auto text-blue-600 text-xs font-black uppercase tracking-[0.15em] hover:opacity-70 transition-opacity flex items-center justify-center sm:justify-end gap-2"
+                        className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
                     >
-                        View all leads <ArrowUpRight size={16} />
+                        View all <ChevronRight size={14} />
                     </button>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-visible">
                     <LeadTable leads={recentLeads} onAction={handleAction} />
-                    {recentLeads.length === 0 && (
-                        <div className="p-12 text-center text-gray-400">
-                            <Clock size={48} className="mx-auto mb-3 opacity-20" />
-                            <p className="font-medium">No new leads at the moment. We'll notify you when a match is found!</p>
-                        </div>
-                    )}
                 </div>
             </div>
 

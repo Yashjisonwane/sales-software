@@ -12,7 +12,8 @@ export const ENDPOINTS = {
     AUTH: '/auth',
     CATEGORIES: '/categories',
     LOCATIONS: '/locations',
-    SUBSCRIPTIONS: '/leads/subscriptions'
+    SUBSCRIPTIONS: '/leads/subscriptions',
+    REVIEWS: '/reviews'
 };
 
 export const getApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;

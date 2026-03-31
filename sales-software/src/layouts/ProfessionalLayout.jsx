@@ -35,11 +35,6 @@ const ProfessionalLayout = () => {
     const nRef = useRef(null);
     useLocationTracker(); // Initialize auto-tracking
 
-    if (isAuthenticated === null) return null; // Wait for checkAuth
-    if (isAuthenticated === false) return <Navigate to="/login" replace />;
-
-    const unreadCount = (notifications || []).filter(n => !n.isRead).length;
-
     useEffect(() => {
         const handleClickOutside = (event) => {
           if (nRef.current && !nRef.current.contains(event.target)) {
@@ -50,10 +45,14 @@ const ProfessionalLayout = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    if (isAuthenticated === null) return null; // Wait for checkAuth
+    if (isAuthenticated === false) return <Navigate to="/login" replace />;
+
+    const unreadCount = (notifications || []).filter(n => !n.isRead).length;
+
     const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/professional/dashboard' },
         { icon: Briefcase, label: 'Leads', path: '/professional/leads' },
-        // { icon: Map, label: 'Map View', path: '/professional/map' },
         { icon: MessageSquare, label: 'Messages', path: '/professional/messages' },
         { icon: Star, label: 'Reviews', path: '/professional/reviews' },
         { icon: CreditCard, label: 'Subscription', path: '/professional/subscription' },
@@ -106,8 +105,6 @@ const ProfessionalLayout = () => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-
-
                         <div className="relative" ref={nRef}>
                             <button
                                 className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -174,7 +171,7 @@ const ProfessionalLayout = () => {
                             </div>
                             <div className="hidden sm:block text-left min-w-0">
                                 <p className="text-xs sm:text-sm font-semibold text-gray-800 truncate max-w-[100px]">{currentUser?.name || 'Professional'}</p>
-                                <p className="text-[10px] text-gray-400 truncate">{currentUser?.role === 'WORKER' ? 'Service Professional' : (currentUser?.role || 'Provider')}</p>
+                                <p className="text-[10px] text-gray-400 truncate tracking-tight">{currentUser?.role === 'WORKER' ? 'Service Professional' : (currentUser?.role || 'Provider')}</p>
                             </div>
                         </div>
                     </div>

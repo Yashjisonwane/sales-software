@@ -20,8 +20,11 @@ export const MarketplaceProvider = ({ children }) => {
     const [dashboardStats, setDashboardStats] = useState(null);
     const [upgradeRequests, setUpgradeRequests] = useState([]);
 
-    // ─── UI & MOCK STATES (Preserved for Admin Demo functionality) ───
+    // ─── UI & MOCK STATES ───
     const [reviews, setReviews] = useState([]);
+    const [reviewStats, setReviewStats] = useState({ averageRating: 0, distribution: [] });
+    const [chats, setChats] = useState([]);
+    const [activeChatMessages, setActiveChatMessages] = useState([]);
     const [locationLogs, setLocationLogs] = useState([]);
     const [earningsHistory, setEarningsHistory] = useState([]);
     const [notifications, setNotifications] = useState([]);
@@ -34,7 +37,6 @@ export const MarketplaceProvider = ({ children }) => {
     }, []);
 
     const addNotification = async (notif) => {
-        // Backend handles notifications now, but we can keep this for local UI optimism
         setNotifications(prev => [{ id: Date.now(), createdAt: new Date().toISOString(), isRead: false, ...notif }, ...prev]);
     };
     const markNotificationRead = async (id) => {
@@ -75,7 +77,7 @@ export const MarketplaceProvider = ({ children }) => {
         setJobs([]);
     };
 
-    // Auto-login check (Fetch real user profile from token)
+    // Auto-login check
     useEffect(() => {
         const checkAuth = async () => {
             const token = localStorage.getItem('userToken');
@@ -86,14 +88,12 @@ export const MarketplaceProvider = ({ children }) => {
                     setCurrentUser(res.data);
                     await loadInitialData();
                 } else {
-                    // Token invalid (User not found in reset DB) or expired
                     localStorage.removeItem('userToken');
                     setIsAuthenticated(false);
                     setCurrentUser(null);
-                    showToast('Session invalid. Please login again.', 'error');
                 }
             } else {
-                setIsAuthenticated(false); // No token, definitely not authenticated
+                setIsAuthenticated(false);
             }
         };
         checkAuth();
@@ -104,10 +104,9 @@ export const MarketplaceProvider = ({ children }) => {
         try {
             const leadsRes = await apiService.fetchAllLeads();
             if (leadsRes.success) {
-                // Flatten the data for easier UI consumption
                 const flattenedLeads = (leadsRes.data || []).map(l => ({
                     ...l,
-                    displayId: l.leadNo || `LD-${l.id.slice(-4).toUpperCase()}`, // Clean Display ID
+                    displayId: l.leadNo || `LD-${l.id.slice(-4).toUpperCase()}`,
                     customerName: l.customer?.name || 'Unknown Customer',
                     customerPhone: l.customer?.phone || '',
                     customerEmail: l.customer?.email || '',
@@ -122,10 +121,9 @@ export const MarketplaceProvider = ({ children }) => {
 
             const jobsRes = await apiService.fetchAllJobs();
             if (jobsRes.success) {
-                // Flatten Jobs data for consume (Job -> lead -> customer)
                 const flattenedJobs = (jobsRes.data || []).map(j => ({
                     ...j,
-                    displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`, // Clean Display ID
+                    displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`,
                     customerName: j.customer?.name || 'Customer',
                     category: j.categoryName || 'General',
                     date: j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString() : 'Today',
@@ -135,12 +133,11 @@ export const MarketplaceProvider = ({ children }) => {
                 }));
                 setJobs(flattenedJobs);
 
-                // --- NEW: Populate Assignments for Professional Dashboard from Jobs ---
                 const mappedAssignments = flattenedJobs.map(j => ({
                     id: j.id,
                     professionalId: j.workerId,
                     leadId: j.leadId,
-                    status: j.status === 'SCHEDULED' ? 'Sent' : j.status, // Map SCHEDULED to 'Sent' for invitation feel
+                    status: j.status === 'SCHEDULED' ? 'Sent' : j.status,
                     date: j.createdAt
                 }));
                 setAssignments(mappedAssignments);
@@ -153,7 +150,7 @@ export const MarketplaceProvider = ({ children }) => {
                     address: w.address || '',
                     city: w.city || '',
                     pincode: w.pincode || '',
-                    location: w.city || w.address || '—', // Use city or address for display
+                    location: w.city || w.address || '—',
                     status: w.status ? w.status : (w.isAvailable ? 'Active' : 'Offline')
                 }));
                 setProfessionals(workers); 
@@ -173,7 +170,6 @@ export const MarketplaceProvider = ({ children }) => {
                 const user = profileRes.data;
                 setCurrentUser(user);
                 
-                // --- ADMIN-ONLY DATA ---
                 if (user.role === 'ADMIN') {
                     const statsRes = await apiService.fetchDashboardStats();
                     if (statsRes.success) setDashboardStats(statsRes.data);
@@ -185,63 +181,33 @@ export const MarketplaceProvider = ({ children }) => {
                     if (upgradeRes.success) setUpgradeRequests(upgradeRes.data);
                 }
 
-                // Fetch real notifications for any logged in user
                 const notifRes = await apiService.fetchNotifications();
                 if (notifRes.success) setNotifications(notifRes.data);
+
+                if (user.role === 'WORKER') {
+                    const chatsRes = await apiService.fetchAllChats();
+                    if (chatsRes.success) setChats(chatsRes.data);
+
+                    const revRes = await apiService.fetchAllReviews();
+                    if (revRes.success) {
+                        setReviews(revRes.data.data);
+                        setReviewStats({
+                            averageRating: revRes.data.averageRating,
+                            distribution: revRes.data.distribution
+                        });
+                    }
+                }
             }
         } catch (error) {
             console.error('Initial Data Load Error:', error);
-            // Non-critical: only notify if it wasn't a permission error (403/401)
-            if (!error.message?.includes('403') && !error.message?.includes('401')) {
-                showToast('Failed to load live data', 'error');
-            }
         }
     }, [showToast]);
 
-    // --- SUBSCRIPTION PLANS ---
-    const addSubscriptionPlan = async (planData) => {
-        const res = await apiService.createSubscriptionPlan(planData);
-        if (res.success) {
-            showToast('New plan created!', 'success');
-            loadInitialData();
-            return res.data;
-        } else {
-            showToast(res.error, 'error');
-            return null;
-        }
-    };
-
-    const editSubscriptionPlan = async (id, planData) => {
-        const res = await apiService.updateSubscriptionPlan(id, planData);
-        if (res.success) {
-            showToast('Plan updated successfully', 'success');
-            loadInitialData();
-            return res.data;
-        } else {
-            showToast(res.error, 'error');
-            return null;
-        }
-    };
-
-    const deleteSubscriptionPlan = async (id) => {
-        const res = await apiService.deleteSubscriptionPlan(id);
-        if (res.success) {
-            showToast('Plan deleted', 'success');
-            loadInitialData();
-            return true;
-        } else {
-            showToast(res.error, 'error');
-            return false;
-        }
-    };
-
     // --- LEADS ---
     const addLead = async (formData) => {
-        // Backend now handles distribution strictly via API
         const res = await apiService.submitServiceRequest(formData);
         if (res.success) {
             showToast('Service request submitted successfully!', 'success');
-            // Refresh leads
             loadInitialData();
             return res.data;
         } else {
@@ -253,10 +219,8 @@ export const MarketplaceProvider = ({ children }) => {
     const assignLead = async (leadId, professionalId) => {
         const res = await apiService.assignLeadToWorker(leadId, professionalId);
         if (res.success) {
-            showToast('Lead Assigned successfully! Job created natively.', 'success');
-            // Optimistically update
-            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: 'ASSIGNED' } : l));
-            loadInitialData(); // Reload to fetch the newly created job
+            showToast('Lead Assigned successfully!', 'success');
+            loadInitialData();
         } else {
             showToast(res.error || 'Failed to assign lead', 'error');
         }
@@ -282,7 +246,7 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    // --- JOBS & WORKFLOW ---
+    // --- JOBS ---
     const addJob = async (jobData) => {
         const res = await apiService.createJob(jobData);
         if (res.success) {
@@ -295,24 +259,11 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    const startJob = (jobId) => {
-        // Backend handles this via Photo Upload mapping automatically 
-        showToast('Initiating Job in Backend...', 'info');
-    };
-
-    const completeJob = (jobId) => {
-        // Handled via Invoice endpoint
-        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'Completed' } : j));
-    };
-
     const deleteJob = async (jobId) => {
         const res = await apiService.deleteJob(jobId);
         if (res.success) {
             showToast('Job record deleted', 'success');
-            setJobs(prev => prev.filter(j => j.id !== jobId));
             loadInitialData();
-        } else {
-            showToast(res.error || 'Failed to delete job', 'error');
         }
     };
 
@@ -321,8 +272,6 @@ export const MarketplaceProvider = ({ children }) => {
         if (res.success) {
             showToast('Job record updated!', 'success');
             loadInitialData();
-        } else {
-            showToast(res.error || 'Update failed', 'error');
         }
     };
 
@@ -334,7 +283,6 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    // --- ASSIGNMENT RESPONSES ---
     const respondToLead = async (assignmentId, decision) => {
         const mappedStatus = decision === 'accept' ? 'ACCEPTED' : (decision === 'reject' ? 'REJECTED' : decision);
         const res = await apiService.updateJob(assignmentId, { status: mappedStatus.toUpperCase() });
@@ -348,72 +296,49 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    const reassignLead = async (leadId) => {
-        showToast('Local reassignment simulation active', 'info');
-    };
-
-    // --- PROFILES ---
-    const updateProfile = async (updates) => {
-        const res = await apiService.updateUserProfile(updates);
+    // --- CHATS & REVIEWS ---
+    const startJob = async (jobId) => {
+        const res = await apiService.updateJob(jobId, { status: 'IN_PROGRESS' });
         if (res.success) {
-            setCurrentUser(res.data);
-            showToast('Profile updated!', 'success');
+            showToast('Job started!', 'success');
+            loadInitialData();
             return true;
-        } else {
-            showToast(res.error || 'Profile update failed', 'error');
-            return false;
         }
+        return false;
     };
 
-    const updateSubscription = async (planName) => {
-        const res = await apiService.enrollInSubscription({ 
-            professionalId: currentUser?.id, 
-            planName: planName 
-        });
+    const completeJob = async (jobId) => {
+        const res = await apiService.updateJob(jobId, { status: 'COMPLETED' });
         if (res.success) {
-            showToast(res.message || `Upgraded to ${planName}!`, 'success');
-            loadInitialData(); // This will refresh the user profile with the new plan
+            showToast('Job completed!', 'success');
+            loadInitialData();
             return true;
-        } else {
-            showToast(res.error || 'Upgrade failed', 'error');
-            return false;
         }
+        return false;
     };
 
-    const deactivateAccount = () => {
-        setCurrentUser(prev => ({ ...prev, status: 'Inactive' }));
-    };
-
-    // --- PROFESSIONAL TRACKING & FLEET ---
-    const updateProfessionalLocation = async (lat, lng) => {
-        const res = await apiService.updateProfessionalLocation(lat, lng);
+    const fetchChatMessages = async (chatId) => {
+        setActiveChatMessages([]); // Clear previous chat messages first
+        const res = await apiService.fetchChatMessages(chatId);
         if (res.success) {
-            setProfessionals(prev => prev.map(p => p.id === currentUser?.id ? { ...p, lastLocation: { lat, lng } } : p));
-            return res;
+            setActiveChatMessages(res.data);
+            return res.data;
         }
-        return res;
+        return [];
     };
 
-    const updateProfessionalStatus = async (isAvailable) => {
-        const res = await apiService.updateProfessionalStatus(isAvailable);
+    const sendChatMessage = async (chatId, text) => {
+        const res = await apiService.sendChatMessage(chatId, text);
         if (res.success) {
-            // Update BOTH the local list AND the current user state
-            setCurrentUser(prev => ({ ...prev, isAvailable }));
-            setProfessionals(prev => prev.map(p => p.id === currentUser?.id ? { ...p, isAvailable, onlineStatus: isAvailable ? 'Online' : 'Offline' } : p));
-            showToast(`Status set to ${isAvailable ? 'Online' : 'Offline'}`, 'info');
-            return res;
+            setActiveChatMessages(prev => [...prev, res.data]);
+            const chatsRes = await apiService.fetchAllChats();
+            if (chatsRes.success) setChats(chatsRes.data);
+            return true;
         }
-        return res;
+        return false;
     };
 
-    const toggleTrackingSetting = async (userId, enabled) => {
-        const res = await apiService.updateProfessionalTracking(enabled);
-        if (res.success) {
-            setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled }));
-            showToast(`Tracking ${enabled ? 'Enabled' : 'Disabled'}`, 'info');
-        }
-    };
-
+    // --- PROFESSIONALS ---
     const addProfessional = async (userData) => {
         const res = await apiService.createProfessional(userData);
         if (res.success) {
@@ -441,24 +366,18 @@ export const MarketplaceProvider = ({ children }) => {
     const removeProfessional = async (id) => {
         const res = await apiService.deleteProfessional(id);
         if (res.success) {
-            showToast('Professional removed from database', 'success');
+            showToast('Professional removed', 'success');
             loadInitialData();
             return true;
-        } else {
-            showToast(res.error || 'Deletion failed', 'error');
-            return false;
         }
     };
 
     const approveProfessionalRequest = async (id) => {
         const res = await apiService.approveProfessionalRequest(id);
         if (res.success) {
-            showToast('Request Approved! Password generated.', 'success');
+            showToast('Request Approved!', 'success');
             loadInitialData();
-            return res.data; // Includes generatedPassword
-        } else {
-            showToast(res.error || 'Approval failed', 'error');
-            return null;
+            return res.data;
         }
     };
 
@@ -468,21 +387,49 @@ export const MarketplaceProvider = ({ children }) => {
             showToast('Request Deleted', 'info');
             loadInitialData();
             return true;
-        } else {
-            showToast(res.error || 'Rejection failed', 'error');
-            return false;
         }
     };
 
+    // --- SUBSCRIPTIONS ---
+    const updateSubscription = async (planName) => {
+        const res = await apiService.enrollInSubscription({ 
+            professionalId: currentUser?.id, 
+            planName: planName 
+        });
+        if (res.success) {
+            showToast(`Upgraded to ${planName}!`, 'success');
+            loadInitialData();
+            return true;
+        }
+    };
+
+    const updateProfessionalStatus = async (isAvailable) => {
+        const res = await apiService.updateProfessionalStatus(isAvailable);
+        if (res.success) {
+            setCurrentUser(prev => ({ ...prev, isAvailable }));
+            showToast(`Status set to ${isAvailable ? 'Online' : 'Offline'}`, 'info');
+            return res;
+        }
+    };
+
+    const toggleTrackingSetting = async (userId, enabled) => {
+        const res = await apiService.updateProfessionalTracking(enabled);
+        if (res.success) {
+            setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled }));
+        }
+    };
+
+    const updateProfessionalLocation = async (lat, lng) => {
+        const res = await apiService.updateProfessionalLocation(lat, lng);
+        return res;
+    };
 
     // --- CATEGORIES ---
     const addCategory = async (data) => {
-        const res = await apiService.addCategory(data);
+        const res = await apiService.createCategory(data);
         if (res.success) {
             showToast('Category added successfully!', 'success');
             loadInitialData();
-        } else {
-            showToast(res.error, 'error');
         }
     };
 
@@ -491,8 +438,6 @@ export const MarketplaceProvider = ({ children }) => {
         if (res.success) {
             showToast('Category updated!', 'success');
             loadInitialData();
-        } else {
-            showToast(res.error, 'error');
         }
     };
 
@@ -501,8 +446,30 @@ export const MarketplaceProvider = ({ children }) => {
         if (res.success) {
             showToast('Category deleted!', 'success');
             loadInitialData();
-        } else {
-            showToast(res.error, 'error');
+        }
+    };
+
+    const addSubscriptionPlan = async (data) => {
+        const res = await apiService.createSubscriptionPlan(data);
+        if (res.success) {
+            showToast('Plan added!', 'success');
+            loadInitialData();
+        }
+    };
+
+    const editSubscriptionPlan = async (id, data) => {
+        const res = await apiService.updateSubscriptionPlan(id, data);
+        if (res.success) {
+            showToast('Plan updated!', 'success');
+            loadInitialData();
+        }
+    };
+
+    const deleteSubscriptionPlan = async (id) => {
+        const res = await apiService.deleteSubscriptionPlan(id);
+        if (res.success) {
+            showToast('Plan deleted!', 'success');
+            loadInitialData();
         }
     };
 
@@ -516,6 +483,11 @@ export const MarketplaceProvider = ({ children }) => {
             categories,
             assignments,
             reviews,
+            reviewStats,
+            chats,
+            activeChatMessages,
+            fetchChatMessages,
+            sendChatMessage,
             notifications,
             setNotifications,
             currentUser,
@@ -526,26 +498,19 @@ export const MarketplaceProvider = ({ children }) => {
             updateLead,
             deleteLead,
             respondToLead,
-            reassignLead,
             assignLead,
             jobs,
-            startJob,
-            completeJob,
             addJob,
             deleteJob,
             updateJob,
             updateJobStatus,
-            addNotification,
             markNotificationRead,
             clearNotifications,
             addCategory,
             editCategory,
             deleteCategory,
             setCurrentUser,
-            updateProfile,
             updateSubscription,
-            deactivateAccount,
-            locationLogs,
             dashboardStats,
             locations,
             subscriptionPlans,
@@ -566,7 +531,6 @@ export const MarketplaceProvider = ({ children }) => {
                     loadInitialData();
                     return true;
                 }
-                showToast(res.error || 'Approval failed', 'error');
                 return false;
             },
             rejectUpgradeRequest: async (id) => {
@@ -576,11 +540,11 @@ export const MarketplaceProvider = ({ children }) => {
                     loadInitialData();
                     return true;
                 }
-                showToast(res.error || 'Rejection failed', 'error');
                 return false;
             },
-            refreshData: loadInitialData, // Exporting refresh function
-            // Custom Auth Methods
+            refreshData: loadInitialData,
+            startJob,
+            completeJob,
             login,
             logout,
             isAuthenticated

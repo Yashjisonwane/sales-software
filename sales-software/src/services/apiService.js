@@ -449,3 +449,43 @@ export const clearNotifications = async () => {
         return { success: false, error: err.message };
     }
 };
+
+// ─── CHATS & MESSAGES ──────────────────────────────────────────
+
+export const fetchAllChats = async () => {
+    try {
+        const response = await apiClient.get(ENDPOINTS.CHATS);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};
+
+export const fetchChatMessages = async (chatId) => {
+    try {
+        const response = await apiClient.get(`${ENDPOINTS.CHATS}/${chatId}/messages`);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};
+
+export const sendChatMessage = async (chatId, text) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.CHATS}/${chatId}/messages`, { text });
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};
+
+// ─── REVIEWS ─────────────────────────────────────────────────
+
+export const fetchAllReviews = async () => {
+    try {
+        const response = await apiClient.get(ENDPOINTS.REVIEWS);
+        return { success: true, data: response.data };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};

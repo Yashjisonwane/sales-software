@@ -192,7 +192,15 @@ const assignLead = async (req, res) => {
             }
         });
 
-        // 3. Create Notification for Professional
+        // 3. Create Chat for this Job
+        await prisma.chat.create({
+            data: {
+                jobId: newJob.id,
+                lastMessage: 'Conversation started'
+            }
+        });
+
+        // 4. Create Notification for Professional
         await prisma.notification.create({
             data: {
                 userId: workerId,

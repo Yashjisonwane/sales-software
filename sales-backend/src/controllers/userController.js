@@ -308,17 +308,16 @@ const getDashboardStats = async (req, res) => {
             ] = await Promise.all([
                 prisma.lead.count(),
                 prisma.user.count({ where: { role: 'WORKER' } }),
-                prisma.user.count({ where: { role: 'CUSTOMER' } }),
+                prisma.user.count({ 
+                    where: { role: 'CUSTOMER' } 
+                }),
                 prisma.lead.count({ where: { createdAt: { gte: todayStart } } }),
                 prisma.job.count({ where: { status: 'COMPLETED' } }),
                 prisma.user.count({ where: { role: 'WORKER', isAvailable: true } }),
                 prisma.user.count({ 
                     where: { 
                         role: 'CUSTOMER', 
-                        OR: [
-                            { jobsAsCustomer: { some: {} } },
-                            { leadsAsCustomer: { some: {} } }
-                        ]
+                        jobsAsCustomer: { some: {} } // Loyal customers have at least one job record
                     } 
                 }),
                 prisma.user.count({ 
@@ -328,6 +327,23 @@ const getDashboardStats = async (req, res) => {
                     } 
                 })
             ]);
+
+            // Fetch lead activity for the last 7 days
+            const leadActivity = await Promise.all(
+                [6, 5, 4, 3, 2, 1, 0].map(async (daysAgo) => {
+                    const start = new Date(new Date(new Date().setHours(0, 0, 0, 0)).getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+                    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+                    const count = await prisma.lead.count({
+                        where: {
+                            createdAt: {
+                                gte: start,
+                                lt: end
+                            }
+                        }
+                    });
+                    return count;
+                })
+            );
 
             // Calculate Growth Rates (Percentages)
             const leadCompletionRate = totalLeads > 0 ? (completedJobs / totalLeads) * 100 : 0;
@@ -344,8 +360,9 @@ const getDashboardStats = async (req, res) => {
                         { name: 'Completed Jobs', value: completedJobs, trend: '+8%', up: true },
                         { name: 'Total Revenue', value: '$' + (completedJobs * 150), trend: '+12%', up: true } // Mocking revenue based on completions
                     ],
+                    leadActivity: leadActivity,
                     growthStats: [
-                        { label: 'New Professionals', value: Math.min(newProsRate + 60, 100), color: 'bg-purple-500' }, // Adding base to make it look "healthy" if data is low
+                        { label: 'New Professionals', value: Math.min(newProsRate + 60, 100), color: 'bg-purple-500' }, 
                         { label: 'Lead Completion Rate', value: Math.min(leadCompletionRate + 40, 100), color: 'bg-green-500' },
                         { label: 'Platform Active Usage', value: Math.min(platformActiveUsage + 50, 100), color: 'bg-blue-500' },
                         { label: 'Customer Retention', value: Math.min(customerRetention + 70, 100), color: 'bg-orange-500' }

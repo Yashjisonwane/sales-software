@@ -41,7 +41,7 @@ function App() {
   return (
     <MarketplaceProvider>
       <DataProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <Routes>
             <Route path="/" element={
               <Navigate to="/professional/login" />
@@ -80,7 +80,6 @@ function App() {
               <Route path="reviews" element={<ProfessionalReviews />} />
               <Route path="subscription" element={<ProfessionalSubscription />} />
               <Route path="notifications" element={<ProfessionalNotifications />} />
-// Profile route removed
               <Route path="settings" element={<ProfessionalSettings />} />
             </Route>
           </Routes>

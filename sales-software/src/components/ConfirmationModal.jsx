@@ -19,21 +19,21 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, icon: I
             />
 
             {/* Modal Content */}
-            <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
-                <div className="p-8 text-center space-y-6">
-                    <div className={`w-16 h-16 ${colors[type] || colors.info} text-white rounded-2xl flex items-center justify-center mx-auto shadow-lg mb-2`}>
-                        <Icon size={32} />
+            <div className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 max-h-[90vh] flex flex-col">
+                <div className="p-6 sm:p-8 text-center space-y-6 overflow-y-auto custom-scrollbar">
+                    <div className={`w-14 h-14 sm:w-16 sm:h-16 ${colors[type] || colors.info} text-white rounded-2xl flex items-center justify-center mx-auto shadow-lg mb-2 transform transition-transform hover:rotate-6`}>
+                        <Icon size={28} className="sm:w-8 sm:h-8" />
                     </div>
 
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-                        <p className="text-gray-500 mt-2 text-sm leading-relaxed">{message}</p>
+                    <div className="px-2">
+                        <h2 className="text-xl sm:text-2xl font-bold text-gray-800 tracking-tight">{title}</h2>
+                        <p className="text-gray-500 mt-2 text-xs sm:text-sm leading-relaxed font-medium">{message}</p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 pt-2">
                         <button
                             onClick={onClose}
-                            className="flex-1 px-6 py-3 border border-gray-200 text-gray-600 rounded-xl font-semibold hover:bg-gray-50 transition-all text-sm"
+                            className="w-full sm:flex-1 px-6 py-3.5 border border-gray-100 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-gray-50 transition-all active:scale-95"
                         >
                             Cancel
                         </button>
@@ -42,10 +42,10 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, icon: I
                                 onConfirm();
                                 onClose();
                             }}
-                            className={`flex-1 px-6 py-3 ${colors[type] || colors.info} text-white rounded-xl font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 text-sm shadow-md`}
+                            className={`w-full sm:flex-1 px-6 py-3.5 ${colors[type] || colors.info} text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:opacity-90 active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2`}
                         >
                             <span>{confirmText}</span>
-                            <ArrowRight size={16} />
+                            <ArrowRight size={16} strokeWidth={3} />
                         </button>
                     </div>
                 </div>

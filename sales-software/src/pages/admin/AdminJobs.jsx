@@ -61,7 +61,7 @@ const AdminJobs = () => {
             else if (statusFilter === 'Completed') matchStatus = jobStatus === 'COMPLETED';
             
             return matchesSearch && matchStatus;
-        });
+        }).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     }, [jobs, searchTerm, statusFilter]);
 
     const handleSubmit = (e) => {
