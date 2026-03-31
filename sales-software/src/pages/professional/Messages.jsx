@@ -68,6 +68,16 @@ const Messages = () => {
         }
     }, [activeChat]);
 
+    // Sync virtual to real chat transition seamlessly
+    useEffect(() => {
+        if (activeChat?.isVirtual) {
+            const realChat = chats.find(c => c.jobId === activeChat.jobId);
+            if (realChat) {
+               setActiveChat(prev => ({ ...realChat, leadNo: prev.leadNo }));
+            }
+        }
+    }, [chats, activeChat]);
+
     const handleSendMessage = async (text) => {
         if (!activeChat) return;
         

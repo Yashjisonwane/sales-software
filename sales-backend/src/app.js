@@ -15,9 +15,13 @@ const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 
+// --- Production & Railway Config ---
+app.set('trust proxy', 1); // For accurate IP tracking behind load balancers
+
 // Middlewares
 app.use(cors());
-app.use(express.json()); // Parses incoming JSON requests
+app.use(express.json({ limit: '10mb' })); // Increased limit for photo data-urls
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes Registration
 app.use('/api/v1/auth', authRoutes);
