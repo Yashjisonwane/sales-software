@@ -19,8 +19,8 @@ const Notifications = () => {
         <div className="space-y-6 max-w-4xl mx-auto pb-10">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Service Alerts</h1>
-                    <p className="text-sm text-gray-500 mt-1">Stay updated with leads, job status, and payments.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Activity Center</h1>
+                    <p className="text-sm text-gray-500 mt-1">Review all system notifications and performance alerts.</p>
                 </div>
                 {notifications.length > 0 && (
                     <button
@@ -63,9 +63,12 @@ const Notifications = () => {
                 ))}
 
                 {(notifications || []).length === 0 && (
-                    <div className="text-center py-24 bg-white rounded-2xl border border-gray-100 shadow-sm text-gray-400 font-medium">
-                        <Mail size={48} className="mx-auto mb-3 opacity-20" />
-                        <p>No notifications yet. We'll keep you posted!</p>
+                    <div className="text-center py-24 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <Mail size={40} className="text-gray-200" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">No notifications</h3>
+                        <p className="text-gray-400 max-w-xs mx-auto">You're all caught up! New alerts will appear here as they happen.</p>
                     </div>
                 )}
             </div>

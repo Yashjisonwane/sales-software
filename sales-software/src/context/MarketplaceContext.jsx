@@ -33,11 +33,22 @@ export const MarketplaceProvider = ({ children }) => {
         setTimeout(() => setToast(null), 3000);
     }, []);
 
-    const addNotification = (notif) => {
-        setNotifications(prev => [{ id: Date.now(), date: new Date().toISOString(), unread: true, ...notif }, ...prev]);
+    const addNotification = async (notif) => {
+        // Backend handles notifications now, but we can keep this for local UI optimism
+        setNotifications(prev => [{ id: Date.now(), createdAt: new Date().toISOString(), isRead: false, ...notif }, ...prev]);
     };
-    const markNotificationRead = (id) => {
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+    const markNotificationRead = async (id) => {
+        const res = await apiService.markNotificationRead(id);
+        if (res.success) {
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+        }
+    };
+    const clearNotifications = async () => {
+        const res = await apiService.clearNotifications();
+        if (res.success) {
+            setNotifications([]);
+            showToast('Notifications cleared', 'info');
+        }
     };
 
     // --- AUTHENTICATION ACTIONS ---
@@ -173,6 +184,10 @@ export const MarketplaceProvider = ({ children }) => {
                     const upgradeRes = await apiService.fetchSubscriptionUpgradeRequests();
                     if (upgradeRes.success) setUpgradeRequests(upgradeRes.data);
                 }
+
+                // Fetch real notifications for any logged in user
+                const notifRes = await apiService.fetchNotifications();
+                if (notifRes.success) setNotifications(notifRes.data);
             }
         } catch (error) {
             console.error('Initial Data Load Error:', error);
@@ -522,6 +537,7 @@ export const MarketplaceProvider = ({ children }) => {
             updateJobStatus,
             addNotification,
             markNotificationRead,
+            clearNotifications,
             addCategory,
             editCategory,
             deleteCategory,

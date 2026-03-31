@@ -419,3 +419,33 @@ export const rejectSubscriptionUpgrade = async (id) => {
         return { success: false, error: err.response?.data?.message || err.message };
     }
 };
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────
+
+export const fetchNotifications = async () => {
+    try {
+        const response = await apiClient.get('/notifications');
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        console.error('[API] fetchNotifications error:', err);
+        return { success: false, error: err.message };
+    }
+};
+
+export const markNotificationRead = async (id) => {
+    try {
+        const response = await apiClient.patch(`/notifications/${id}/read`);
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
+export const clearNotifications = async () => {
+    try {
+        const response = await apiClient.delete('/notifications/clear');
+        return { success: true, data: response.data };
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+};

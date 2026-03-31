@@ -10,6 +10,7 @@ import AdminSubscriptions from './pages/admin/AdminSubscriptions';
 import LiveTracking from './pages/admin/LiveTracking';
 import NearbyProfessionals from './pages/admin/NearbyProfessionals';
 import LocationHistory from './pages/admin/LocationHistory';
+import AdminNotifications from './pages/admin/Notifications';
 
 import AdminLogin from './pages/admin/AdminLogin';
 import Reports from './pages/admin/Reports';
@@ -26,6 +27,7 @@ import ProfessionalLeadMap from './pages/professional/LeadMap';
 import ProfessionalMessages from './pages/professional/Messages';
 import ProfessionalReviews from './pages/professional/Reviews';
 import ProfessionalSubscription from './pages/professional/Subscription';
+import ProfessionalNotifications from './pages/professional/Notifications';
 // Profile consolidated into Settings
 import ProfessionalSettings from './pages/professional/Settings';
 
@@ -64,6 +66,7 @@ function App() {
               <Route path="reports" element={<Reports />} />
               <Route path="settings" element={<Settings />} />
               <Route path="reminders" element={<Reminders />} />
+              <Route path="notifications" element={<AdminNotifications />} />
             </Route>
 
 
@@ -76,6 +79,7 @@ function App() {
               <Route path="messages" element={<ProfessionalMessages />} />
               <Route path="reviews" element={<ProfessionalReviews />} />
               <Route path="subscription" element={<ProfessionalSubscription />} />
+              <Route path="notifications" element={<ProfessionalNotifications />} />
 // Profile route removed
               <Route path="settings" element={<ProfessionalSettings />} />
             </Route>

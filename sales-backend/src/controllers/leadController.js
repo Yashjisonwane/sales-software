@@ -90,9 +90,18 @@ const createLead = async (req, res) => {
                         status: 'Active'
                     }
                 });
-                console.log(`[AUTO-LOCATION] New demand area registered: ${locName}`);
             }
         }
+
+        // 5. Create Admin Notification
+        await prisma.notification.create({
+            data: {
+                userId: null, // Broadcast to admins
+                title: "New Lead Received",
+                message: `Lead #${leadNo} received from ${customerName || name || 'Customer'} for ${lead.category.name}.`,
+                type: 'LEAD'
+            }
+        });
 
         res.status(201).json({
             success: true,
@@ -180,6 +189,16 @@ const assignLead = async (req, res) => {
                 status: 'SCHEDULED',
                 scheduledDate: new Date(),
                 scheduledTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            }
+        });
+
+        // 3. Create Notification for Professional
+        await prisma.notification.create({
+            data: {
+                userId: workerId,
+                title: "New Job Assigned",
+                message: `You have been assigned to Job #${jobNo} (${lead.category.name}) at ${lead.location}.`,
+                type: 'ASSIGNMENT'
             }
         });
 

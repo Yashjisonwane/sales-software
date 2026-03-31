@@ -14,7 +14,9 @@ import {
 const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const langRef = useRef(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -26,11 +28,21 @@ const Navbar = () => {
       }
     }
 
+    const handleClickOutside = (event) => {
+      if (langRef.current && !langRef.current.contains(event.target)) {
+        setLangMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
     };
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   return (
@@ -110,32 +122,80 @@ const Navbar = () => {
             </div>
 
             {/* Language Selector */}
-            <button style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '8px 16px',
-              border: '1px solid #D1D5DB',
-              borderRadius: 12,
-              background: '#FFFFFF',
-              cursor: 'pointer',
-              fontSize: 13,
-              fontWeight: 600,
-              color: '#374151',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-            }}>
-              <span style={{ display: 'flex', alignItems: 'center' }}>
-                <img 
-                  src="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/3.4.6/flags/4x3/us.svg" 
-                  alt="US Flag" 
-                  style={{ width: 18, height: 13.5, borderRadius: 2 }} 
-                />
-              </span>
-              <span>English</span>
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ marginTop: 1 }}>
-                <path d="M3 5L6 8L9 5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+            <div style={{ position: 'relative' }} ref={langRef}>
+              <button 
+                onClick={() => setLangMenuOpen(!langMenuOpen)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 16px',
+                  border: '1px solid #D1D5DB',
+                  borderRadius: 12,
+                  background: '#FFFFFF',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#374151',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center' }}>
+                  <img 
+                    src="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/3.4.6/flags/4x3/us.svg" 
+                    alt="US Flag" 
+                    style={{ width: 18, height: 13.5, borderRadius: 2 }} 
+                  />
+                </span>
+                <span>English</span>
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ 
+                  marginTop: 1,
+                  transform: langMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease'
+                }}>
+                  <path d="M3 5L6 8L9 5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+
+              {langMenuOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  right: 0,
+                  width: '160px',
+                  background: 'white',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                  padding: '8px',
+                  zIndex: 2200,
+                  border: '1px solid #E5E7EB',
+                  animation: 'slideIn 0.2s ease'
+                }}>
+                  <div 
+                    onClick={() => setLangMenuOpen(false)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: '#F9FAFB',
+                      color: '#111827',
+                      fontSize: '13px',
+                      fontWeight: '600'
+                    }}
+                  >
+                    <img 
+                      src="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/3.4.6/flags/4x3/us.svg" 
+                      alt="US Flag" 
+                      style={{ width: 18, height: 13.5, borderRadius: 2 }} 
+                    />
+                    English
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Hamburger Button */}
             <button 
@@ -276,10 +336,37 @@ const Navbar = () => {
               <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Grow your business with us</div>
             </div>
           </Link>
+
+          {/* Mobile Language Selector */}
+          <div style={{
+            padding: '24px',
+            background: '#F9FAFB',
+            borderRadius: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            transition: 'background 0.2s'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 48, height: 48, background: '#FFFFFF', border: '1px solid #E5E7EB', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <img 
+                  src="https://cdnjs.cloudflare.com/ajax/libs/flag-icon-css/3.4.6/flags/4x3/us.svg" 
+                  alt="US Flag" 
+                  style={{ width: 24, height: 18, borderRadius: 2 }} 
+                />
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#111827' }}>English</div>
+            </div>
+            <div style={{ color: '#6B7280', fontSize: 13, fontWeight: 600 }}>Active</div>
+          </div>
         </div>
       </div>
 
       <style>{`
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }

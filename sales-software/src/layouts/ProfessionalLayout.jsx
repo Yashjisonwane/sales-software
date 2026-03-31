@@ -18,7 +18,7 @@ import {
     Settings,
     Globe
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ConfirmationModal from '../components/ConfirmationModal';
 import Toast from '../components/Toast';
 import { useMarketplace } from '../context/MarketplaceContext';
@@ -30,11 +30,25 @@ const ProfessionalLayout = () => {
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
-    const { logout, currentUser, toast, showToast, notifications, isAuthenticated } = useMarketplace();
+    const { logout, currentUser, toast, showToast, notifications, isAuthenticated, markNotificationRead, clearNotifications } = useMarketplace();
+    const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+    const nRef = useRef(null);
     useLocationTracker(); // Initialize auto-tracking
 
     if (isAuthenticated === null) return null; // Wait for checkAuth
     if (isAuthenticated === false) return <Navigate to="/login" replace />;
+
+    const unreadCount = (notifications || []).filter(n => !n.isRead).length;
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+          if (nRef.current && !nRef.current.contains(event.target)) {
+            setNotifMenuOpen(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/professional/dashboard' },
@@ -43,6 +57,7 @@ const ProfessionalLayout = () => {
         { icon: MessageSquare, label: 'Messages', path: '/professional/messages' },
         { icon: Star, label: 'Reviews', path: '/professional/reviews' },
         { icon: CreditCard, label: 'Subscription', path: '/professional/subscription' },
+        { icon: Bell, label: 'Notifications', path: '/professional/notifications' },
         { icon: Settings, label: 'Settings', path: '/professional/settings' },
     ];
 
@@ -92,16 +107,65 @@ const ProfessionalLayout = () => {
                     <div className="flex items-center gap-2 sm:gap-4 shrink-0">
 
 
-                        <div className="relative">
+                        <div className="relative" ref={nRef}>
                             <button
-                                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                                onClick={() => navigate('/professional/notifications')}
+                                className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                                onClick={() => setNotifMenuOpen(!notifMenuOpen)}
                             >
                                 <Bell size={18} className="sm:w-5" />
-                                {notifications.filter(n => n.unread).length > 0 && (
+                                {unreadCount > 0 && (
                                     <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
                                 )}
                             </button>
+
+                            {notifMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                                        <h3 className="font-bold text-gray-900 text-sm">Action Alerts</h3>
+                                        {unreadCount > 0 && (
+                                            <button 
+                                                onClick={clearNotifications}
+                                                className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-tight"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
+                                        {(notifications || []).length > 0 ? (
+                                            notifications.map((n) => (
+                                                <div 
+                                                    key={n.id}
+                                                    onClick={() => !n.isRead && markNotificationRead(n.id)}
+                                                    className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer relative ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                                                >
+                                                    {!n.isRead && (
+                                                        <div className="absolute top-4 right-4 w-2 h-2 bg-blue-600 rounded-full"></div>
+                                                    )}
+                                                    <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-1">{n.type || 'System'}</p>
+                                                    <h4 className="text-xs font-bold text-gray-900 mb-1">{n.title}</h4>
+                                                    <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">{n.message}</p>
+                                                    <p className="text-[9px] text-gray-400 mt-2 font-medium">
+                                                        {new Date(n.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                    </p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-10 text-center">
+                                                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <Bell size={20} className="text-gray-300" />
+                                                </div>
+                                                <p className="text-xs text-gray-400 font-medium">No new alerts</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-3 border-t border-gray-100 bg-gray-50/50 text-center">
+                                        <button onClick={() => { navigate('/professional/notifications'); setNotifMenuOpen(false); }} className="text-[11px] font-bold text-gray-500 hover:text-gray-900 underline transition-colors">
+                                            View all activity
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div className="flex items-center gap-2 sm:gap-3 cursor-pointer" onClick={() => navigate('/professional/settings')}>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shrink-0">

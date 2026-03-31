@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Briefcase, Users, FolderOpen, MapPin, CreditCard, BarChart2, Settings, LogOut, Menu, X, ShieldAlert, Bell, Zap, Activity, Navigation, ClipboardList } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import { useMarketplace } from '../context/MarketplaceContext';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -10,12 +10,23 @@ import Sidebar from '../components/Sidebar';
 const AdminLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-    const { notifications, toast, showToast } = useData();
-    const { currentUser } = useMarketplace();
+    const [notifMenuOpen, setNotifMenuOpen] = useState(false);
+    const { notifications, toast, showToast, markNotificationRead, clearNotifications, currentUser } = useMarketplace();
+    const notifRef = useRef(null);
     const location = useLocation();
     const navigate = useNavigate();
 
-    const unreadCount = notifications.filter(n => n.unread).length;
+    const unreadCount = (notifications || []).filter(n => !n.isRead).length;
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+          if (notifRef.current && !notifRef.current.contains(event.target)) {
+            setNotifMenuOpen(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
@@ -26,6 +37,7 @@ const AdminLayout = () => {
         { icon: MapPin, label: 'Locations', path: '/admin/locations' },
         { icon: Navigation, label: 'Live Tracking', path: '/admin/live-tracking' },
         { icon: CreditCard, label: 'Subscriptions', path: '/admin/subscriptions' },
+        { icon: Bell, label: 'Notifications', path: '/admin/notifications' },
         { icon: BarChart2, label: 'Reports', path: '/admin/reports' },
         { icon: Settings, label: 'Settings', path: '/admin/settings' },
     ];
@@ -73,17 +85,68 @@ const AdminLayout = () => {
                     <div className="flex items-center gap-2 sm:gap-4 shrink-0">
 
 
-                        <button
-                            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                            onClick={() => navigate('/admin/reminders')}
-                        >
-                            <Bell size={18} className="sm:w-5" />
-                            {unreadCount > 0 && (
-                                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                                    {unreadCount}
-                                </span>
+                        <div className="relative" ref={notifRef}>
+                            <button
+                                className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                                onClick={() => setNotifMenuOpen(!notifMenuOpen)}
+                            >
+                                <Bell size={18} className="sm:w-5" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                                        {unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {notifMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                                        <h3 className="font-bold text-gray-900 text-sm">Notifications</h3>
+                                        {unreadCount > 0 && (
+                                            <button 
+                                                onClick={clearNotifications}
+                                                className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-tight"
+                                            >
+                                                Clear All
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                                        {(notifications || []).length > 0 ? (
+                                            notifications.map((n) => (
+                                                <div 
+                                                    key={n.id}
+                                                    onClick={() => !n.isRead && markNotificationRead(n.id)}
+                                                    className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer relative ${!n.isRead ? 'bg-blue-50/30' : ''}`}
+                                                >
+                                                    {!n.isRead && (
+                                                        <div className="absolute top-4 right-4 w-2 h-2 bg-blue-600 rounded-full"></div>
+                                                    )}
+                                                    <p className="text-[11px] font-bold text-blue-600 uppercase tracking-widest mb-1">{n.type || 'System'}</p>
+                                                    <h4 className="text-xs font-bold text-gray-900 mb-1">{n.title}</h4>
+                                                    <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">{n.message}</p>
+                                                    <p className="text-[9px] text-gray-400 mt-2 font-medium">
+                                                        {new Date(n.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                                    </p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="p-10 text-center">
+                                                <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <Bell size={20} className="text-gray-300" />
+                                                </div>
+                                                <p className="text-xs text-gray-400 font-medium">No new notifications</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-3 border-t border-gray-100 bg-gray-50/50 text-center">
+                                        <Link to="/admin/notifications" onClick={() => setNotifMenuOpen(false)} className="text-[11px] font-bold text-gray-500 hover:text-gray-900 underline transition-colors">
+                                            View all activity
+                                        </Link>
+                                    </div>
+                                </div>
                             )}
-                        </button>
+                        </div>
                         <div className="flex items-center gap-2 sm:gap-3 cursor-pointer" onClick={() => navigate('/admin/settings')}>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shrink-0">
                                 {currentUser?.name?.charAt(0) || 'A'}
