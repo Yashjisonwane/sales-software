@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Check, X, MessageSquare } from 'lucide-react';
+import { Eye, Check, X, MessageSquare, Zap } from 'lucide-react';
 
 const LeadTable = ({ leads, onAction }) => {
     const getStatusColor = (status) => {
@@ -10,6 +10,9 @@ const LeadTable = ({ leads, onAction }) => {
             case 'open':
             case 'viewed': return 'bg-blue-50 text-blue-700 border-blue-100';
             case 'accepted': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+            case 'in progress':
+            case 'active':
+            case 'in_progress': return 'bg-amber-50 text-amber-700 border-amber-100';
             case 'rejected': return 'bg-rose-50 text-rose-700 border-rose-100';
             case 'closed':
             case 'completed': return 'bg-gray-50 text-gray-500 border-gray-100';
@@ -40,6 +43,10 @@ const LeadTable = ({ leads, onAction }) => {
                             const status = statusVal.toLowerCase();
                             const isNew = ['new', 'open', 'sent', 'viewed'].includes(status);
                             const isAccepted = status === 'accepted';
+                            const isInProgress = ['in progress', 'active', 'in_progress'].includes(status);
+                            const isCompleted = status === 'completed' || status === 'closed';
+                            const canView = isAccepted || isInProgress || isCompleted;
+                            const canInteract = isAccepted || isInProgress;
 
                             const displayName = lead.customerName || 'Customer';
                             const displayLocation = lead.location || 'Not Specified';
@@ -54,14 +61,14 @@ const LeadTable = ({ leads, onAction }) => {
                                     <td className="hidden xl:table-cell px-4 py-5 whitespace-nowrap text-sm font-medium text-gray-500">
                                         <div className="max-w-[180px] truncate">{displayLocation}</div>
                                     </td>
-                                    <td className="hidden lg:table-cell px-4 py-5 whitespace-nowrap text-xs text-gray-400 font-bold">{new Date(lead.dateRequested).toLocaleDateString()}</td>
+                                    <td className="hidden lg:table-cell px-4 py-5 whitespace-nowrap text-xs text-gray-400 font-bold">{new Date(lead.dateRequested || lead.createdAt).toLocaleDateString()}</td>
                                     <td className="px-4 py-5 whitespace-nowrap">
                                         <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${getStatusColor(statusVal)}`}>
-                                            {isNew ? 'New' : (status === 'completed' || status === 'closed' ? 'Closed' : statusVal)}
+                                            {isNew ? 'New' : (isCompleted ? 'Closed' : statusVal)}
                                         </span>
                                     </td>
                                     <td className="px-4 py-5 whitespace-nowrap text-center">
-                                        {isAccepted && (
+                                        {canView && (
                                             <button
                                                 onClick={() => onAction('view', lead)}
                                                 className="inline-flex items-center justify-center h-9 w-9 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl hover:bg-blue-100 transition-all active:scale-95 shadow-sm"
@@ -89,13 +96,31 @@ const LeadTable = ({ leads, onAction }) => {
                                                     </button>
                                                 </>
                                             )}
-                                            {isAccepted && (
-                                                <button
-                                                    onClick={() => onAction('contact', lead)}
-                                                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all active:scale-95"
-                                                >
-                                                    <MessageSquare size={12} /> Contact
-                                                </button>
+                                            {canInteract && (
+                                                <>
+                                                    <button
+                                                        onClick={() => onAction('contact', lead)}
+                                                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all active:scale-95"
+                                                    >
+                                                        <MessageSquare size={12} /> Contact
+                                                    </button>
+                                                    {isAccepted && (
+                                                        <button
+                                                            onClick={() => onAction('start', lead)}
+                                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md active:scale-95 whitespace-nowrap"
+                                                        >
+                                                            Start Job
+                                                        </button>
+                                                    )}
+                                                    {isInProgress && (
+                                                        <button
+                                                            onClick={() => onAction('complete', lead)}
+                                                            className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-md active:scale-95 whitespace-nowrap"
+                                                        >
+                                                            Complete Job
+                                                        </button>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                     </td>
@@ -113,7 +138,10 @@ const LeadTable = ({ leads, onAction }) => {
                     const statusLower = (statusVal || '').toLowerCase();
                     const isNew = ['new', 'open', 'sent', 'viewed'].includes(statusLower);
                     const isAccepted = statusLower === 'accepted';
-                    const isRejected = statusLower === 'rejected';
+                    const isInProgress = ['in progress', 'active', 'in_progress'].includes(statusLower);
+                    const isCompleted = statusLower === 'completed' || statusLower === 'closed';
+                    const canView = isAccepted || isInProgress || isCompleted;
+                    const canInteract = isAccepted || isInProgress;
 
                     const displayName = lead.customerName || 'Customer';
                     const displayLocation = lead.location || 'Not Specified';
@@ -125,7 +153,7 @@ const LeadTable = ({ leads, onAction }) => {
                                 <div className="flex justify-between items-start mb-4">
                                     <span className="px-3 py-1.5 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-blue-50 shadow-sm leading-none">ID: #{lead.leadNo || lead.id}</span>
                                     <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm ${getStatusColor(statusVal)}`}>
-                                        {isNew ? 'New' : (statusLower === 'completed' || statusLower === 'closed' ? 'Closed' : statusVal)}
+                                        {isNew ? 'New' : (isCompleted ? 'Closed' : statusVal)}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-4">
@@ -136,7 +164,7 @@ const LeadTable = ({ leads, onAction }) => {
                                         <h4 className="font-black tracking-tight truncate leading-none mb-1.5 text-gray-900 text-xl">
                                             {displayName}
                                         </h4>
-                                        <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">{new Date(lead.dateRequested).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                                        <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">{new Date(lead.dateRequested || lead.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                                     </div>
                                 </div>
                             </div>
@@ -162,7 +190,7 @@ const LeadTable = ({ leads, onAction }) => {
 
                                 {/* Bottom Actions Row */}
                                 <div className="flex items-center gap-3 pt-2">
-                                    {isAccepted && (
+                                    {canView && (
                                         <button
                                             onClick={() => onAction('view', lead)}
                                             className="h-14 w-14 flex items-center justify-center bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 shadow-sm shrink-0 active:scale-90 transition-all"
@@ -188,13 +216,31 @@ const LeadTable = ({ leads, onAction }) => {
                                                 </button>
                                             </div>
                                         )}
-                                        {isAccepted && (
-                                            <button
-                                                onClick={() => onAction('contact', lead)}
-                                                className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-50 border-2 border-emerald-100 text-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-sm"
-                                            >
-                                                <MessageSquare size={18} /> Contact Customer
-                                            </button>
+                                        {canInteract && (
+                                            <div className="flex flex-col gap-3">
+                                                <button
+                                                    onClick={() => onAction('contact', lead)}
+                                                    className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-50 border-2 border-emerald-100 text-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-sm"
+                                                >
+                                                    <MessageSquare size={18} /> Contact Customer
+                                                </button>
+                                                {isAccepted && (
+                                                    <button
+                                                        onClick={() => onAction('start', lead)}
+                                                        className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-blue-100"
+                                                    >
+                                                        <Zap size={18} fill="currentColor" /> Start Job
+                                                    </button>
+                                                )}
+                                                {isInProgress && (
+                                                    <button
+                                                        onClick={() => onAction('complete', lead)}
+                                                        className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-emerald-100"
+                                                    >
+                                                        <Check size={18} strokeWidth={3} /> Complete Work
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>

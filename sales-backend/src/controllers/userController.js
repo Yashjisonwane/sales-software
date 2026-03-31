@@ -309,13 +309,7 @@ const getDashboardStats = async (req, res) => {
                 prisma.lead.count(),
                 prisma.user.count({ where: { role: 'WORKER' } }),
                 prisma.user.count({ 
-                    where: { 
-                        role: 'CUSTOMER',
-                        OR: [
-                            { leadsAsCustomer: { some: {} } },
-                            { jobsAsCustomer: { some: {} } }
-                        ]
-                    } 
+                    where: { role: 'CUSTOMER' } 
                 }),
                 prisma.lead.count({ where: { createdAt: { gte: todayStart } } }),
                 prisma.job.count({ where: { status: 'COMPLETED' } }),
@@ -323,10 +317,7 @@ const getDashboardStats = async (req, res) => {
                 prisma.user.count({ 
                     where: { 
                         role: 'CUSTOMER', 
-                        OR: [
-                            { jobsAsCustomer: { some: {} } },
-                            { leadsAsCustomer: { some: {} } }
-                        ]
+                        jobsAsCustomer: { some: {} } // Loyal customers have at least one job record
                     } 
                 }),
                 prisma.user.count({ 
@@ -369,7 +360,7 @@ const getDashboardStats = async (req, res) => {
                         { name: 'Total Customers', value: totalCustomers, trend: '+8%', up: true },
                         { name: 'New Leads Today', value: newLeadsToday, trend: '+15%', up: true }
                     ],
-                    leadActivity: leadActivity, // Array of counts for last 7 days [d-6, d-5, ..., today]
+                    leadActivity: leadActivity,
                     growthStats: [
                         { label: 'New Professionals', value: Math.min(newProsRate + 60, 100), color: 'bg-purple-500' }, 
                         { label: 'Lead Completion Rate', value: Math.min(leadCompletionRate + 40, 100), color: 'bg-green-500' },

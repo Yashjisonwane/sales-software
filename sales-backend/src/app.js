@@ -10,6 +10,8 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const professionalRequestRoutes = require('./routes/professionalRequestRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 
@@ -26,6 +28,8 @@ app.use('/api/v1/categories', categoryRoutes);
 app.use('/api/v1/locations', locationRoutes);
 app.use('/api/v1/professional-requests', professionalRequestRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/chats', chatRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
 
 // Health Check Route
 app.get('/api/v1/health', (req, res) => {

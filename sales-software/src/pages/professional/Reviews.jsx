@@ -1,18 +1,18 @@
-import React from 'react';
-import { reviewsData } from '../../data/models';
+import { useMarketplace } from '../../context/MarketplaceContext';
 import ReviewCard from '../../components/professional/ReviewCard';
 import { Star, MessageSquare, ThumbsUp, TrendingUp, Filter, Search } from 'lucide-react';
 
 const Reviews = () => {
-    const averageRating = 4.8;
-    const totalReviews = reviewsData.length;
+    const { reviews, reviewStats } = useMarketplace();
+    const averageRating = reviewStats.averageRating || 0;
+    const totalReviews = reviews.length;
 
-    const ratingBreakdown = [
-        { stars: 5, percentage: 85 },
-        { stars: 4, percentage: 10 },
-        { stars: 3, percentage: 3 },
-        { stars: 2, percentage: 1 },
-        { stars: 1, percentage: 1 },
+    const ratingBreakdown = reviewStats.distribution || [
+        { stars: 5, percentage: 0 },
+        { stars: 4, percentage: 0 },
+        { stars: 3, percentage: 0 },
+        { stars: 2, percentage: 0 },
+        { stars: 1, percentage: 0 },
     ];
 
     return (
@@ -86,9 +86,15 @@ const Reviews = () => {
 
             {/* Reviews Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {reviewsData.map((review) => (
+                {reviews.map((review) => (
                     <ReviewCard key={review.id} review={review} />
                 ))}
+                {reviews.length === 0 && (
+                    <div className="col-span-full py-20 text-center text-gray-400">
+                        <Star size={48} className="mx-auto mb-3 opacity-10" />
+                        <p className="font-bold">No reviews yet. Complete your first job to get feedback!</p>
+                    </div>
+                )}
             </div>
         </div>
     );
