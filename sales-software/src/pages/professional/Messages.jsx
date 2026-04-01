@@ -104,9 +104,9 @@ const Messages = () => {
     }));
 
     return (
-        <div className="h-[calc(100vh-140px)] flex gap-6 overflow-hidden animate-in fade-in duration-500">
+        <div className="h-[calc(100dvh-64px)] md:h-[calc(100vh-140px)] flex md:gap-6 overflow-hidden animate-in fade-in duration-500 -m-4 sm:-m-6 md:m-0">
             {/* Sidebar Conversation List */}
-            <div className="w-full md:w-80 lg:w-96 shrink-0 bg-white rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+            <div className={`w-full md:w-80 lg:w-96 shrink-0 bg-white md:rounded-[2.5rem] shadow-sm md:border border-gray-100 flex flex-col overflow-hidden ${activeChat ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-6 border-b border-gray-50 bg-gray-50/30">
                     <div className="relative group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-blue-600 transition-colors" />
@@ -124,10 +124,10 @@ const Messages = () => {
                     <div
                         key={chat.id}
                         onClick={() => setActiveChat(chat)}
-                        className={`p-6 border-b border-gray-50 cursor-pointer hover:bg-blue-50/30 transition-all relative flex items-center gap-4 group ${activeChat?.id === chat.id ? 'bg-blue-50/50' : ''}`}
+                        className={`p-4 md:p-6 border-b border-gray-50 cursor-pointer hover:bg-blue-50/30 transition-all relative flex items-center gap-3 md:gap-4 group ${activeChat?.id === chat.id ? 'bg-blue-50/50' : ''}`}
                     >
                         {activeChat?.id === chat.id && (
-                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-12 bg-blue-600 rounded-r-full"></div>
+                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-10 md:h-12 bg-blue-600 rounded-r-full"></div>
                         )}
                         <div className="relative">
                             <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center font-black text-gray-400 shadow-inner border border-white group-hover:scale-110 transition-transform duration-300">
@@ -162,16 +162,17 @@ const Messages = () => {
         </div>
 
         {/* Chat Window Component */}
-        <div className="flex-1 overflow-hidden relative">
+        <div className={`flex-1 overflow-hidden relative ${!activeChat ? 'hidden md:block' : 'block h-full'}`}>
             {activeChat ? (
                 <ChatWindow
                     customerName={activeChat.customerName}
                     messages={formattedMessages} // Always pass messages even if virtual (logic handles state)
                     onSendMessage={handleSendMessage}
+                    onBack={() => setActiveChat(null)}
                 />
             ) : (
-                <div className="h-full bg-white rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center text-gray-400 p-12 text-center">
-                        <div className="h-24 w-24 bg-gray-50 rounded-[2rem] flex items-center justify-center mb-6 shadow-inner border border-gray-100">
+                <div className="h-full bg-white md:rounded-[2.5rem] shadow-sm border border-gray-100 flex flex-col items-center justify-center text-gray-400 p-12 text-center">
+                        <div className="h-20 w-20 md:h-24 md:w-24 bg-gray-50 rounded-[2rem] flex items-center justify-center mb-6 shadow-inner border border-gray-100">
                             <MessageSquare size={40} className="opacity-20" />
                         </div>
                         <h3 className="text-lg md:text-xl font-black text-gray-900 tracking-tight">Select a consultation</h3>

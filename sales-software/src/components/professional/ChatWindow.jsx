@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Paperclip, Smile, MoreHorizontal, Check, MessageSquare, Image as ImageIcon, X } from 'lucide-react';
+import { Send, User, Paperclip, Smile, MoreHorizontal, Check, MessageSquare, Image as ImageIcon, X, ChevronLeft } from 'lucide-react';
 
-const ChatWindow = ({ customerName, messages = [], onSendMessage }) => {
+const ChatWindow = ({ customerName, messages = [], onSendMessage, onBack }) => {
     const [text, setText] = useState('');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
@@ -48,26 +48,34 @@ const ChatWindow = ({ customerName, messages = [], onSendMessage }) => {
     const commonEmojis = ['😊', '🤝', '✅', '🏗️', '📍', '💰', '📅', '👷', '🏠', '✨'];
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden relative">
+        <div className="flex flex-col h-full bg-white md:rounded-[2.5rem] shadow-sm md:border border-gray-100 overflow-hidden relative">
             {/* Header */}
-            <div className="px-8 py-6 border-b border-gray-50 flex items-center justify-between bg-white z-10 shrink-0">
-                <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 md:h-14 md:w-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-xl shadow-inner border border-white">
+            <div className="px-5 md:px-8 py-4 md:py-6 border-b border-gray-50 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-2 md:gap-4">
+                    {/* Mobile Back Button */}
+                    <button 
+                        onClick={onBack}
+                        className="p-2 -ml-2 text-gray-400 hover:text-blue-600 md:hidden transition-colors"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+
+                    <div className="h-10 w-10 md:h-14 md:w-14 rounded-xl md:rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-black text-lg md:text-xl shadow-inner border border-white">
                         {customerName ? customerName.charAt(0) : 'C'}
                     </div>
                     <div>
-                        <h3 className="font-black text-gray-900 tracking-tight text-base md:text-lg leading-tight">{customerName}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-200"></div>
-                            <span className="text-[10px] uppercase tracking-widest text-emerald-600 font-black">Active Now</span>
+                        <h3 className="font-black text-gray-900 tracking-tight text-sm md:text-lg leading-tight truncate max-w-[120px] sm:max-w-none">{customerName}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-200"></div>
+                            <span className="text-[9px] uppercase tracking-widest text-emerald-600 font-black">Active Now</span>
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button className="p-2 md:p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all">
+                <div className="flex items-center gap-1 md:gap-2">
+                    <button className="p-2 md:p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl md:rounded-2xl transition-all">
                         <User size={18} className="md:w-5 md:h-5" />
                     </button>
-                    <button className="p-2 md:p-3 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-all">
+                    <button className="p-2 md:p-3 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-xl md:rounded-2xl transition-all">
                         <MoreHorizontal size={18} className="md:w-5 md:h-5" />
                     </button>
                 </div>
@@ -117,23 +125,23 @@ const ChatWindow = ({ customerName, messages = [], onSendMessage }) => {
             </div>
 
             {/* Input Area */}
-            <div className="p-4 md:p-6 bg-white border-t border-gray-50 shrink-0">
+            <div className="p-2 sm:p-4 md:p-6 bg-white border-t border-gray-50 shrink-0">
                 {selectedImage && (
-                    <div className="mb-4 flex items-center gap-3 p-3 bg-blue-50 rounded-2xl border border-blue-100 animate-in slide-in-from-bottom-2">
-                        <div className="h-16 w-16 bg-white rounded-xl overflow-hidden border border-blue-200">
+                    <div className="mb-2 sm:mb-4 flex items-center gap-3 p-2 sm:p-3 bg-blue-50 rounded-xl sm:rounded-2xl border border-blue-100 animate-in slide-in-from-bottom-2">
+                        <div className="h-12 w-12 sm:h-16 sm:w-16 bg-white rounded-lg sm:rounded-xl overflow-hidden border border-blue-200">
                             <img src={selectedImage} alt="Selected" className="h-full w-full object-cover" />
                         </div>
                         <div className="flex-1">
-                            <p className="text-xs font-black text-blue-600 uppercase tracking-widest">Photo selected</p>
-                            <p className="text-[10px] text-blue-400 font-bold">Will be sent with message</p>
+                            <p className="text-[10px] sm:text-xs font-black text-blue-600 uppercase tracking-widest">Photo selected</p>
+                            <p className="text-[9px] sm:text-[10px] text-blue-400 font-bold">Attachment ready</p>
                         </div>
                         <button onClick={() => setSelectedImage(null)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-xl">
-                            <X size={20} />
+                            <X size={18} />
                         </button>
                     </div>
                 )}
 
-                <form onSubmit={handleSend} className="flex items-center gap-2 md:gap-4 bg-gray-50 p-2 md:p-3 rounded-[1.5rem] md:rounded-[2rem] border border-gray-100 focus-within:border-blue-200 transition-all focus-within:shadow-lg focus-within:shadow-blue-50/50">
+                <form onSubmit={handleSend} className="flex items-center gap-2 md:gap-4 bg-gray-50 p-1.5 sm:p-2 md:p-3 rounded-2xl md:rounded-[2rem] border border-gray-100 focus-within:border-blue-200 transition-all focus-within:shadow-lg focus-within:shadow-blue-50/50">
                     <input
                         type="file"
                         className="hidden"
