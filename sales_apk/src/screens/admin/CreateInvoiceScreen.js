@@ -19,34 +19,26 @@ const { width } = Dimensions.get('window');
 
 const CreateInvoiceScreen = ({ navigation, route }) => {
   const [paymentMethod, setPaymentMethod] = useState('Card');
-  const [depositRequired, setDepositRequired] = useState(true);
-  const [partialPayments, setPartialPayments] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const job = route.params?.job || {};
 
   // Form States
-  const [customerName, setCustomerName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [email, setEmail] = useState('');
-  const [jobAddress, setJobAddress] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState('#INV-1026');
+  const [amount, setAmount] = useState('1500');
+  const [milestone, setMilestone] = useState('SINGLE');
 
   const insets = useSafeAreaInsets();
 
-  const InputField = ({ label, placeholder, icon, value, onChangeText, keyboardType = 'default' }) => (
-    <View style={styles.inputContainer}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputWrapper}>
-        <TextInput
-          style={styles.input}
-          placeholder={placeholder}
-          placeholderTextColor="#A0AEC0"
-          value={value}
-          onChangeText={onChangeText}
-          keyboardType={keyboardType}
-        />
-        {icon && <Ionicons name={icon} size={20} color="#A0AEC0" />}
-      </View>
-    </View>
-  );
+  const handleSendInvoice = async () => {
+    setLoading(true);
+    const res = await createInvoice(job.id, amount, { milestone, totalAmount: amount });
+    setLoading(false);
+    if (res.success) {
+      alert('Invoice Sent Successfully!');
+      navigation.popToTop();
+    } else {
+      alert('Error: ' + (res.message || 'Unknown error'));
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -55,198 +47,54 @@ const CreateInvoiceScreen = ({ navigation, route }) => {
           <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create Invoice</Text>
-        <TouchableOpacity style={styles.menuBtn}>
-          <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ width: 44 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Section 1: Customer & Job Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Customer & Job Details</Text>
+          <Text style={styles.sectionTitle}>Job Details</Text>
+          <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Customer</Text><Text style={styles.summaryValue}>{job.customerName || 'N/A'}</Text></View>
+          <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Location</Text><Text style={styles.summaryValue}>{job.location || 'N/A'}</Text></View>
+          <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Category</Text><Text style={styles.summaryValue}>{job.categoryName || 'N/A'}</Text></View>
+        </View>
 
-          <InputField label="Customer Name" placeholder="Customer Name" value={customerName} onChangeText={setCustomerName} />
-          <InputField label="Phone Number" placeholder="Phone Number" value={phoneNumber} onChangeText={setPhoneNumber} keyboardType="phone-pad" />
-          <InputField label="Email" placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Job / Project</Text>
-            <TouchableOpacity style={styles.inputWrapper}>
-              <Text style={styles.placeholderText}>Select Job / Project</Text>
-              <Ionicons name="chevron-down" size={20} color="#A0AEC0" />
-            </TouchableOpacity>
-          </View>
-
-          <InputField label="Job Address" placeholder="Select Location" icon="location-outline" value={jobAddress} onChangeText={setJobAddress} />
-
-          <InputField label="Invoice Number" placeholder="#INV-1026" value={invoiceNumber} onChangeText={setInvoiceNumber} />
-
-          <View style={styles.row}>
-            <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.label}>Invoice Date</Text>
-              <TouchableOpacity style={styles.inputWrapper}>
-                <Text style={styles.placeholderText}>DD-MM</Text>
-                <Ionicons name="calendar-outline" size={18} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
-            <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.label}>Invoice Due Date</Text>
-              <TouchableOpacity style={styles.inputWrapper}>
-                <Text style={styles.placeholderText}>DD-MM</Text>
-                <Ionicons name="calendar-outline" size={18} color={COLORS.textPrimary} />
-              </TouchableOpacity>
-            </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Billing Amount</Text>
+          <View style={styles.inputWrapper}>
+             <Text style={{ fontSize: 18, marginRight: 8, color: '#718096' }}>$</Text>
+             <TextInput 
+                 style={{ flex: 1, fontSize: 20, fontWeight: '700' }} 
+                 value={amount} 
+                 onChangeText={setAmount} 
+                 keyboardType="numeric"
+             />
           </View>
         </View>
 
-        {/* Section 2: Invoice Items */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Invoice Items</Text>
-          <Text style={[styles.label, { marginBottom: 8 }]}>Item 1</Text>
-          <View style={styles.itemCard}>
-            <TextInput style={styles.itemInput} placeholder="Labor – Roof Installation" placeholderTextColor="#A0AEC0" />
-
-            <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>Description (optional)</Text>
-            <TextInput
-              style={styles.textArea}
-              placeholder="Enter description..."
-              placeholderTextColor="#A0AEC0"
-              multiline
-              numberOfLines={4}
-            />
-
-            <View style={[styles.row, { marginTop: 16 }]}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.label}>Quantity</Text>
-                <View style={styles.smallInput}><TextInput placeholder="00" placeholderTextColor="#A0AEC0" keyboardType="numeric" /></View>
-              </View>
-              <View style={{ flex: 1, marginHorizontal: 4 }}>
-                <Text style={styles.label}>Rate ($)</Text>
-                <View style={styles.smallInput}><TextInput placeholder="$0.00" placeholderTextColor="#A0AEC0" keyboardType="numeric" /></View>
-              </View>
-              <View style={{ flex: 1, marginLeft: 8 }}>
-                <Text style={styles.label}>Amount</Text>
-                <View style={[styles.smallInput, { backgroundColor: '#F8FAFC' }]}><Text style={styles.amountValue}>$0.00</Text></View>
-              </View>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.addLineItemBtn}>
-            <Ionicons name="add" size={20} color={COLORS.textPrimary} />
-            <Text style={styles.addLineItemText}>Add Line Item</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Section 3: Materials & Parts */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Materials & Parts</Text>
-          <View style={styles.materialRow}>
-            <View>
-              <Text style={styles.materialName}>Asphalt Shingles</Text>
-              <Text style={styles.materialQty}>Qty: 20 × $35</Text>
-            </View>
-            <Text style={styles.materialPrice}>$700.00</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.materialRow}>
-            <View>
-              <Text style={styles.materialName}>Roofing Nails</Text>
-              <Text style={styles.materialQty}>Qty: 5 × $12</Text>
-            </View>
-            <Text style={styles.materialPrice}>$60.00</Text>
-          </View>
-        </View>
-
-        {/* Section 4: Taxes, Discount & Fees */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Taxes, Discount & Fees</Text>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Discount</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput style={styles.input} placeholder="Discount" placeholderTextColor="#A0AEC0" keyboardType="numeric" />
-              <Text style={styles.unitText}>%</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Tax</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput style={styles.input} placeholder="Tax" placeholderTextColor="#A0AEC0" keyboardType="numeric" />
-              <Text style={styles.unitText}>%</Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <View style={{ flex: 1, marginRight: 8 }}>
-              <Text style={styles.label}>Travel Fee</Text>
-              <View style={styles.inputWrapper}>
-                <TextInput style={styles.input} placeholder="$0.00" placeholderTextColor="#A0AEC0" keyboardType="numeric" />
-              </View>
-            </View>
-            <View style={{ flex: 1, marginLeft: 8 }}>
-              <Text style={styles.label}>Service Fee</Text>
-              <View style={styles.inputWrapper}>
-                <TextInput style={styles.input} placeholder="$0.00" placeholderTextColor="#A0AEC0" keyboardType="numeric" />
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Section 5: Payment Details */}
-        <View style={[styles.section, { paddingBottom: 40 }]}>
-          <Text style={styles.sectionTitle}>Payment Details</Text>
-
+          <Text style={styles.sectionTitle}>Milestone Type</Text>
           <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, paymentMethod === 'Card' && styles.activeTab]}
-              onPress={() => setPaymentMethod('Card')}
-            >
-              <Text style={[styles.tabText, paymentMethod === 'Card' && styles.activeTabText]}>Card</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, paymentMethod === 'Bank Transfer' && styles.activeTab]}
-              onPress={() => setPaymentMethod('Bank Transfer')}
-            >
-              <Text style={[styles.tabText, paymentMethod === 'Bank Transfer' && styles.activeTabText]}>Bank Transfer</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Deposit Required</Text>
-            <Switch
-              value={depositRequired}
-              onValueChange={setDepositRequired}
-              trackColor={{ false: '#E2E8F0', true: '#3B82F6' }}
-              thumbColor={COLORS.white}
-            />
-          </View>
-
-          <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Partial Payments Allowed</Text>
-            <Switch
-              value={partialPayments}
-              onValueChange={setPartialPayments}
-              trackColor={{ false: '#E2E8F0', true: '#3B82F6' }}
-              thumbColor={COLORS.white}
-            />
+            {['SINGLE', 'DEPOSIT_15', 'PROGRESS_50', 'FINAL_35'].map(m => (
+              <TouchableOpacity
+                key={m}
+                style={[styles.tab, milestone === m && styles.activeTab]}
+                onPress={() => setMilestone(m)}
+              >
+                <Text style={[styles.tabText, milestone === m && styles.activeTabText, { fontSize: 10 }]}>{m.replace('_', ' ')}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.sendBtn} onPress={async () => {
-          const jobId = route.params?.jobId || 'mock-id'; 
-          const res = await createInvoice(jobId, 1500);
-          if (res?.success || jobId === 'mock-id') {
-            alert('Invoice Sent Successfully!');
-            navigation.navigate('WorkerTabs'); 
-          } else {
-             alert('Error generating invoice: ' + (res?.message || 'Unknown error'));
-          }
-        }}>
+        <TouchableOpacity 
+          style={[styles.sendBtn, loading && { opacity: 0.7 }]} 
+          disabled={loading}
+          onPress={handleSendInvoice}
+        >
           <Ionicons name="send-outline" size={20} color={COLORS.white} style={{ marginRight: 10 }} />
-          <Text style={styles.sendBtnText}>Send Invoice</Text>
+          <Text style={styles.sendBtnText}>{loading ? 'Generating...' : 'Sync & Send Invoice'}</Text>
         </TouchableOpacity>
       </View>
     </View>

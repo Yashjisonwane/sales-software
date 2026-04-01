@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { getProfessionals, assignLeadToWorker } from '../../api/apiService';
 import { Alert, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const AssignJobScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();

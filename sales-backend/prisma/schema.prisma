@@ -36,13 +36,8 @@ model User {
   jobsAsCustomer              Job[]                        @relation("CustomerJobs")
   jobsAsWorker                Job[]                        @relation("WorkerJobs")
   leadsAsCustomer             Lead[]                       @relation("CustomerLeads")
-  conversationsStarted        Conversation[]               @relation("User1Conv")
-  conversationsReceived       Conversation[]               @relation("User2Conv")
-  messagesSent                Message[]                    @relation("MessageSender")
   notifications               Notification[]
   subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
-  adminCommission             Int                          @default(10) @map("admin_commission")
-  workerCommission            Int                          @default(90) @map("worker_commission")
   plan                        SubscriptionPlan?            @relation(fields: [planId], references: [id])
   categories                  WorkerCategory[]
 
@@ -109,7 +104,6 @@ model Job {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   preferredDate String?        @map("preferred_date")
-  chat          Chat?
   contract      JobContract?
   estimate      JobEstimate?
   inspection    JobInspection?
@@ -118,7 +112,6 @@ model Job {
   customer      User           @relation("CustomerJobs", fields: [customerId], references: [id])
   lead          Lead?          @relation(fields: [leadId], references: [id])
   worker        User           @relation("WorkerJobs", fields: [workerId], references: [id])
-  review        Review?
 
   @@index([customerId], map: "jobs_customer_id_fkey")
   @@index([workerId], map: "jobs_worker_id_fkey")
@@ -173,15 +166,13 @@ model JobContract {
 }
 
 model JobInvoice {
-  id          String   @id @default(uuid())
-  jobId       String   @unique @map("job_id")
-  totalAmount Float    @default(0) @map("total_amount")
-  amount      Float
-  milestone   String   @default("SINGLE")
-  status      String   @default("UNPAID")
-  paymentId   String?  @map("payment_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  jobId     String   @unique @map("job_id")
+  amount    Float
+  status    String   @default("UNPAID")
+  paymentId String?  @map("payment_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_invoices")
 }
@@ -260,43 +251,6 @@ model Notification {
   @@map("notifications")
 }
 
-model Review {
-  id        String   @id @default(uuid())
-  jobId     String   @unique @map("job_id")
-  rating    Int      @default(5)
-  comment   String?  @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@map("reviews")
-}
-
-model Chat {
-  id          String    @id @default(uuid())
-  jobId       String    @unique @map("job_id")
-  lastMessage String?   @map("last_message") @db.Text
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  messages    Message[]
-
-  @@map("chats")
-}
-
-model Message {
-  id        String   @id @default(uuid())
-  chatId    String   @map("chat_id")
-  senderId  String   @map("sender_id")
-  text      String   @db.Text
-  isRead    Boolean  @default(false) @map("is_read")
-  createdAt DateTime @default(now()) @map("created_at")
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender    User     @relation("MessageSender", fields: [senderId], references: [id])
-
-  @@index([chatId], map: "messages_chat_id_fkey")
-  @@index([senderId], map: "messages_sender_id_fkey")
-  @@map("messages")
-}
-
 enum Role {
   ADMIN
   WORKER
@@ -318,29 +272,4 @@ enum LeadStatus {
   OPEN
   ASSIGNED
   REJECTED
-}
-
-model Conversation {
-  id          String          @id @default(uuid())
-  user1Id     String          @map("user1_id")
-  user2Id     String          @map("user2_id")
-  lastMessage String?         @map("last_message") @db.Text
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-  messages    DirectMessage[]
-  user1       User            @relation("User1Conv", fields: [user1Id], references: [id])
-  user2       User            @relation("User2Conv", fields: [user2Id], references: [id])
-
-  @@unique([user1Id, user2Id])
-  @@map("conversations")
-}
-
-model DirectMessage {
-  id             String       @id @default(uuid())
-  conversationId String       @map("conversation_id")
-  senderId       String       @map("sender_id")
-  text           String       @db.Text
-  createdAt      DateTime     @default(now()) @map("created_at")
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@map("direct_messages")
 }

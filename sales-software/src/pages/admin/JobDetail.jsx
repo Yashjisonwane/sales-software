@@ -109,6 +109,37 @@ const JobDetail = () => {
                 </div>
             </div>
 
+            {/* Real Job Photos Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {(job.photos && job.photos.length > 0) ? job.photos.slice(0, 3).map((photo, index) => (
+                    <div key={photo.id || index} className="relative group aspect-video rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm">
+                        <img 
+                            src={photo.url} 
+                            alt={`Site Photo ${index + 1}`}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                        />
+                        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-4 py-1 rounded-full text-[10px] font-black text-white uppercase tracking-widest">
+                            {photo.type || 'Site Photo'}
+                        </div>
+                    </div>
+                )) : (
+                    <>
+                        <div className="aspect-video bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
+                            <Camera size={24} className="mb-2 opacity-50" />
+                            <p className="text-[10px] font-black uppercase tracking-widest">Pending Site Scan</p>
+                        </div>
+                        <div className="aspect-video bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
+                             <Camera size={24} className="mb-2 opacity-50" />
+                             <p className="text-[10px] font-black uppercase tracking-widest">Awaiting Before Photo</p>
+                        </div>
+                        <div className="aspect-video bg-gray-50 rounded-[2rem] border border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
+                             <Camera size={24} className="mb-2 opacity-50" />
+                             <p className="text-[10px] font-black uppercase tracking-widest">Inventory Log Missing</p>
+                        </div>
+                    </>
+                )}
+            </div>
+
             {/* Action Buttons (WITH WORKFLOW GUARDS) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {actionTools.map((tool, idx) => {

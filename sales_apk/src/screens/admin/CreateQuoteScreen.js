@@ -14,6 +14,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createEstimate } from '../../api/apiService';
+import { Alert } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -54,38 +56,38 @@ export default function CreateQuoteScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const [step, setStep] = useState(0);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [amount, setAmount] = useState('1896.15');
+    const [description, setDescription] = useState('HVAC Installation - Standard setup');
+    const job = route.params?.job || {};
+
+    const handleSendQuote = async () => {
+        setLoading(true);
+        const res = await createEstimate(job.id, amount, description);
+        setLoading(false);
+        if (res.success) {
+            setShowSuccess(true);
+        } else {
+            alert(res.message || 'Error creating quote');
+        }
+    };
 
     const renderStep0 = () => (
         <View style={styles.stepContent}>
             <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Select Service Type</Text>
-                <TouchableOpacity style={styles.dropdown}>
-                    <Text style={styles.dropdownText}>HVAC Installation</Text>
-                    <Ionicons name="chevron-down" size={20} color="#1A202C" />
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Measurement input</Text>
-                <Text style={styles.cardSub}>Use the tool ro auto-fill measurements,</Text>
-                <TouchableOpacity style={styles.secondaryActionBtn}>
-                    <Text style={styles.secondaryActionBtnText}>Start Pre-Inspection Tool</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Add Materials & Labor</Text>
-                <View style={styles.listItem}>
-                    <Text style={styles.listLabel}>Total Materials Added:</Text>
-                    <Text style={styles.listValue}>5 Items</Text>
+                <Text style={styles.cardTitle}>Job Scope: {job.customerName || 'New Client'}</Text>
+                <Text style={styles.cardSub}>{job.categoryName || 'Service Req'} • {job.location || 'Site Location'}</Text>
+                <View style={styles.divider} />
+                <View style={{ marginTop: 15 }}>
+                    <Text style={styles.label}>Detailed Description</Text>
+                    <TextInput 
+                        style={styles.textAreaRefined}
+                        value={description}
+                        onChangeText={setDescription}
+                        multiline
+                        placeholder="Describe materials, labor, and timeline..."
+                    />
                 </View>
-                <View style={styles.listItem}>
-                    <Text style={styles.listLabel}>Estimated Labor Hours:</Text>
-                    <Text style={styles.listValue}>8.5 hrs</Text>
-                </View>
-                <TouchableOpacity style={styles.secondaryActionBtn}>
-                    <Text style={styles.secondaryActionBtnText}>Edit Item List</Text>
-                </TouchableOpacity>
             </View>
         </View>
     );
@@ -93,40 +95,15 @@ export default function CreateQuoteScreen({ navigation }) {
     const renderStep1 = () => (
         <View style={styles.stepContent}>
             <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Measurement input</Text>
-                <Text style={styles.cardSub}>The AI assistant is applying rules to generate the final price.</Text>
-
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Material Cost (Auto-lookup)</Text>
-                    <Text style={styles.costValue}>$550.00</Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Labor Cost (8.5 hrs @ $75/hr)</Text>
-                    <Text style={styles.costValue}>$637.50</Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Travel/ Distance Surcharge</Text>
-                    <Text style={styles.costValue}>$45.00</Text>
-                </View>
-                <View style={[styles.costItem, styles.subtotalRow]}>
-                    <Text style={styles.subtotalLabel}>Subtotal</Text>
-                    <Text style={styles.subtotalValue}>$1,232.50</Text>
-                </View>
-            </View>
-
-            <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Profit Margin Rules</Text>
-                <Text style={styles.cardSub}>This margin represents the organization's net profit on this job.</Text>
-
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Desired margin (%)</Text>
-                    <Text style={styles.costValue}>35%</Text>
-                </View>
-                <View style={[styles.costItem, styles.finalPriceRow]}>
-                    <Text style={styles.finalPriceLabel}>Final Quote Price</Text>
-                    <Text style={styles.finalPriceValue}>$1,896.15</Text>
+                <Text style={styles.cardTitle}>Final Pricing</Text>
+                <View style={styles.inputContainerQuote}>
+                    <Text style={styles.label}>Quote Amount ($)</Text>
+                    <TextInput 
+                        style={styles.pricingInput}
+                        value={amount}
+                        onChangeText={setAmount}
+                        keyboardType="numeric"
+                    />
                 </View>
             </View>
         </View>
@@ -135,44 +112,12 @@ export default function CreateQuoteScreen({ navigation }) {
     const renderStep2 = () => (
         <View style={styles.stepContent}>
             <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>E-Contract Setup</Text>
-                <Text style={styles.cardSub}>Review terms and set up the payment split.</Text>
-                <View style={styles.costItem}>
-                    <Text style={styles.finalPriceLabel}>Final Price</Text>
-                    <Text style={styles.finalPriceValue}>$1,896.15</Text>
+                <Text style={styles.cardTitle}>Review & Send</Text>
+                <View style={styles.summaryBox}>
+                    <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Customer</Text><Text style={styles.summaryValue}>{job.customerName}</Text></View>
+                    <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Total Budget</Text><Text style={[styles.summaryValue, { color: '#0062E1' }]}>${amount}</Text></View>
+                    <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Category</Text><Text style={styles.summaryValue}>{job.categoryName}</Text></View>
                 </View>
-            </View>
-
-            <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Payment Schedule</Text>
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Deposit Due (15%)</Text>
-                    <Text style={styles.costValue}>$284.42</Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Milestone 1 (50%)</Text>
-                    <Text style={styles.costValue}>$948.08</Text>
-                </View>
-                <View style={styles.divider} />
-                <View style={styles.costItem}>
-                    <Text style={styles.costLabel}>Final Payment (35%)</Text>
-                    <Text style={styles.costValue}>$663.65</Text>
-                </View>
-            </View>
-
-            <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Contract Preview</Text>
-                <Text style={styles.cardSub}>(Mock Legal Text) All work is subject to standard terms and conditions. The customer agrees to the payment schedule outlined above. Signature...</Text>
-                <TouchableOpacity>
-                    <Text style={styles.viewPdfLink}>View Full PDF</Text>
-                </TouchableOpacity>
-            </View>
-
-            <View style={styles.formCard}>
-                <Text style={styles.cardTitle}>Signature Confirmation</Text>
-                <Text style={styles.cardSub}>Type or draw your signature to confirm and authorize</Text>
-                {/* Signature input would go here */}
             </View>
         </View>
     );
@@ -181,21 +126,16 @@ export default function CreateQuoteScreen({ navigation }) {
         <Modal visible={showSuccess} transparent animationType="fade">
             <View style={styles.modalBg}>
                 <View style={styles.modalPopup}>
-                    <TouchableOpacity style={styles.closeModal} onPress={() => setShowSuccess(false)}>
-                        <Ionicons name="close" size={24} color="#1A202C" />
-                    </TouchableOpacity>
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <View style={styles.successContent}>
                             <View style={styles.successIconBg}>
                                 <Ionicons name="checkmark" size={60} color={COLORS.white} />
                             </View>
-                            <Text style={styles.successTitle}>Quote Sent Successfully!</Text>
-                            <Text style={styles.successSub}>Your quote has been sent to the customer for review and signature.</Text>
+                            <Text style={styles.successTitle}>Quote Sent!</Text>
+                            <Text style={styles.successSub}>Your quote has been successfully synchronized and sent to the client.</Text>
                             <View style={styles.summaryBox}>
-                                <Text style={styles.summaryBoxTitle}>Quote Summary</Text>
-                                <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Customer Name</Text><Text style={styles.summaryValue}>Alistair Hughes</Text></View>
-                                <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Service Type</Text><Text style={styles.summaryValue}>HVAC Installation</Text></View>
-                                <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Total Amount</Text><Text style={styles.summaryValue}>$1,896.15</Text></View>
+                                <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Job Ref</Text><Text style={styles.summaryValue}>#JB-{job.id?.slice(-4).toUpperCase()}</Text></View>
+                                <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Total Amount</Text><Text style={styles.summaryValue}>${amount}</Text></View>
                             </View>
                         </View>
                     </ScrollView>
@@ -203,10 +143,10 @@ export default function CreateQuoteScreen({ navigation }) {
                         style={styles.backHomeBtn}
                         onPress={() => {
                             setShowSuccess(false);
-                            navigation.reset({ index: 0, routes: [{ name: 'AdminTabs' }] });
+                            navigation.popToTop();
                         }}
                     >
-                        <Text style={styles.backHomeBtnText}>Back to Home</Text>
+                        <Text style={styles.backHomeBtnText}>Back to Dashboard</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -220,7 +160,7 @@ export default function CreateQuoteScreen({ navigation }) {
                 <TouchableOpacity onPress={() => step > 0 ? setStep(step - 1) : navigation.goBack()} style={styles.backBtn}>
                     <Ionicons name="chevron-back" size={24} color="#1A202C" />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>{step === 0 ? 'Job Scope' : step === 1 ? 'Pricing' : 'Review & Send'}</Text>
+                <Text style={styles.headerTitle}>{step === 0 ? 'Scope' : step === 1 ? 'Pricing' : 'Confirm'}</Text>
                 <View style={{ width: 44 }} />
             </View>
 
@@ -235,11 +175,12 @@ export default function CreateQuoteScreen({ navigation }) {
 
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
                 <TouchableOpacity
-                    style={styles.primaryBtn}
-                    onPress={() => step < 2 ? setStep(step + 1) : setShowSuccess(true)}
+                    style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
+                    disabled={loading}
+                    onPress={() => step < 2 ? setStep(step + 1) : handleSendQuote()}
                 >
                     <Text style={styles.primaryBtnText}>
-                        {step === 0 ? 'Continue to Pricing' : step === 1 ? 'Review Contract' : 'Send Quote'}
+                        {loading ? 'Processing...' : step === 0 ? 'Continue to Pricing' : step === 1 ? 'Review Final' : 'Sync & Send Quote'}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -319,4 +260,8 @@ const styles = StyleSheet.create({
     summaryValue: { fontSize: 14, fontWeight: '700', color: '#1A202C' },
     backHomeBtn: { height: 60, borderRadius: 30, backgroundColor: '#0062E1', alignItems: 'center', justifyContent: 'center', marginTop: 30 },
     backHomeBtnText: { color: '#FFF', fontSize: 16, fontWeight: '800' },
+    textAreaRefined: { backgroundColor: '#FFF', borderRadius: 16, padding: 16, height: 120, textAlignVertical: 'top', marginTop: 8, borderWidth: 1, borderColor: '#EDF2F7', color: '#2D3748' },
+    pricingInput: { backgroundColor: '#FFF', borderRadius: 16, padding: 16, height: 56, marginTop: 8, borderWidth: 1, borderColor: '#EDF2F7', color: '#2D3748', fontSize: 18, fontWeight: '700' },
+    label: { fontSize: 14, fontWeight: '600', color: '#4A5568', marginBottom: 4 },
+    inputContainerQuote: { marginTop: 10 },
 });
