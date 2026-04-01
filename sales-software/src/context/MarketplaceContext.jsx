@@ -121,16 +121,22 @@ export const MarketplaceProvider = ({ children }) => {
 
             const jobsRes = await apiService.fetchAllJobs();
             if (jobsRes.success) {
-                const flattenedJobs = (jobsRes.data || []).map(j => ({
-                    ...j,
-                    displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`,
-                    customerName: j.customer?.name || 'Customer',
-                    category: j.categoryName || 'General',
-                    date: j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString() : 'Today',
-                    time: j.scheduledTime || 'TBD',
-                    workerName: j.worker?.name || 'Assigned Worker',
-                    professionalName: j.worker?.name || 'Assigned Worker'
-                }));
+                const flattenedJobs = (jobsRes.data || []).map(j => {
+                    // Fallback to lead data if job record is partial
+                    const relatedLead = (leadsRes.data || []).find(l => l.id === j.leadId);
+                    
+                    return {
+                        ...j,
+                        displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`,
+                        customerName: j.customer?.name || relatedLead?.customer?.name || relatedLead?.customerName || 'Customer',
+                        phone: j.customer?.phone || j.customerPhone || relatedLead?.customer?.phone || relatedLead?.phone || '',
+                        category: j.categoryName || relatedLead?.category?.name || 'General',
+                        date: j.scheduledDate ? new Date(j.scheduledDate).toLocaleDateString() : 'Today',
+                        time: j.scheduledTime || 'TBD',
+                        workerName: j.worker?.name || 'Assigned Worker',
+                        professionalName: j.worker?.name || 'Assigned Worker'
+                    };
+                });
                 setJobs(flattenedJobs);
 
                 const mappedAssignments = flattenedJobs.map(j => ({

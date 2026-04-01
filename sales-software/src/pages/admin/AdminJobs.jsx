@@ -111,6 +111,35 @@ const AdminJobs = () => {
         }
     };
 
+    const handleExport = () => {
+        const headers = ["ID", "Customer Name", "Phone", "Service", "Professional", "Status", "Date", "Time", "Location"];
+        const csvRows = [headers.join(",")];
+        
+        filteredJobs.forEach(job => {
+            const row = [
+                job.displayId,
+                `"${job.customerName}"`,
+                job.phone,
+                `"${job.category}"`,
+                `"${job.professionalName || 'Unassigned'}"`,
+                job.status,
+                job.date,
+                job.time || '10:00 AM',
+                `"${(job.location || '').replace(/"/g, '""')}"`
+            ];
+            csvRows.push(row.join(","));
+        });
+
+        const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `jobs_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const getStatusColor = (status = '') => {
         const s = status.toUpperCase().replace(/_/g, ' ');
         switch (s) {
@@ -166,7 +195,10 @@ const AdminJobs = () => {
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                 </div>
                 
-                <button className="hidden xl:flex items-center justify-center px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-gray-700 transition shadow-sm gap-2">
+                <button 
+                    onClick={handleExport}
+                    className="hidden xl:flex items-center justify-center px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-500 font-bold text-xs hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50 transition shadow-sm gap-2 active:scale-95"
+                >
                      <Download size={14} /> Export
                 </button>
             </div>

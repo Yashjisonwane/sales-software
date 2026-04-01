@@ -44,7 +44,7 @@ const AddLocationModal = ({ isOpen, onClose, onAdd }) => {
                         <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-blue-200">
                             <Plus size={22} />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800 tracking-tight">Add Location</h2>
+                        <h2 className="text-xl font-bold text-gray-800 tracking-tight">New Service Area (City)</h2>
                     </div>
                     <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all">
                         <X size={20} />
@@ -60,7 +60,7 @@ const AddLocationModal = ({ isOpen, onClose, onAdd }) => {
                             onChange={handleChange}
                             required
                             className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-gray-300"
-                            placeholder="e.g. Los Angeles"
+                            placeholder="e.g. Indore, Mumbai, Delhi..."
                         />
                     </div>
 

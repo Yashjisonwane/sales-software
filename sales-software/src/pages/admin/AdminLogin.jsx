@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Zap, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Zap, Mail, Lock, User, Loader2, ShieldCheck, X } from 'lucide-react';
 import LoginRoleSelector from '../../components/LoginRoleSelector';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { registerUser } from '../../services/apiService';
+import { registerUser, resetPassword } from '../../services/apiService';
 
 const AdminLogin = () => {
     const navigate = useNavigate();
@@ -15,14 +15,22 @@ const AdminLogin = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('admin@gmail.com');
     const [phone, setPhone] = useState('9999912345');
-    const [password, setPassword] = useState('pass-123');
+    const [password, setPassword] = useState('1234');
     
     const [isLoading, setIsLoading] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
     const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
+
+    // Forgot Password State
+    const [showForgotModal, setShowForgotModal] = useState(false);
+    const [forgotEmail, setForgotEmail] = useState('');
+    const [newPass, setNewPass] = useState('');
 
     const handleAuth = async (e) => {
         e.preventDefault();
         setError('');
+        setSuccessMsg('');
         setIsLoading(true);
 
         try {
@@ -51,6 +59,29 @@ const AdminLogin = () => {
         }
 
         setIsLoading(false);
+    };
+
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccessMsg('');
+        setIsResetting(true);
+
+        try {
+            const res = await resetPassword(forgotEmail, newPass);
+            if (res.success) {
+                setSuccessMsg(res.message);
+                setShowForgotModal(false);
+                setForgotEmail('');
+                setNewPass('');
+            } else {
+                setError(res.error || 'Password reset failed.');
+            }
+        } catch (err) {
+            setError('Server error during password reset.');
+        } finally {
+            setIsResetting(false);
+        }
     };
 
     return (
@@ -120,7 +151,18 @@ const AdminLogin = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-sm font-medium text-gray-700">Password</label>
+                                {!isRegistering && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowForgotModal(true)}
+                                        className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                                    >
+                                        Forgot password?
+                                    </button>
+                                )}
+                            </div>
                             <div className="relative">
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                                 <input
@@ -136,6 +178,10 @@ const AdminLogin = () => {
 
                         {error && (
                             <p className="text-xs text-red-500 font-medium bg-red-50 px-3 py-2 rounded-lg border border-red-100">{error}</p>
+                        )}
+
+                        {successMsg && (
+                            <p className="text-xs text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">{successMsg}</p>
                         )}
 
                         <button
@@ -155,6 +201,7 @@ const AdminLogin = () => {
                             onClick={() => {
                                 setIsRegistering(!isRegistering);
                                 setError('');
+                                setSuccessMsg('');
                             }}
                             className="text-blue-600 hover:text-blue-800 font-semibold transition-colors"
                         >
@@ -164,9 +211,62 @@ const AdminLogin = () => {
 
                 </div>
             </div>
+
+            {/* Forgot Password Modal */}
+            {showForgotModal && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowForgotModal(false)} />
+                    <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8 space-y-6 animate-in zoom-in duration-300">
+                        <div className="text-center">
+                            <h2 className="text-xl font-bold text-gray-800 tracking-tight">Admin Reset</h2>
+                            <p className="text-gray-500 text-xs mt-1">Set a new administrative password</p>
+                        </div>
+
+                        <form onSubmit={handleResetPassword} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5 ml-1">Admin Email</label>
+                                <input
+                                    required
+                                    type="email"
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm transition-all outline-none focus:border-blue-500"
+                                    placeholder="admin@example.com"
+                                    value={forgotEmail}
+                                    onChange={(e) => setForgotEmail(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-400 uppercase mb-1.5 ml-1">New Password</label>
+                                <input
+                                    required
+                                    type="password"
+                                    className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm transition-all outline-none focus:border-blue-500"
+                                    placeholder="Enter new password"
+                                    value={newPass}
+                                    onChange={(e) => setNewPass(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-2 pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={isResetting}
+                                    className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isResetting ? <Loader2 className="animate-spin" size={16} /> : 'Reset Password'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowForgotModal(false)}
+                                    className="w-full py-2 text-gray-400 text-xs font-medium hover:text-gray-600 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 export default AdminLogin;
-

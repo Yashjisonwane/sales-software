@@ -17,6 +17,16 @@ export const loginUser = async (email, password) => {
     }
 };
 
+export const resetPassword = async (email, newPassword) => {
+    try {
+        const response = await apiClient.post(`${ENDPOINTS.AUTH}/reset-password`, { email, newPassword });
+        return { success: true, message: response.data.message };
+    } catch (err) {
+        console.error('[API] resetPassword error:', err);
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
 export const registerUser = async (userData) => {
     try {
         const response = await apiClient.post(`${ENDPOINTS.AUTH}/register`, userData);

@@ -99,7 +99,8 @@ const Navbar = () => {
           {/* Right Side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {/* Join as Professional Button (Desktop) */}
-            <div className="desktop-menu" style={{ display: 'none' }}>
+            {/* Join as Professional Button (Desktop) */}
+            {/* <div className="desktop-menu" style={{ display: 'none' }}>
               <Link to="/become-professional" className="nav-cta-button" style={{
                 textDecoration: 'none',
                 padding: '10px 20px',
@@ -119,7 +120,7 @@ const Navbar = () => {
                 <Briefcase size={16} />
                 Join as a Professional
               </Link>
-            </div>
+            </div> */}
 
             {/* Language Selector */}
             <div style={{ position: 'relative' }} ref={langRef}>
@@ -314,7 +315,7 @@ const Navbar = () => {
             </div>
           </a>
 
-          <Link 
+          {/* <Link 
             to="/become-professional" 
             onClick={() => setMenuOpen(false)}
             style={{
@@ -335,7 +336,7 @@ const Navbar = () => {
               <div style={{ fontSize: 17, fontWeight: 700, color: '#7C3AED' }}>Join as Professional</div>
               <div style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }}>Grow your business with us</div>
             </div>
-          </Link>
+          </Link> */}
 
           {/* Mobile Language Selector */}
           <div style={{
