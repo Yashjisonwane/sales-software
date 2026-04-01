@@ -111,8 +111,8 @@ const AdminLocations = () => {
 
             <div className="flex justify-between items-end">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Marketplace Locations</h1>
-                    <p className="text-base text-gray-500 mt-1 font-medium font-sans">Manage active service areas and professional density.</p>
+                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Service Areas & Cities</h1>
+                    <p className="text-base text-gray-500 mt-1 font-medium font-sans">Manage the specific cities and zones where your business operates and offers services.</p>
                 </div>
                 <button
                     onClick={() => setShowAddModal(true)}
@@ -182,7 +182,7 @@ const AdminLocations = () => {
                             <div className="grid grid-cols-2 gap-4 p-5 bg-gray-50/50 rounded-3xl border border-gray-100 mb-2">
                                 <div className="text-center">
                                     <p className="text-lg font-bold text-gray-900 leading-none mb-1.5">{loc.professionals || 0}</p>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Professionals</p>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Registered Pros</p>
                                 </div>
                                 <div className="text-center border-l border-gray-100">
                                     <p className="text-lg font-bold text-gray-900 leading-none mb-1.5">{loc.activeLeads || 0}</p>

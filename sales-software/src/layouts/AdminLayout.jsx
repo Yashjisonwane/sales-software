@@ -11,7 +11,7 @@ const AdminLayout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
     const [notifMenuOpen, setNotifMenuOpen] = useState(false);
-    const { notifications, toast, showToast, markNotificationRead, clearNotifications, currentUser } = useMarketplace();
+    const { notifications, toast, showToast, markNotificationRead, clearNotifications, currentUser, logout } = useMarketplace();
     const notifRef = useRef(null);
     const location = useLocation();
     const navigate = useNavigate();
@@ -175,11 +175,14 @@ const AdminLayout = () => {
             <ConfirmationModal
                 isOpen={isLogoutModalOpen}
                 onClose={() => setIsLogoutModalOpen(false)}
-                onConfirm={() => navigate('/login')}
+                onConfirm={() => {
+                    logout();
+                    navigate('/login');
+                }}
                 title="Terminate Session"
-                message="Are you sure you want to terminate your current administrative session? You will need to re-authenticate to access the management terminal."
+                message="Are you sure you want to sign out of your administrator account?"
                 icon={ShieldAlert}
-                confirmText="Terminate Session"
+                confirmText="Sign Out"
                 type="danger"
             />
 

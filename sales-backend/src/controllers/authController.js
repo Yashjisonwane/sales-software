@@ -127,7 +127,53 @@ const loginUser = async (req, res) => {
     }
 };
 
+// @route   POST /api/v1/auth/reset-password
+// @desc    Direct password reset (Admin/Pro convenience)
+const resetPassword = async (req, res) => {
+    try {
+        const { email, phone, newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 4) {
+            return res.status(400).json({ success: false, message: "Password must be at least 4 characters." });
+        }
+
+        // 1. Find User by Email or Phone
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: email || '_NOT_SET_' },
+                    { phone: phone || '_NOT_SET_' }
+                ]
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found with this email/phone." });
+        }
+
+        // 2. Hash New Password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // 3. Update in Database
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { password: hashedPassword }
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Password updated successfully! You can now login."
+        });
+
+    } catch (error) {
+        console.error("Reset Password Error:", error);
+        res.status(500).json({ success: false, message: "Server Error", error: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
-    loginUser
+    loginUser,
+    resetPassword
 };

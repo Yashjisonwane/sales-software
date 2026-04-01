@@ -14,32 +14,31 @@ const MarketplaceDashboard = () => {
 
     // Icon & Color mapping for API stats
     const statIcons = {
-        'Total Leads': Briefcase,
-        'Active Professionals': Users,
-        'Total Customers': Globe,
-        'New Leads Today': Activity,
-        'Leads Today': Activity
+        'TOTAL LEADS': Briefcase,
+        'TOTAL PROFESSIONALS': Users,
+        'LEADS TODAY': Activity,
+        'CONVERSION RATE': TrendingUp
     };
 
     const statColors = {
-        'Total Leads': 'text-blue-600 bg-blue-50',
-        'Active Professionals': 'text-purple-600 bg-purple-50',
-        'Total Customers': 'text-orange-600 bg-orange-50',
-        'New Leads Today': 'text-green-600 bg-green-50',
-        'Leads Today': 'text-green-600 bg-green-50'
+        'TOTAL LEADS': 'text-blue-600 bg-blue-50',
+        'TOTAL PROFESSIONALS': 'text-purple-600 bg-purple-50',
+        'LEADS TODAY': 'text-green-600 bg-green-50',
+        'CONVERSION RATE': 'text-orange-600 bg-orange-50'
     };
 
     // Helper to calculate fallback stats if API data is missing
     const getFallbackStats = () => {
-        const uniqueCustomers = new Set(leads.map(l => l.customerPhone || l.phone || l.customerId)).size;
         const todayStr = new Date().toDateString();
         const leadsToday = leads.filter(l => new Date(l.dateRequested || l.createdAt).toDateString() === todayStr).length;
+        const completedJobs = leads.filter(l => l.status === 'Completed').length;
+        const conversionRate = leads.length > 0 ? ((completedJobs / leads.length) * 100).toFixed(1) : 0;
 
         return [
-            { name: 'Total Leads', value: leads.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+8%', up: true },
-            { name: 'Total Professionals', value: professionals.length, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+12%', up: true },
-            { name: 'Total Customers', value: uniqueCustomers, icon: Globe, color: 'text-orange-600', bg: 'bg-orange-50', trend: '+10%', up: true },
-            { name: 'Leads Today', value: leadsToday, icon: Activity, color: 'text-green-600', bg: 'bg-green-50', trend: '+5%', up: true },
+            { name: 'TOTAL LEADS', value: leads.length, icon: Briefcase, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+8%', up: true },
+            { name: 'TOTAL PROFESSIONALS', value: professionals.length, icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+12%', up: true },
+            { name: 'LEADS TODAY', value: leadsToday, icon: Activity, color: 'text-green-600', bg: 'bg-green-50', trend: '+5%', up: true },
+            { name: 'CONVERSION RATE', value: conversionRate + '%', icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50', trend: '-2%', up: false },
         ];
     };
 

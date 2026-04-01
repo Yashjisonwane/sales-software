@@ -311,12 +311,14 @@ const getDashboardStats = async (req, res) => {
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
         
         if (user.role === 'ADMIN') {
-            const [totalLeads, completedJobs, totalPros, totalCustomers] = await Promise.all([
+            const [totalLeads, completedJobs, totalPros, leadsToday] = await Promise.all([
                 prisma.lead.count(),
                 prisma.job.count({ where: { status: 'COMPLETED' } }),
                 prisma.user.count({ where: { role: 'WORKER' } }),
-                prisma.user.count({ where: { role: 'CUSTOMER' } })
+                prisma.lead.count({ where: { createdAt: { gte: todayStart } } })
             ]);
+
+            const conversionRate = totalLeads > 0 ? ((completedJobs / totalLeads) * 100).toFixed(1) : 0;
 
             // 2. Real Financials from Invoices
             const revenueResult = await prisma.jobInvoice.aggregate({
@@ -366,10 +368,10 @@ const getDashboardStats = async (req, res) => {
                 success: true,
                 data: {
                     mainStats: [
-                        { name: 'Active Professionals', value: totalPros, trend: '+5%', up: true },
-                        { name: 'Jobs In Progress', value: totalLeads - completedJobs, trend: 'Lead: ' + totalLeads, up: true },
-                        { name: 'Completed Jobs', value: completedJobs, trend: '+8%', up: true },
-                        { name: 'Total Revenue', value: '$' + totalRevenue.toLocaleString(), trend: '+12%', up: true }
+                        { name: 'TOTAL LEADS', value: totalLeads, trend: '+8%', up: true },
+                        { name: 'TOTAL PROFESSIONALS', value: totalPros, trend: '+12%', up: true },
+                        { name: 'LEADS TODAY', value: leadsToday, trend: '+5%', up: true },
+                        { name: 'CONVERSION RATE', value: conversionRate + '%', trend: '-2%', up: false }
                     ],
                     financials: {
                         platformFees,
