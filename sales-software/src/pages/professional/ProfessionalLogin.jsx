@@ -9,7 +9,7 @@ import * as apiService from '../../services/apiService';
 const ProfessionalLogin = () => {
     const navigate = useNavigate();
     const [email, setEmail] = useState('pro@market.com');
-    const [password, setPassword] = useState('pro123');
+    const [password, setPassword] = useState('1234');
     const [isLoading, setIsLoading] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
     const [error, setError] = useState('');
