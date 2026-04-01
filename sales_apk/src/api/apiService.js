@@ -17,6 +17,18 @@ export const loginWorker = async (email, password) => {
     }
 };
 
+/**
+ * SERVICE: Password Reset
+ */
+export const resetPassword = async (email, newPassword) => {
+    try {
+        const response = await apiClient.post('/auth/reset-password', { email, newPassword });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Update failed' };
+    }
+};
+
 export const registerUser = async (userData) => {
     try {
         const response = await apiClient.post('/auth/register', userData);
@@ -231,5 +243,6 @@ export default {
     updateProfile,
     updateProfessional,
     getDirectMessages,
-    sendDirectMessage
+    sendDirectMessage,
+    resetPassword
 };
