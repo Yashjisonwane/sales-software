@@ -28,6 +28,7 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const snapPoints = React.useMemo(() => ['18%', '40%', '92%'], []);
   const [activeTab, setActiveTab] = useState('Job Details');
   const animatedIndex = useSharedValue(0);
+  const job = route.params?.job || {};
 
   const buttonAnimatedStyle = useAnimatedStyle(() => {
     const opacity = interpolate(
@@ -40,6 +41,13 @@ const JobDetailsScreen = ({ navigation, route }) => {
   });
 
   const tabs = ['Job Details', 'Description', 'Photos', 'Updates'];
+
+  const isStepCompleted = (step) => {
+    if (step === 'Photos') return (job.photos?.length || 0) > 0;
+    if (step === 'Inspection') return !!job.inspection;
+    if (step === 'Estimate') return !!job.estimate;
+    return false;
+  };
 
   return (
     <View style={styles.container}>
@@ -55,12 +63,12 @@ const JobDetailsScreen = ({ navigation, route }) => {
 
       {/* Header Container (Floating on Map) */}
       <View style={[styles.headerActions, { top: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => navigation.navigate('AdminTabs')} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
           <Ionicons name="chevron-down" size={28} color="#000" />
         </TouchableOpacity>
         <View style={styles.rightHeaderActions}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="share-outline" size={24} color="#000" />
+            <Ionicons name="call-outline" size={24} color="#000" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
             <Ionicons name="ellipsis-horizontal" size={24} color="#000" />
@@ -86,42 +94,44 @@ const JobDetailsScreen = ({ navigation, route }) => {
         >
           <View style={styles.mainInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.workerName}>{route.params?.job?.customerName || 'Active Job'}</Text>
-              <View style={styles.newBadge}><Text style={styles.newBadgeText}>{route.params?.job?.status || 'Active'}</Text></View>
-              <Text style={styles.priceText}>${route.params?.job?.amount || '250'}</Text>
+              <Text style={styles.workerName}>{job.customerName || 'Active Job'}</Text>
+              <View style={[styles.newBadge, { backgroundColor: job.status === 'COMPLETED' ? '#ECFDF5' : '#F5F3FF' }]}>
+                <Text style={[styles.newBadgeText, { color: job.status === 'COMPLETED' ? '#10B981' : '#8B5CF6' }]}>{job.status}</Text>
+              </View>
+              <Text style={styles.priceText}>${job.estimate?.amount || '0'}</Text>
             </View>
-            <Text style={styles.address}>{route.params?.job?.location || 'No location provided'}</Text>
-            <Text style={styles.distTime}>{route.params?.job?.categoryName || 'Service'}</Text>
+            <Text style={styles.address}>{job.location || 'No location provided'}</Text>
+            <Text style={styles.distTime}>{job.categoryName || 'Service Request'}</Text>
 
             <View style={styles.actionRow}>
               <TouchableOpacity style={styles.blueActionBtn}>
                 <Ionicons name="navigate" size={18} color="#fff" />
-                <Text style={styles.blueActionText}>Directions</Text>
+                <Text style={styles.blueActionText}>Open Map</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.lightActionBtn} onPress={() => navigation.navigate('AdminChat', { name: job.customerName })}>
+                <Ionicons name="chatbubble-ellipses-outline" size={18} color="#0062E1" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.lightActionBtn}>
-                <Ionicons name="call" size={18} color="#0062E1" />
+                <Ionicons name="images-outline" size={18} color="#0062E1" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.lightActionBtn}>
-                <Ionicons name="bookmark-outline" size={18} color="#0062E1" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.lightActionBtn}>
-                <Ionicons name="share-social-outline" size={18} color="#0062E1" />
+                <Ionicons name="document-text-outline" size={18} color="#0062E1" />
               </TouchableOpacity>
             </View>
 
             <View style={styles.imageGrid}>
               <View style={styles.largeImgContainer}>
-                <Image source={{ uri: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=400' }} style={styles.gridImg} />
-                <View style={styles.timeTag}><Text style={styles.timeTagText}>2 days ago</Text></View>
+                <Image source={{ uri: job.photos?.[0]?.url || 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&q=80&w=400' }} style={styles.gridImg} />
+                <View style={styles.timeTag}><Text style={styles.timeTagText}>Before Photo</Text></View>
               </View>
               <View style={styles.smallImgsColumn}>
                 <View style={styles.smallImgContainer}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?auto=format&fit=crop&q=80&w=200' }} style={styles.gridImg} />
-                  <View style={styles.timeTag}><Text style={styles.timeTagText}>2 days ago</Text></View>
+                  <Image source={{ uri: job.photos?.[1]?.url || 'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?auto=format&fit=crop&q=80&w=200' }} style={styles.gridImg} />
+                  <View style={styles.timeTag}><Text style={styles.timeTagText}>Site Scan</Text></View>
                 </View>
                 <View style={styles.smallImgContainer}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1517646280104-a63870634676?auto=format&fit=crop&q=80&w=200' }} style={styles.gridImg} />
-                  <View style={styles.timeTag}><Text style={styles.timeTagText}>2 days ago</Text></View>
+                  <Image source={{ uri: job.photos?.[2]?.url || 'https://images.unsplash.com/photo-1517646280104-a63870634676?auto=format&fit=crop&q=80&w=200' }} style={styles.gridImg} />
+                  <View style={styles.timeTag}><Text style={styles.timeTagText}>Inventory</Text></View>
                 </View>
               </View>
             </View>
@@ -140,16 +150,18 @@ const JobDetailsScreen = ({ navigation, route }) => {
 
             <View style={styles.detailsList}>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Service Type</Text>
-                <Text style={styles.detailValue}>{route.params?.job?.categoryName || 'N/A'}</Text>
+                <Text style={styles.detailLabel}>Job Ref ID</Text>
+                <Text style={styles.detailValue}>{job.jobNo || job.id?.slice(0,8)}</Text>
               </View>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Scheduled Time</Text>
-                <Text style={styles.detailValue}>{route.params?.job?.scheduledTime || 'Not set'}</Text>
+                <Text style={styles.detailLabel}>Professional</Text>
+                <Text style={styles.detailValue}>{job.workerName || 'Awaiting'}</Text>
               </View>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Budget</Text>
-                <Text style={styles.detailValue}>${route.params?.job?.amount || '0'}</Text>
+                <Text style={styles.detailLabel}>Work Progress</Text>
+                <Text style={[styles.detailValue, { color: isStepCompleted('Photos') ? '#10B981' : '#718096' }]}>
+                  {isStepCompleted('Photos') ? 'Active Site' : 'No Photos Yet'}
+                </Text>
               </View>
             </View>
           </View>

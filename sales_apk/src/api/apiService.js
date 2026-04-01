@@ -183,6 +183,39 @@ export const updateProfile = async (profileData) => {
     }
 };
 
+/**
+ * SERVICE: Admin - Worker Management
+ */
+export const updateProfessional = async (workerId, updateData) => {
+    try {
+        const response = await apiClient.put(`/users/workers/${workerId}`, updateData);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to update professional account' };
+    }
+};
+
+/**
+ * SERVICE: Messaging
+ */
+export const getDirectMessages = async (userId) => {
+    try {
+        const response = await apiClient.get(`/chats/direct/${userId}`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to load conversation' };
+    }
+};
+
+export const sendDirectMessage = async (userId, text) => {
+    try {
+        const response = await apiClient.post(`/chats/direct/${userId}`, { text });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to send message' };
+    }
+};
+
 export default {
     loginWorker,
     registerUser,
@@ -195,5 +228,8 @@ export default {
     createInvoice,
     getDashboardStats,
     getProfile,
-    updateProfile
+    updateProfile,
+    updateProfessional,
+    getDirectMessages,
+    sendDirectMessage
 };

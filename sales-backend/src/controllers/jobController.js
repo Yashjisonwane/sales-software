@@ -146,7 +146,7 @@ const createEstimate = async (req, res) => {
 const createInvoice = async (req, res) => {
     try {
         const jobId = req.params.id;
-        const { amount } = req.body;
+        const { amount, milestone, totalAmount } = req.body;
 
         // --- STRICT WORKFLOW CHECK ---
         const job = await prisma.job.findUnique({
@@ -157,10 +157,21 @@ const createInvoice = async (req, res) => {
         if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
         if (!job.estimate) return res.status(400).json({ success: false, message: 'Estimate is required before invoice' });
         
+        // Calculate amount based on milestone if totalAmount is provided
+        let invoiceAmount = parseFloat(amount) || 0;
+        if (totalAmount && milestone) {
+            const total = parseFloat(totalAmount);
+            if (milestone === 'DEPOSIT_15') invoiceAmount = total * 0.15;
+            else if (milestone === 'PROGRESS_50') invoiceAmount = total * 0.50;
+            else if (milestone === 'FINAL_35') invoiceAmount = total * 0.35;
+        }
+
         const invoice = await prisma.jobInvoice.create({
             data: {
                 jobId: jobId,
-                amount: parseFloat(amount) || 0,
+                totalAmount: parseFloat(totalAmount) || 0,
+                amount: invoiceAmount,
+                milestone: milestone || 'SINGLE',
                 status: 'UNPAID'
             }
         });
@@ -172,6 +183,7 @@ const createInvoice = async (req, res) => {
 
         res.status(200).json({ success: true, data: invoice });
     } catch (err) {
+        console.error("Invoice Creation Error:", err);
         res.status(500).json({ success: false, message: 'Invoice creation failed' });
     }
 };

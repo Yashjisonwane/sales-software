@@ -8,6 +8,7 @@ import {
   StatusBar,
   Dimensions,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
@@ -60,20 +61,36 @@ const RecentActivityItem = ({ icon, color, title, subtitle, time }) => (
   </View>
 );
 
+import { getDashboardStats } from '../../api/apiService';
+
 export default function DashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const bottomSheetRef = React.useRef(null);
   const snapPoints = React.useMemo(() => ['18%', '40%', '92%'], []);
-  const [activeTab, setActiveTab] = React.useState('Overview');
+  const [stats, setStats] = React.useState(null);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchFocused, setIsSearchFocused] = React.useState(false);
   const [mapUrl, setMapUrl] = React.useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin');
   const animatedIndex = useSharedValue(0);
 
+  const fetchStats = async () => {
+    setIsLoading(true);
+    const res = await getDashboardStats();
+    if(res.success) {
+      setStats(res.data);
+    }
+    setIsLoading(false);
+  };
+
+  React.useEffect(() => {
+    fetchStats();
+  }, []);
+
   const buttonAnimatedStyle = useAnimatedStyle(() => {
     const opacity = interpolate(
       animatedIndex.value,
-      [0.2, 0.4, 0.6], // When moving from 40% (index ~0.5) to 92% (index 1)
+      [0.2, 0.4, 0.6],
       [1, 1, 0],
       Extrapolate.CLAMP
     );
@@ -179,90 +196,73 @@ export default function DashboardScreen({ navigation }) {
           showsVerticalScrollIndicator={false} 
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
         >
-          <View style={styles.statsGrid}>
-            <StatCard
-              icon="checkmark-circle-outline"
-              label="Completed Jobs"
-              value="1,284"
-              change="+8.5%"
-              color="#10B981"
-            />
-            <StatCard
-              icon="cash-outline"
-              label="Total Revenue"
-              value="$149K"
-              change="+12.3%"
-              color="#10B981"
-            />
-          </View>
-
-          <View style={styles.revenueCard}>
-            <Text style={styles.cardTitle}>Revenue Breakdown</Text>
-            <ProgressBar label="Platform Fees" value="$42.3K" progress={0.4} color="#8B5CF6" />
-            <ProgressBar label="Subcontract Revenue" value="$106.2K" progress={0.8} color="#10B981" />
-          </View>
-
-          <View style={styles.topPerformersCard}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Top Performers</Text>
-              <TouchableOpacity><Text style={styles.viewAllText}>View all</Text></TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.performerRow}>
-              <View style={[styles.performerAvatar, { backgroundColor: '#3B82F6' }]}><Text style={styles.avatarText}>JM</Text></View>
-              <View style={styles.performerInfo}>
-                <Text style={styles.performerName}>Sarah Johnson</Text>
-                <View style={styles.badgesRow}>
-                  <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}><Text style={[styles.badgeText, { color: '#8B5CF6' }]}>Technician</Text></View>
-                  <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}><Text style={[styles.badgeText, { color: '#10B981' }]}>Active</Text></View>
-                </View>
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#0E56D0" style={{ marginTop: 40 }} />
+          ) : (
+            <>
+              <View style={styles.statsGrid}>
+                {stats?.mainStats?.map((s, idx) => (
+                  <StatCard
+                    key={idx}
+                    icon={s.name === 'Total Revenue' ? 'cash-outline' : s.name.includes('Job') ? 'checkmark-circle-outline' : 'people-outline'}
+                    label={s.name}
+                    value={s.value}
+                    change={s.trend}
+                    color={idx % 2 === 0 ? '#10B981' : '#3B82F6'}
+                  />
+                ))}
               </View>
-            </TouchableOpacity>
 
-            <TouchableOpacity style={styles.performerRow}>
-              <View style={[styles.performerAvatar, { backgroundColor: '#3B82F6' }]}><Text style={styles.avatarText}>MK</Text></View>
-              <View style={styles.performerInfo}>
-                <Text style={styles.performerName}>Mike Kolsun</Text>
-                <View style={styles.badgesRow}>
-                  <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}><Text style={[styles.badgeText, { color: '#8B5CF6' }]}>Plumber</Text></View>
-                  <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}><Text style={[styles.badgeText, { color: '#10B981' }]}>Active</Text></View>
-                </View>
+              <View style={styles.revenueCard}>
+                <Text style={styles.cardTitle}>Revenue Breakdown</Text>
+                <ProgressBar 
+                  label="Platform Fees" 
+                  value={`$${stats?.financials?.platformFees?.toLocaleString() || '0'}`} 
+                  progress={stats?.financials?.totalRevenue > 0 ? stats.financials.platformFees / stats.financials.totalRevenue : 0} 
+                  color="#8B5CF6" 
+                />
+                <ProgressBar 
+                  label="Subcontract Revenue" 
+                  value={`$${stats?.financials?.workerRevenue?.toLocaleString() || '0'}`} 
+                  progress={stats?.financials?.totalRevenue > 0 ? stats.financials.workerRevenue / stats.financials.totalRevenue : 0} 
+                  color="#10B981" 
+                />
               </View>
-            </TouchableOpacity>
 
-            <TouchableOpacity style={styles.performerRow}>
-              <View style={[styles.performerAvatar, { backgroundColor: '#3B82F6' }]}><Text style={styles.avatarText}>DV</Text></View>
-              <View style={styles.performerInfo}>
-                <Text style={styles.performerName}>David Vas</Text>
-                <View style={styles.badgesRow}>
-                  <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}><Text style={[styles.badgeText, { color: '#8B5CF6' }]}>Electrician</Text></View>
-                  <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}><Text style={[styles.badgeText, { color: '#10B981' }]}>Active</Text></View>
+              <View style={styles.topPerformersCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.cardTitle}>Top Performers</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('TeamAccounts')}><Text style={styles.viewAllText}>View all</Text></TouchableOpacity>
                 </View>
-              </View>
-            </TouchableOpacity>
-          </View>
 
-          <View style={styles.recentActivityCard}>
-            <Text style={styles.cardTitle}>Recent Activity</Text>
-            <RecentActivityItem
-              icon="settings-outline"
-              color="#3B82F6"
-              title="John Carter completed #1024"
-              subtitle="Job ID #1024 • Today, 9:30 AM"
-            />
-            <RecentActivityItem
-              icon="checkmark-circle-outline"
-              color="#10B981"
-              title="Sarah Wilson joined the platform"
-              subtitle="10 mins ago"
-            />
-            <RecentActivityItem
-              icon="cash-outline"
-              color="#8B5CF6"
-              title="Payment of $850 to Mike Davis"
-              subtitle="2 hours ago"
-            />
-          </View>
+                {stats?.performers?.map((p, idx) => (
+                  <TouchableOpacity key={idx} style={styles.performerRow} onPress={() => navigation.navigate('WorkerProfile', { worker: p })}>
+                    <View style={[styles.performerAvatar, { backgroundColor: '#3B82F6' }]}><Text style={styles.avatarText}>{p.name.charAt(0)}</Text></View>
+                    <View style={styles.performerInfo}>
+                      <Text style={styles.performerName}>{p.name}</Text>
+                      <View style={styles.badgesRow}>
+                        <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}><Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{p.role}</Text></View>
+                        <View style={[styles.badge, { backgroundColor: '#E0F2FE' }]}><Text style={[styles.badgeText, { color: '#0EA5E9' }]}>{p.jobs} Jobs</Text></View>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.recentActivityCard}>
+                <Text style={styles.cardTitle}>Recent Activity</Text>
+                {stats?.activities?.map((a, idx) => (
+                  <RecentActivityItem
+                    key={idx}
+                    icon={a.icon}
+                    color={a.color}
+                    title={a.title}
+                    subtitle={new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  />
+                ))}
+              </View>
+            </>
+          )}
         </BottomSheetScrollView>
       </BottomSheet>
 

@@ -1,50 +1,61 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   FlatList, StatusBar, KeyboardAvoidingView, Platform,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getDirectMessages, sendDirectMessage } from '../../api/apiService';
 
-const MESSAGES = [
-  { id: '1', text: 'Hello! I need help with my kitchen sink.', sender: 'customer', time: '10:30 AM' },
-  { id: '2', text: 'Hi! I can help with that. Can you describe the issue?', sender: 'pro', time: '10:31 AM' },
-  { id: '3', text: 'The pipe is leaking and there is water on the floor.', sender: 'customer', time: '10:32 AM' },
-  { id: '4', text: '📷 Photo received', sender: 'customer', time: '10:33 AM', type: 'image' },
-  { id: '5', text: 'I see. I can fix that today. I\'ll come at 2 PM.', sender: 'pro', time: '10:35 AM' },
-  { id: '6', text: 'Perfect! Here\'s my address.', sender: 'customer', time: '10:36 AM' },
-  { id: '7', text: '📍 Location received', sender: 'customer', time: '10:37 AM', type: 'location' },
-  { id: '8', text: 'Got it! I\'ll bring the necessary parts. See you at 2 PM!', sender: 'pro', time: '10:38 AM' },
-];
-
-export default function ProChatScreen({ navigation }) {
+export default function AdminChatScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const [message, setMessage] = useState('');
+  const { name, userId } = route.params;
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const flatListRef = useRef();
 
+  const loadChat = async () => {
+    const res = await getDirectMessages(userId);
+    if(res.success) {
+      setMessages(res.data.messages || []);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    loadChat();
+  }, [userId]);
+
+  const handleSend = async () => {
+    if(!inputText.trim()) return;
+    const textToSend = inputText.trim();
+    setInputText('');
+
+    const res = await sendDirectMessage(userId, textToSend);
+    if(res.success) {
+       // Append locally or re-fetch
+       setMessages(prev => [...prev, res.data]);
+       setTimeout(() => flatListRef.current?.scrollToEnd(), 200);
+    }
+  };
+
   const renderMessage = ({ item }) => {
-    const isPro = item.sender === 'pro';
+    const isMe = item.senderId !== userId; // if senderId is NOT the worker, then it's the admin
     return (
-      <View style={[styles.messageRow, isPro && styles.messageRowPro]}>
-        {!isPro && (
+      <View style={[styles.messageRow, isMe && styles.messageRowPro]}>
+        {!isMe && (
           <View style={styles.custAvatar}>
-            <Text style={styles.custAvatarText}>AJ</Text>
+            <Text style={styles.custAvatarText}>{name?.charAt(0) || 'W'}</Text>
           </View>
         )}
-        <View style={[styles.bubble, isPro ? styles.proBubble : styles.custBubble]}>
-          {item.type === 'image' && (
-            <View style={[styles.mediaPlaceholder, isPro && { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-              <Ionicons name="image" size={28} color={isPro ? 'rgba(255,255,255,0.6)' : COLORS.textTertiary} />
-            </View>
-          )}
-          {item.type === 'location' && (
-            <View style={[styles.mediaPlaceholder, { backgroundColor: isPro ? 'rgba(255,255,255,0.15)' : '#E0F2FE' }]}>
-              <Ionicons name="location" size={22} color={isPro ? COLORS.white : COLORS.secondary} />
-            </View>
-          )}
-          <Text style={[styles.msgText, isPro && styles.proMsgText]}>{item.text}</Text>
-          <Text style={[styles.timeText, isPro && styles.proTimeText]}>{item.time}</Text>
+        <View style={[styles.bubble, isMe ? styles.proBubble : styles.custBubble]}>
+          <Text style={[styles.msgText, isMe && styles.proMsgText]}>{item.text}</Text>
+          <Text style={[styles.timeText, isMe && styles.proTimeText]}>
+            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
         </View>
       </View>
     );
@@ -61,29 +72,30 @@ export default function ProChatScreen({ navigation }) {
           <Ionicons name="arrow-back" size={22} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerAvatar}>
-          <Text style={styles.headerAvatarText}>AJ</Text>
+          <Text style={styles.headerAvatarText}>{name?.charAt(0) || 'W'}</Text>
         </View>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>Alex Johnson</Text>
+          <Text style={styles.headerName}>{name || 'Worker'}</Text>
           <View style={styles.onlineRow}>
             <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Online</Text>
+            <Text style={styles.onlineText}>Active Session</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.headerAction}>
-          <Ionicons name="call" size={20} color="#8B5CF6" />
-        </TouchableOpacity>
       </View>
 
-      <FlatList
-        ref={flatListRef}
-        data={MESSAGES}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.msgList}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-      />
+      {isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center' }}><ActivityIndicator size="large" color="#8B5CF6" /></View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.msgList}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+        />
+      )}
 
       <View style={styles.inputBar}>
         <TouchableOpacity>
@@ -94,11 +106,11 @@ export default function ProChatScreen({ navigation }) {
             style={styles.input}
             placeholder="Type a message..."
             placeholderTextColor={COLORS.textTertiary}
-            value={message}
-            onChangeText={setMessage}
+            value={inputText}
+            onChangeText={setInputText}
           />
         </View>
-        <TouchableOpacity style={styles.sendBtn}>
+        <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
           <Ionicons name="send" size={18} color={COLORS.white} />
         </TouchableOpacity>
       </View>

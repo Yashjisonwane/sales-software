@@ -139,8 +139,78 @@ const sendMessage = async (req, res) => {
     }
 };
 
+// @route   GET /api/v1/chats/direct/:otherUserId
+// @desc    Get or create direct conversation and messages
+const getDirectMessages = async (req, res) => {
+    try {
+        const { otherUserId } = req.params;
+        const myId = req.user.id;
+
+        // Sort IDs to ensure unique conversation key
+        const [u1, u2] = [myId, otherUserId].sort();
+
+        let conversation = await prisma.conversation.findUnique({
+            where: { user1Id_user2Id: { user1Id: u1, user2Id: u2 } },
+            include: { 
+                messages: { orderBy: { createdAt: 'asc' } },
+                user1: { select: { name: true, role: true } },
+                user2: { select: { name: true, role: true } }
+            }
+        });
+
+        if (!conversation) {
+            conversation = await prisma.conversation.create({
+                data: { user1Id: u1, user2Id: u2 },
+                include: { 
+                    messages: true,
+                    user1: { select: { name: true, role: true } },
+                    user2: { select: { name: true, role: true } }
+                }
+            });
+        }
+
+        res.status(200).json({ success: true, data: conversation });
+    } catch (error) {
+        console.error("Direct Messages Error:", error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @route   POST /api/v1/chats/direct/:otherUserId
+// @desc    Send direct message
+const sendDirectMessage = async (req, res) => {
+    try {
+        const { otherUserId } = req.params;
+        const { text } = req.body;
+        const myId = req.user.id;
+
+        const [u1, u2] = [myId, otherUserId].sort();
+
+        let conversation = await prisma.conversation.upsert({
+            where: { user1Id_user2Id: { user1Id: u1, user2Id: u2 } },
+            update: { lastMessage: text },
+            create: { user1Id: u1, user2Id: u2, lastMessage: text }
+        });
+
+        const message = await prisma.directMessage.create({
+            data: {
+                conversationId: conversation.id,
+                senderId: myId,
+                text
+            }
+        });
+
+        res.status(201).json({ success: true, data: message });
+    } catch (error) {
+        console.error("Direct Send Error:", error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
 module.exports = {
     getChats,
     getMessages,
-    sendMessage
+    sendMessage,
+    getDirectMessages,
+    sendDirectMessage
 };

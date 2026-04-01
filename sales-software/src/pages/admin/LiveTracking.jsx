@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { MapPin, Search, Activity, Clock, User, Filter, MoreVertical, Navigation } from 'lucide-react';
+import { Search, Activity, Clock, User, Filter, MoreVertical, Navigation } from 'lucide-react';
 
 const LiveTracking = () => {
     const { professionals, locationLogs } = useMarketplace();
@@ -97,50 +97,25 @@ const LiveTracking = () => {
 
             {/* Right Side: Map Interace */}
             <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden relative group">
-                {/* Mock Map Background */}
-                <div className="absolute inset-0 bg-[#f8f9fa] bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=19.0760,72.8777&zoom=12&size=1200x800&sensor=false')] bg-cover opacity-60"></div>
-                
-                {/* Overlay Grid/Patterns for "Premium" look */}
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:20px_20px]"></div>
-
-                {/* Markers */}
-                {trackedPros.map(pro => (
-                    <div 
-                        key={pro.id}
-                        className="absolute cursor-pointer transition-transform hover:scale-110 active:scale-95 z-20"
-                        style={{ 
-                            // Simplified Coordinate to Pixel mapping for Demo - in real map we'd use Google Maps Library
-                            left: `${40 + (pro.lastLocation.lng - 72.8) * 200}%`, 
-                            top: `${40 - (pro.lastLocation.lat - 19.0) * 200}%` 
-                        }}
-                        onClick={() => setSelectedPro(pro)}
-                    >
-                        <div className="relative group/pin">
-                            {/* Pulse */}
-                            {pro.onlineStatus === 'Online' && (
-                                <span className="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-20 scale-150"></span>
-                            )}
-                            {/* Pin */}
-                            <div className={`p-1.5 rounded-xl border-2 shadow-lg transition-all ${
-                                selectedPro?.id === pro.id ? 'bg-blue-600 border-white scale-110' : 'bg-white border-blue-600'
-                            }`}>
-                                <MapPin size={24} className={selectedPro?.id === pro.id ? 'text-white' : 'text-blue-600'} />
-                            </div>
-                            
-                            {/* Hover Tooltip */}
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-slate-900 text-white text-[10px] font-black rounded-lg opacity-0 group-hover/pin:opacity-100 transition-opacity pointer-events-none shadow-xl">
-                                {pro.name} • {pro.onlineStatus}
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
+                {/* Google Map Iframe */}
+                <iframe 
+                    src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29447.82891851613!2d75.86119679999999!3d22.69184!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1775022608974!5m2!1sen!2sin" 
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    allowFullScreen="" 
+                    loading="lazy" 
+                    referrerPolicy="no-referrer-when-downgrade"
+                    className="absolute inset-0 z-0"
+                ></iframe>
 
                 {/* UI Overlays */}
                 <div className="absolute top-6 left-6 flex gap-2">
                     <div className="px-4 py-2 bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-xs font-black uppercase tracking-widest text-gray-700">Mumbai Live Cluster</span>
+                        <span className="text-xs font-black uppercase tracking-widest text-gray-700">
+                            {selectedPro?.city || trackedPros[0]?.city || 'Indore'} Live Cluster
+                        </span>
                     </div>
                 </div>
 

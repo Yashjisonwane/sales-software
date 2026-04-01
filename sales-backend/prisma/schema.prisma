@@ -36,6 +36,8 @@ model User {
   jobsAsCustomer              Job[]                        @relation("CustomerJobs")
   jobsAsWorker                Job[]                        @relation("WorkerJobs")
   leadsAsCustomer             Lead[]                       @relation("CustomerLeads")
+  conversationsStarted        Conversation[]               @relation("User1Conv")
+  conversationsReceived       Conversation[]               @relation("User2Conv")
   messagesSent                Message[]                    @relation("MessageSender")
   notifications               Notification[]
   subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
@@ -171,13 +173,15 @@ model JobContract {
 }
 
 model JobInvoice {
-  id        String   @id @default(uuid())
-  jobId     String   @unique @map("job_id")
-  amount    Float
-  status    String   @default("UNPAID")
-  paymentId String?  @map("payment_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  jobId       String   @unique @map("job_id")
+  totalAmount Float    @default(0) @map("total_amount")
+  amount      Float
+  milestone   String   @default("SINGLE")
+  status      String   @default("UNPAID")
+  paymentId   String?  @map("payment_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_invoices")
 }
@@ -314,4 +318,29 @@ enum LeadStatus {
   OPEN
   ASSIGNED
   REJECTED
+}
+
+model Conversation {
+  id          String          @id @default(uuid())
+  user1Id     String          @map("user1_id")
+  user2Id     String          @map("user2_id")
+  lastMessage String?         @map("last_message") @db.Text
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  messages    DirectMessage[]
+  user1       User            @relation("User1Conv", fields: [user1Id], references: [id])
+  user2       User            @relation("User2Conv", fields: [user2Id], references: [id])
+
+  @@unique([user1Id, user2Id])
+  @@map("conversations")
+}
+
+model DirectMessage {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  senderId       String       @map("sender_id")
+  text           String       @db.Text
+  createdAt      DateTime     @default(now()) @map("created_at")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("direct_messages")
 }

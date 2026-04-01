@@ -8,11 +8,12 @@ import {
     StatusBar,
     Image,
     Dimensions,
+    Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { updateProfessional } from '../../api/apiService';
+import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 
 const { width, height } = Dimensions.get('window');
 
@@ -38,6 +39,37 @@ export default function WorkerProfileScreen({ navigation, route }) {
     };
 
     const initials = worker.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'WP';
+
+    const handleEditEarnings = () => {
+        Alert.prompt(
+            "Edit Earnings Split",
+            "Enter Admin Commission (e.g., 15 for 15%). Worker share will be 85%.",
+            [
+                { text: "Cancel", style: "cancel" },
+                { 
+                    text: "Update", 
+                    onPress: async (val) => {
+                        const adminPart = parseInt(val);
+                        if(isNaN(adminPart) || adminPart < 0 || adminPart > 100) {
+                            Alert.alert("Error", "Please enter a valid number between 0 and 100.");
+                            return;
+                        }
+                        const res = await updateProfessional(worker.id, { 
+                            adminCommission: adminPart, 
+                            workerCommission: 100 - adminPart 
+                        });
+                        if(res.success) {
+                            Alert.alert("Success", "Earnings agreement updated successfully!");
+                        } else {
+                            Alert.alert("Error", "Failed to update agreement.");
+                        }
+                    }
+                }
+            ],
+            "plain-text",
+            (worker.adminCommission || 10).toString()
+        );
+    };
 
     return (
         <View style={styles.container}>
@@ -92,6 +124,20 @@ export default function WorkerProfileScreen({ navigation, route }) {
                         <View style={{ position: 'absolute', top: '50%', left: '50%', marginLeft: -12, marginTop: -24 }}>
                             <Ionicons name="location" size={24} color="#EF4444" />
                         </View>
+                    </View>
+                </View>
+
+                {/* Subscription Plan */}
+                <Text style={styles.sectionTitleRefined}>Subscription Account</Text>
+                <View style={styles.profileCard}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A202C' }}>{worker.plan?.name || 'Standard Pro'}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#8B5CF6' }}>${worker.plan?.price || '29'}/mo</Text>
+                    </View>
+                    <View style={styles.dividerLight} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                        <Ionicons name="shield-checkmark" size={18} color="#10B981" />
+                        <Text style={{ fontSize: 13, color: '#64748B' }}>Account Expires: <Text style={{ fontWeight: '700', color: '#1A202C' }}>{worker.subscriptionExpiresAt ? new Date(worker.subscriptionExpiresAt).toLocaleDateString() : 'Jan 12, 2027'}</Text></Text>
                     </View>
                 </View>
 
@@ -150,7 +196,7 @@ export default function WorkerProfileScreen({ navigation, route }) {
                         <View style={[styles.progressPart, { width: `${worker.workerCommission || 90}%`, backgroundColor: '#10B981' }]} />
                     </View>
 
-                    <TouchableOpacity style={styles.editEarningsButton}>
+                    <TouchableOpacity style={styles.editEarningsButton} onPress={handleEditEarnings}>
                         <Text style={styles.editEarningsButtonText}>Edit Earnings Percentage</Text>
                     </TouchableOpacity>
                 </View>
@@ -165,7 +211,7 @@ export default function WorkerProfileScreen({ navigation, route }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.filledActionBtnBlue}
-                    onPress={() => navigation.navigate('AdminChat', { name: worker.name })}
+                    onPress={() => navigation.navigate('AdminChat', { name: worker.name, userId: worker.id })}
                 >
                     <Text style={styles.filledActionBtnText}>Message Worker</Text>
                 </TouchableOpacity>

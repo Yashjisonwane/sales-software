@@ -311,60 +311,56 @@ const getDashboardStats = async (req, res) => {
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
         
         if (user.role === 'ADMIN') {
-            const [
-                totalLeads, 
-                totalPros, 
-                totalCustomers, 
-                newLeadsToday, 
-                completedJobs, 
-                activePros,
-                loyalCustomers,
-                newProsThisMonth
-            ] = await Promise.all([
+            const [totalLeads, completedJobs, totalPros, totalCustomers] = await Promise.all([
                 prisma.lead.count(),
-                prisma.user.count({ where: { role: 'WORKER' } }),
-                prisma.user.count({ 
-                    where: { role: 'CUSTOMER' } 
-                }),
-                prisma.lead.count({ where: { createdAt: { gte: todayStart } } }),
                 prisma.job.count({ where: { status: 'COMPLETED' } }),
-                prisma.user.count({ where: { role: 'WORKER', isAvailable: true } }),
-                prisma.user.count({ 
-                    where: { 
-                        role: 'CUSTOMER', 
-                        jobsAsCustomer: { some: {} } // Loyal customers have at least one job record
-                    } 
-                }),
-                prisma.user.count({ 
-                    where: { 
-                        role: 'WORKER', 
-                        createdAt: { gte: new Date(new Date().setDate(now.getDate() - 30)) } 
-                    } 
-                })
+                prisma.user.count({ where: { role: 'WORKER' } }),
+                prisma.user.count({ where: { role: 'CUSTOMER' } })
             ]);
 
-            // Fetch lead activity for the last 7 days
-            const leadActivity = await Promise.all(
-                [6, 5, 4, 3, 2, 1, 0].map(async (daysAgo) => {
-                    const start = new Date(new Date(new Date().setHours(0, 0, 0, 0)).getTime() - (daysAgo * 24 * 60 * 60 * 1000));
-                    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-                    const count = await prisma.lead.count({
-                        where: {
-                            createdAt: {
-                                gte: start,
-                                lt: end
-                            }
-                        }
-                    });
-                    return count;
-                })
-            );
+            // 2. Real Financials from Invoices
+            const revenueResult = await prisma.jobInvoice.aggregate({
+                _sum: { amount: true },
+                where: { status: 'PAID' }
+            });
+            const totalRevenue = revenueResult._sum.amount || 0;
 
-            // Calculate Growth Rates (Percentages)
-            const leadCompletionRate = totalLeads > 0 ? (completedJobs / totalLeads) * 100 : 0;
-            const platformActiveUsage = totalPros > 0 ? (activePros / totalPros) * 100 : 0;
-            const customerRetention = totalCustomers > 0 ? (loyalCustomers / totalCustomers) * 100 : 0;
-            const newProsRate = totalPros > 0 ? (newProsThisMonth / totalPros) * 100 : 0;
+            const platformFees = totalRevenue * 0.15; // 15% Platform fee as per docs
+            const workerRevenue = totalRevenue * 0.85;
+
+            // 3. Top Performers
+            const topWorkers = await prisma.job.groupBy({
+                by: ['workerId'],
+                _count: { id: true },
+                where: { status: 'COMPLETED' },
+                orderBy: { _count: { id: 'desc' } },
+                take: 3
+            });
+
+            const workerDetails = await prisma.user.findMany({
+                where: { id: { in: topWorkers.map(w => w.workerId) } },
+                select: { id: true, name: true, role: true }
+            });
+
+            const performers = workerDetails.map(w => ({
+                id: w.id,
+                name: w.name,
+                jobs: topWorkers.find(tw => tw.workerId === w.id)?._count.id || 0,
+                role: w.role
+            }));
+
+            // 4. Recent Activity (Latest 5 records across systems)
+            const [recentJobs, recentInvoices, recentUsers] = await Promise.all([
+                prisma.job.findMany({ take: 3, orderBy: { updatedAt: 'desc' }, include: { customer: true, worker: true } }),
+                prisma.jobInvoice.findMany({ take: 2, orderBy: { createdAt: 'desc' }, include: { job: { include: { worker: true } } } }),
+                prisma.user.findMany({ take: 2, orderBy: { createdAt: 'desc' }, where: { role: 'WORKER' } })
+            ]);
+
+            const activities = [
+                ...recentJobs.map(j => ({ id: j.id, type: 'JOB', title: `${j.worker?.name || 'Worker'} updated Job #${j.jobNo}`, time: j.updatedAt, color: '#3B82F6', icon: 'settings-outline' })),
+                ...recentInvoices.map(i => ({ id: i.id, type: 'PAYMENT', title: `Invoice for $${i.amount} generated`, time: i.createdAt, color: '#8B5CF6', icon: 'cash-outline' })),
+                ...recentUsers.map(u => ({ id: u.id, type: 'USER', title: `${u.name} joined as Professional`, time: u.createdAt, color: '#10B981', icon: 'checkmark-circle-outline' }))
+            ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 5);
 
             res.status(200).json({
                 success: true,
@@ -373,15 +369,15 @@ const getDashboardStats = async (req, res) => {
                         { name: 'Active Professionals', value: totalPros, trend: '+5%', up: true },
                         { name: 'Jobs In Progress', value: totalLeads - completedJobs, trend: 'Lead: ' + totalLeads, up: true },
                         { name: 'Completed Jobs', value: completedJobs, trend: '+8%', up: true },
-                        { name: 'Total Revenue', value: '$' + (completedJobs * 150), trend: '+12%', up: true } // Mocking revenue based on completions
+                        { name: 'Total Revenue', value: '$' + totalRevenue.toLocaleString(), trend: '+12%', up: true }
                     ],
-                    leadActivity: leadActivity,
-                    growthStats: [
-                        { label: 'New Professionals', value: Math.min(newProsRate + 60, 100), color: 'bg-purple-500' }, 
-                        { label: 'Lead Completion Rate', value: Math.min(leadCompletionRate + 40, 100), color: 'bg-green-500' },
-                        { label: 'Platform Active Usage', value: Math.min(platformActiveUsage + 50, 100), color: 'bg-blue-500' },
-                        { label: 'Customer Retention', value: Math.min(customerRetention + 70, 100), color: 'bg-orange-500' }
-                    ]
+                    financials: {
+                        platformFees,
+                        workerRevenue,
+                        totalRevenue
+                    },
+                    performers,
+                    activities
                 }
             });
         } else {
