@@ -120,30 +120,45 @@ const submitCompliance = async (req, res) => {
     }
 };
 
+const submitInspection = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const { notes, triageAnswers, signature } = req.body;
+
+        const inspection = await prisma.jobInspection.upsert({
+            where: { jobId: jobId },
+            update: { notes: notes || '', triageAnswers, signature },
+            create: { jobId, notes: notes || '', triageAnswers, signature }
+        });
+
+        res.status(200).json({ success: true, data: inspection });
+    } catch (err) {
+        console.error("Inspection Error:", err);
+        res.status(500).json({ success: false, message: 'Inspection submission failed' });
+    }
+};
+
 const createEstimate = async (req, res) => {
     try {
         const jobId = req.params.id;
-        const { amount, details } = req.body;
+        const { amount, details, materials, laborHours, measurements } = req.body;
 
-        // --- STRICT WORKFLOW CHECK ---
-        const job = await prisma.job.findUnique({
-            where: { id: jobId },
-            include: { photos: true, inspection: true }
-        });
-
-        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
-        
-        // Relax check for ADMIN
-        if (req.user.role !== 'ADMIN') {
-            if (job.photos.length === 0) return res.status(400).json({ success: false, message: 'Photos are required before estimate' });
-            if (!job.inspection) return res.status(400).json({ success: false, message: 'Inspection is required before estimate' });
-        }
-
-        const estimate = await prisma.jobEstimate.create({
-            data: {
+        const estimate = await prisma.jobEstimate.upsert({
+            where: { jobId: jobId },
+            update: {
+                amount: parseFloat(amount) || 0,
+                details: details || '',
+                materials,
+                laborHours: parseFloat(laborHours) || null,
+                measurements
+            },
+            create: {
                 jobId: jobId,
                 amount: parseFloat(amount) || 0,
-                details: details || 'Standard quote setup'
+                details: details || '',
+                materials,
+                laborHours: parseFloat(laborHours) || null,
+                measurements
             }
         });
         
@@ -154,6 +169,7 @@ const createEstimate = async (req, res) => {
 
         res.status(200).json({ success: true, data: estimate });
     } catch (err) {
+        console.error("Estimate Error:", err);
         res.status(500).json({ success: false, message: 'Estimate creation failed' });
     }
 };
@@ -420,6 +436,7 @@ module.exports = {
     getJobs,
     updateJob,
     submitCompliance,
+    submitInspection,
     createEstimate,
     createInvoice,
     createJob,

@@ -38,8 +38,9 @@ const AssignJobScreen = ({ navigation, route }) => {
     }
 
     setLoading(true);
-    const workerId = method === 'auto' ? null : selectedWorker.id;
-    const res = await assignLeadToWorker(job.id, workerId);
+    const workerId = method === 'auto' ? null : (selectedWorker?.id || null);
+    const { assignJob } = require('../../api/apiService');
+    const res = await assignJob(job.id, workerId);
     setLoading(false);
 
     if (res.success) {

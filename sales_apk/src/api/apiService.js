@@ -17,6 +17,18 @@ export const loginWorker = async (email, password) => {
     }
 };
 
+/**
+ * SERVICE: Password Reset
+ */
+export const resetPassword = async (email, newPassword) => {
+    try {
+        const response = await apiClient.post('/auth/reset-password', { email, newPassword });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Update failed' };
+    }
+};
+
 export const registerUser = async (userData) => {
     try {
         const response = await apiClient.post('/auth/register', userData);
@@ -108,6 +120,15 @@ export const assignLeadToWorker = async (leadId, workerId) => {
     }
 };
 
+export const submitInspection = async (jobId, notes, triageAnswers) => {
+    try {
+        const response = await apiClient.post(`/jobs/${jobId}/inspection`, { notes, triageAnswers });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to submit inspection' };
+    }
+};
+
 export const submitCompliance = async (jobId) => {
     try {
         const response = await apiClient.post(`/jobs/${jobId}/compliance`);
@@ -117,9 +138,11 @@ export const submitCompliance = async (jobId) => {
     }
 };
 
-export const createEstimate = async (jobId, amount, details) => {
+export const createEstimate = async (jobId, amount, details, materials, laborHours, measurements) => {
     try {
-        const response = await apiClient.post(`/jobs/${jobId}/estimate`, { amount, details });
+        const response = await apiClient.post(`/jobs/${jobId}/estimate`, { 
+            amount, details, materials, laborHours, measurements 
+        });
         return response.data;
     } catch (error) {
         return { success: false, message: 'Failed to create estimate' };
@@ -259,6 +282,11 @@ export default {
     updateProfessional,
     getDirectMessages,
     sendDirectMessage,
+    resetPassword,
     uploadJobPhoto,
-    assignJob
+    assignJob,
+    getJobHistory,
+    getEstimates,
+    getInvoices,
+    submitInspection
 };

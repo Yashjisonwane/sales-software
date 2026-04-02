@@ -34,7 +34,13 @@ const SNAP_INTERVAL = IMAGE_WIDTH + IMAGE_GAP;
 const getImgSource = (img) => {
   if (!img) return require('../../assets/images/wood_flooring_job.png');
   if (typeof img === 'number') return img;
-  if (typeof img === 'string') return { uri: img.startsWith('http') ? img : 'https://images.unsplash.com/photo-1517646272486-a2c99afd9538?q=80&w=500' };
+  if (typeof img === 'string') {
+    if (img.startsWith('http') || img.startsWith('file') || img.startsWith('content')) {
+      return { uri: img };
+    }
+    // Fallback for relative paths if server base is known
+    return { uri: img }; 
+  }
   if (img.uri) return img;
   return require('../../assets/images/wood_flooring_job.png');
 };
@@ -89,10 +95,10 @@ const JobCard = ({ name, id, tag, time, images, address, jobType, onPress }) => 
       snapToInterval={SNAP_INTERVAL}
       decelerationRate="fast"
     >
-      {images.map((img, i) => (
+      {(images && images.length > 0 ? images : getCategoryImages(jobType)).map((img, i) => (
         <Image 
           key={i} 
-          source={getImgSource(img)} 
+          source={getImgSource(img.url || img)} 
           style={[styles.jobImage, { width: IMAGE_WIDTH }]} 
           defaultSource={require('../../assets/images/wood_flooring_job.png')}
         />

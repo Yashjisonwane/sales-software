@@ -7,18 +7,56 @@ import {
   ScrollView,
   StatusBar,
   TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS } from '../../constants/theme';
 
-const PreInspectionScreen = ({ navigation }) => {
+import { submitInspection } from '../../api/apiService';
+
+const PreInspectionScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const { job } = route.params || {};
   
   // Selection states
   const [issueType, setIssueType] = useState('New Installation');
   const [urgency, setUrgency] = useState('Medium');
   const [damage, setDamage] = useState('None');
+  const [loading, setLoading] = useState(false);
+
+  const handleInspect = async () => {
+    setLoading(true);
+    const triageAnswers = { issueType, urgency, damage };
+    const notes = `Triage: ${issueType}, Urgency: ${urgency}, Damage: ${damage}`;
+    
+    const res = await submitInspection(job.id, notes, triageAnswers);
+    setLoading(false);
+
+    if (res.success) {
+      // Pass back results to QuoteScope
+      navigation.navigate('QuoteScope', { 
+        job,
+        inspectionResults: {
+           materials: [
+             { name: 'HVAC Unit (3-Ton)', qty: 1 },
+             { name: 'Duct Pipe', qty: 20 },
+             { name: 'Wiring Kit', qty: 1 },
+             { name: 'Mounting Brackets', qty: 2 }
+           ],
+           labor: 8.5,
+           measurements: {
+             wallWidth: '12.4 ft',
+             ceilingHeight: '9.1 ft',
+             ductLength: '18.6 ft'
+           }
+        }
+      });
+    } else {
+      Alert.alert("Error", res.message || "Failed to save inspection");
+    }
+  };
 
   const CheckItem = ({ label, selected, onPress, color }) => (
     <TouchableOpacity style={styles.checkItem} onPress={onPress}>
@@ -39,31 +77,25 @@ const PreInspectionScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pre-Inspection & Measuring</Text>
-        <TouchableOpacity style={styles.editBtn}>
-          <Ionicons name="create-outline" size={24} color="#000" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Pre-Inspection Tool</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Job Details Card */}
         <View style={styles.card}>
-          <Text style={styles.cardHeaderTitle}>Job Details</Text>
+          <Text style={styles.cardHeaderTitle}>Job Context</Text>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Customer Name</Text>
-            <Text style={styles.detailValue}>Alistair Hughes</Text>
+            <Text style={styles.detailLabel}>Customer</Text>
+            <Text style={styles.detailValue}>{job?.customerName || 'Alistair Hughes'}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Job Address</Text>
-            <Text style={[styles.detailValue, { flex: 1, textAlign: 'right' }]}>742 Pine Street, Austin, TX</Text>
+            <Text style={styles.detailLabel}>Address</Text>
+            <Text style={[styles.detailValue, { flex: 1, textAlign: 'right' }]}>{job?.location || '742 Pine Street, Austin, TX'}</Text>
           </View>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Service Type</Text>
-            <Text style={styles.detailValue}>HVAC Installation</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Property Type</Text>
-            <Text style={styles.detailValue}>Residential</Text>
+            <Text style={styles.detailLabel}>Category</Text>
+            <Text style={styles.detailValue}>{job?.categoryName || 'HVAC Installation'}</Text>
           </View>
         </View>
 
@@ -72,7 +104,7 @@ const PreInspectionScreen = ({ navigation }) => {
           <View style={styles.aiHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.aiTitle}>AI Job Triage</Text>
-              <Text style={styles.aiSub}>Answer a few questions to help AI understand the job complexity.</Text>
+              <Text style={styles.aiSub}>Analyze job complexity for better estimates.</Text>
             </View>
             <MaterialCommunityIcons name="sparkles" size={22} color="#A855F7" />
           </View>
@@ -82,7 +114,6 @@ const PreInspectionScreen = ({ navigation }) => {
             <CheckItem label="New Installation" selected={issueType === 'New Installation'} onPress={() => setIssueType('New Installation')} />
             <CheckItem label="Repair" selected={issueType === 'Repair'} onPress={() => setIssueType('Repair')} />
             <CheckItem label="Replacement" selected={issueType === 'Replacement'} onPress={() => setIssueType('Replacement')} />
-            <CheckItem label="Inspection Only" selected={issueType === 'Inspection Only'} onPress={() => setIssueType('Inspection Only')} />
           </View>
 
           <View style={styles.triageBox}>
@@ -91,28 +122,20 @@ const PreInspectionScreen = ({ navigation }) => {
             <CheckItem label="Medium" selected={urgency === 'Medium'} onPress={() => setUrgency('Medium')} color="#EAB308" />
             <CheckItem label="Urgent" selected={urgency === 'Urgent'} onPress={() => setUrgency('Urgent')} color="#EF4444" />
           </View>
-
-          <View style={styles.triageBox}>
-            <Text style={styles.triageSectionTitle}>Existing Damage</Text>
-            <CheckItem label="None" selected={damage === 'None'} onPress={() => setDamage('None')} />
-            <CheckItem label="Minor" selected={damage === 'Minor'} onPress={() => setDamage('Minor')} />
-            <CheckItem label="Major" selected={damage === 'Major'} onPress={() => setDamage('Major')} />
-          </View>
         </View>
 
         {/* Camera Measuring Section */}
         <View style={styles.card}>
           <Text style={styles.cardHeaderTitle}>Camera Measuring</Text>
-          <Text style={styles.cardSub}>Use your camera to measure spaces and detect objects automatically.</Text>
+          <Text style={styles.cardSub}>Detect objects and spaces via camera.</Text>
           
           <View style={styles.cameraBox}>
             <TouchableOpacity style={styles.openCameraBtn}>
               <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.openCameraBtnText}>Open Camera</Text>
+              <Text style={styles.openCameraBtnText}>Open AR Camera</Text>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.measurementTitle}>Measurement Results</Text>
           <View style={styles.measRow}>
              <Text style={styles.measLab}>Wall Width</Text>
              <Text style={styles.measVal}>12.4 ft</Text>
@@ -121,61 +144,14 @@ const PreInspectionScreen = ({ navigation }) => {
              <Text style={styles.measLab}>Ceiling Height</Text>
              <Text style={styles.measVal}>9.1 ft</Text>
           </View>
-          <View style={styles.measRow}>
-             <Text style={styles.measLab}>Duct Length</Text>
-             <Text style={styles.measVal}>18.6 ft</Text>
-          </View>
-          <View style={styles.measRow}>
-             <Text style={styles.measLab}>Unit Placement Area</Text>
-             <Text style={styles.measVal}>6.2 × 4.8 ft</Text>
-          </View>
-
-          <TouchableOpacity style={styles.addMeasBtn}>
-             <Ionicons name="add" size={20} color="#000" />
-             <Text style={styles.addMeasText}>Add Another Measurement</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Materials & Labor Estimate */}
-        <View style={styles.card}>
-           <Text style={styles.cardHeaderTitle}>Materials & Labor Estimate</Text>
-           
-           <View style={styles.estimateSubSection}>
-              <Text style={styles.estimateLabel}>Materials (Auto-Suggested)</Text>
-              <View style={styles.estItem}><Text style={styles.estName}>HVAC Unit (3-Ton)</Text><Text style={styles.estQty}>Qty 1</Text></View>
-              <View style={styles.estItem}><Text style={styles.estName}>Duct Pipe</Text><Text style={styles.estQty}>Qty 20</Text></View>
-              <View style={styles.estItem}><Text style={styles.estName}>Wiring Kit</Text><Text style={styles.estQty}>Qty 1</Text></View>
-              <View style={styles.estItem}><Text style={styles.estName}>Mounting Brackets</Text><Text style={styles.estQty}>Qty 2</Text></View>
-           </View>
-
-           <View style={styles.estimateSubSection}>
-              <Text style={styles.estimateLabel}>Labor Estimate</Text>
-              <View style={styles.estItem}><Text style={styles.estName}>Estimated Hours</Text><Text style={styles.estValDark}>8.5 hrs</Text></View>
-              <View style={styles.estItem}><Text style={styles.estName}>Crew Size</Text><Text style={styles.estValDark}>2 workers</Text></View>
-              <View style={styles.estItem}><Text style={styles.estName}>Skill Level</Text><Text style={styles.estValDark}>Senior Technician</Text></View>
-           </View>
-
-           <TouchableOpacity style={styles.inspectBtn}>
-              <Text style={styles.inspectBtnText}>Inspect</Text>
-           </TouchableOpacity>
-
-           <View style={styles.confidenceSection}>
-              <Text style={styles.confidenceTitle}>AI Confidence & Review</Text>
-              <View style={styles.confidenceMeta}>
-                 <Text style={styles.accuracyLabel}>Accuracy</Text>
-                 <Text style={styles.accuracyValue}>92%</Text>
-              </View>
-              <View style={styles.progressBarBg}>
-                 <View style={[styles.progressBarFill, { width: '92%' }]} />
-              </View>
-           </View>
         </View>
 
         <TouchableOpacity 
-          style={styles.continueBtn}
-          onPress={() => navigation.navigate('JobOfferDetail', { state: 'active' })}
+          style={[styles.inspectBtn, { marginTop: 10 }]}
+          onPress={handleInspect}
+          disabled={loading}
         >
-          <Text style={styles.continueBtnText}>Continue</Text>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.inspectBtnText}>Confirm Inspection</Text>}
         </TouchableOpacity>
         
         <View style={{ height: 40 }} />

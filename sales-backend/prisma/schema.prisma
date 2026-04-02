@@ -107,23 +107,46 @@ model JobPhoto {
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobInspection {
+<<<<<<< HEAD
   id        String   @id @default(uuid())
   jobId     String   @map("job_id")
   notes     String   @db.Text
   signature String?
   createdAt DateTime @default(now()) @map("created_at")
+=======
+  id            String   @id @default(uuid())
+  jobId         String   @unique @map("job_id")
+  notes         String   @db.Text
+  triageAnswers Json?    @map("triage_answers")
+  signature     String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+>>>>>>> adf8db8c7d6db8d79d01c12eac07be4b0251f65c
 
   @@map("job_inspections")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobEstimate {
+<<<<<<< HEAD
   id         String   @id @default(uuid())
   jobId      String   @map("job_id")
   amount     Float
   details    String   @db.Text
   isApproved Boolean  @default(false) @map("is_approved")
   createdAt  DateTime @default(now()) @map("created_at")
+=======
+  id           String   @id @default(uuid())
+  jobId        String   @unique @map("job_id")
+  amount       Float
+  details      String   @db.Text
+  materials    Json?
+  laborHours   Float?   @map("labor_hours")
+  measurements Json?
+  isApproved   Boolean  @default(false) @map("is_approved")
+  createdAt    DateTime @default(now()) @map("created_at")
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+>>>>>>> adf8db8c7d6db8d79d01c12eac07be4b0251f65c
 
   @@map("job_estimates")
 }
