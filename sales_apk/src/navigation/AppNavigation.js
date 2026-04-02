@@ -242,7 +242,7 @@ export default function AppNavigation() {
         {/* Other screens */}
         <Stack.Screen name="Providers" component={ProvidersScreen} />
         <Stack.Screen name="RequestService" component={RequestServiceScreen} />
-        <Stack.Screen name="WorkerChat" component={WorkerChatScreen} />
+        <Stack.Screen name="Chat" component={WorkerChatScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Reviews" component={ReviewsScreen} />
         <Stack.Screen name="LeadMap" component={ExploreScreen} />

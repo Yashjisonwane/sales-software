@@ -8,38 +8,43 @@ datasource db {
 }
 
 model User {
-  id                          String                       @id @default(uuid())
-  name                        String
-  email                       String                       @unique
-  phone                       String                       @unique
-  password                    String
-  role                        Role                         @default(CUSTOMER)
-  isAvailable                 Boolean                      @default(true) @map("is_available")
-  lat                         Float?
-  lng                         Float?
-  fcmToken                    String?                      @map("fcm_token")
-  address                     String?                      @db.Text
-  city                        String?
-  state                       String?
-  pincode                     String?
-  createdAt                   DateTime                     @default(now()) @map("created_at")
-  updatedAt                   DateTime                     @updatedAt @map("updated_at")
-  planId                      String?                      @map("plan_id")
-  subscriptionExpiresAt       DateTime?                    @map("subscription_expires_at")
-  completedJobs               Int                          @default(0) @map("completed_jobs")
-  rating                      Float                        @default(0)
-  availability                String?
-  bio                         String?                      @db.Text
-  businessName                String?                      @map("business_name")
-  experience                  String?
-  serviceRadius               Int?                         @default(15) @map("service_radius")
-  jobsAsCustomer              Job[]                        @relation("CustomerJobs")
-  jobsAsWorker                Job[]                        @relation("WorkerJobs")
-  leadsAsCustomer             Lead[]                       @relation("CustomerLeads")
-  notifications               Notification[]
-  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
-  plan                        SubscriptionPlan?            @relation(fields: [planId], references: [id])
-  categories                  WorkerCategory[]
+  id                                          String                       @id @default(uuid())
+  name                                        String
+  email                                       String                       @unique
+  phone                                       String                       @unique
+  password                                    String
+  role                                        Role                         @default(CUSTOMER)
+  isAvailable                                 Boolean                      @default(true) @map("is_available")
+  lat                                         Float?
+  lng                                         Float?
+  fcmToken                                    String?                      @map("fcm_token")
+  address                                     String?                      @db.Text
+  city                                        String?
+  state                                       String?
+  pincode                                     String?
+  createdAt                                   DateTime                     @default(now()) @map("created_at")
+  updatedAt                                   DateTime                     @updatedAt @map("updated_at")
+  planId                                      String?                      @map("plan_id")
+  subscriptionExpiresAt                       DateTime?                    @map("subscription_expires_at")
+  completedJobs                               Int                          @default(0) @map("completed_jobs")
+  rating                                      Float                        @default(0)
+  availability                                String?
+  bio                                         String?                      @db.Text
+  businessName                                String?                      @map("business_name")
+  experience                                  String?
+  serviceRadius                               Int?                         @default(15) @map("service_radius")
+  admin_commission                            Int                          @default(10)
+  worker_commission                           Int                          @default(90)
+  conversations_conversations_user1_idTousers conversations[]              @relation("conversations_user1_idTousers")
+  conversations_conversations_user2_idTousers conversations[]              @relation("conversations_user2_idTousers")
+  jobsAsCustomer                              Job[]                        @relation("CustomerJobs")
+  jobsAsWorker                                Job[]                        @relation("WorkerJobs")
+  leadsAsCustomer                             Lead[]                       @relation("CustomerLeads")
+  messages                                    messages[]
+  notifications                               Notification[]
+  subscriptionUpgradeRequests                 SubscriptionUpgradeRequest[]
+  plan                                        SubscriptionPlan?            @relation(fields: [planId], references: [id])
+  categories                                  WorkerCategory[]
 
   @@index([planId], map: "users_plan_id_fkey")
   @@map("users")
@@ -74,6 +79,8 @@ model Lead {
   customerId    String     @map("customer_id")
   categoryId    String     @map("category_id")
   location      String
+  latitude      Float?     @map("latitude")
+  longitude     Float?     @map("longitude")
   description   String?    @db.Text
   servicePlan   String     @default("Starter") @map("service_plan")
   status        LeadStatus @default(OPEN)
@@ -98,12 +105,15 @@ model Job {
   categoryName  String         @map("category_name")
   status        JobStatus      @default(SCHEDULED)
   location      String
+  latitude      Float?         @map("latitude")
+  longitude     Float?         @map("longitude")
   description   String?        @db.Text
   scheduledDate DateTime       @map("scheduled_date")
   scheduledTime String         @map("scheduled_time")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   preferredDate String?        @map("preferred_date")
+  chats         chats?
   contract      JobContract?
   estimate      JobEstimate?
   inspection    JobInspection?
@@ -112,6 +122,7 @@ model Job {
   customer      User           @relation("CustomerJobs", fields: [customerId], references: [id])
   lead          Lead?          @relation(fields: [leadId], references: [id])
   worker        User           @relation("WorkerJobs", fields: [workerId], references: [id])
+  reviews       reviews?
 
   @@index([customerId], map: "jobs_customer_id_fkey")
   @@index([workerId], map: "jobs_worker_id_fkey")
@@ -170,13 +181,15 @@ model JobContract {
 }
 
 model JobInvoice {
-  id        String   @id @default(uuid())
-  jobId     String   @unique @map("job_id")
-  amount    Float
-  status    String   @default("UNPAID")
-  paymentId String?  @map("payment_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid())
+  jobId        String   @unique @map("job_id")
+  amount       Float
+  status       String   @default("UNPAID")
+  paymentId    String?  @map("payment_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  milestone    String   @default("SINGLE")
+  total_amount Float    @default(0)
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_invoices")
 }
@@ -255,6 +268,75 @@ model Notification {
   @@map("notifications")
 }
 
+model chats {
+  id           String     @id
+  job_id       String     @unique
+  last_message String?    @db.Text
+  updated_at   DateTime
+  jobs         Job        @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  messages     messages[]
+}
+
+model conversations {
+  id                                  String            @id
+  user1_id                            String
+  user2_id                            String
+  last_message                        String?           @db.Text
+  updated_at                          DateTime
+  users_conversations_user1_idTousers User              @relation("conversations_user1_idTousers", fields: [user1_id], references: [id])
+  users_conversations_user2_idTousers User              @relation("conversations_user2_idTousers", fields: [user2_id], references: [id])
+  direct_messages                     direct_messages[]
+
+  @@unique([user1_id, user2_id])
+  @@index([user2_id], map: "conversations_user2_id_fkey")
+}
+
+model direct_messages {
+  id              String        @id
+  conversation_id String
+  sender_id       String
+  text            String        @db.Text
+  created_at      DateTime      @default(now())
+  conversations   conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id], map: "direct_messages_conversation_id_fkey")
+}
+
+model Invitation {
+  id        String   @id
+  email     String   @unique
+  token     String   @unique
+  role      Role     @default(WORKER)
+  status    String   @default("PENDING")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+}
+
+model messages {
+  id         String   @id
+  chat_id    String
+  sender_id  String
+  text       String   @db.Text
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+  chats      chats    @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  users      User     @relation(fields: [sender_id], references: [id])
+
+  @@index([chat_id], map: "messages_chat_id_fkey")
+  @@index([sender_id], map: "messages_sender_id_fkey")
+}
+
+model reviews {
+  id         String   @id
+  job_id     String   @unique
+  rating     Int      @default(5)
+  comment    String?  @db.Text
+  created_at DateTime @default(now())
+  jobs       Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+}
+
 enum Role {
   ADMIN
   WORKER
@@ -265,6 +347,8 @@ enum JobStatus {
   SCHEDULED
   ACCEPTED
   REJECTED
+  ON_THE_WAY
+  STARTED
   IN_PROGRESS
   ESTIMATED
   INVOICED

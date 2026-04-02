@@ -19,13 +19,13 @@ const protect = async (req, res, next) => {
 
             // 2. Verify token
             const decoded = jwt.verify(token, secret);
-            
+
             console.log("🔓 [AUTH] Decoded Token:", decoded);
 
             // 3. Get user from db to ensure they still exist and have correct role
             req.user = await prisma.user.findUnique({
                 where: { id: decoded.id },
-                select: { id: true, name: true, email: true, role: true }
+                include: { plan: true }
             });
 
             if (!req.user) {
@@ -38,9 +38,9 @@ const protect = async (req, res, next) => {
         } catch (error) {
             console.error("❌ [AUTH] Token Verification Failed:", error.message);
             // Always 401 for authentication failure (invalid/expired token)
-            return res.status(401).json({ 
-                success: false, 
-                message: 'Not authorized, session expired or invalid token' 
+            return res.status(401).json({
+                success: false,
+                message: 'Not authorized, session expired or invalid token'
             });
         }
     }
@@ -51,18 +51,38 @@ const protect = async (req, res, next) => {
     }
 };
 
+// @desc    Optional protection - verify token if present, otherwise allow guest
+const optionalProtect = async (req, res, next) => {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const secret = process.env.JWT_SECRET;
+            if (secret) {
+                const decoded = jwt.verify(token, secret);
+                req.user = await prisma.user.findUnique({
+                    where: { id: decoded.id },
+                    include: { plan: true }
+                });
+            }
+        } catch (error) {
+            console.warn("⚠️ [AUTH] Invalid token in optionalProtect, continuing as guest");
+        }
+    }
+    next(); // Always continue to next middleware/controller
+};
+
 // @desc    Authorize specific roles
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({ success: false, message: 'Not authenticated' });
+            return res.status(401).json({ success: false, message: 'Authentication required for this action' });
         }
 
         if (!roles.includes(req.user.role)) {
-            console.warn(`⛔ [AUTH] Forbidden: User ${req.user.name} (${req.user.role}) attempted to access restricted route. Required: [${roles.join(', ')}]`);
             return res.status(403).json({
                 success: false,
-                message: `Access denied: Role ${req.user.role} is not authorized for this resource`
+                message: `Access denied: Role ${req.user.role} is not authorized`
             });
         }
 
@@ -72,5 +92,6 @@ const authorize = (...roles) => {
 
 module.exports = {
     protect,
+    optionalProtect,
     authorize
 };

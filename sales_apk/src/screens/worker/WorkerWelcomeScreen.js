@@ -32,7 +32,7 @@ export default function WorkerWelcomeScreen({ navigation }) {
                     style={styles.getStartedBtn}
                     onPress={() => navigation.navigate('WorkerWorkType')}
                 >
-                    <Text style={styles.getStartedText}>Get Started</Text>
+                    <Text style={styles.getStartedText}>Join as Professional</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity

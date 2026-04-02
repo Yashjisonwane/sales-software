@@ -52,22 +52,22 @@ const Dashboard = () => {
         color: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[0],
         bg: (statColors[s.name] || 'text-blue-600 bg-blue-50').split(' ')[1]
     })) : [
-        { 
-            name: 'New Leads Today', 
+        {
+            name: 'New Leads Today',
             value: proAssignments.filter(a => {
                 const s = a.status?.toLowerCase();
                 return s === 'sent' || s === 'viewed' || s === 'new' || s === 'scheduled';
-            }).length, 
-            icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%', up: true 
+            }).length,
+            icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50', trend: '+12%', up: true
         },
         { name: 'Total Leads', value: proAssignments.length, icon: Briefcase, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+8%', up: true },
-        { 
-            name: 'Accepted Leads', 
+        {
+            name: 'Accepted Leads',
             value: proAssignments.filter(a => {
                 const s = a.status?.toLowerCase();
                 return s === 'accepted' || s === 'in progress' || s === 'active';
-            }).length, 
-            icon: ListChecks, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%', up: true 
+            }).length,
+            icon: ListChecks, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+5%', up: true
         },
         { name: 'Conversion Rate', value: proAssignments.length > 0 ? ((proAssignments.filter(a => a.status?.toLowerCase() === 'completed').length / proAssignments.length) * 100).toFixed(0) + '%' : '0%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', trend: '+0%', up: true },
     ];
@@ -92,8 +92,8 @@ const Dashboard = () => {
         .slice(0, 10)
         .map(l => {
             const assignment = proAssignments.find(a => a.leadId === l.id);
-            return { 
-                ...l, 
+            return {
+                ...l,
                 assignmentStatus: assignment?.status || 'Sent',
                 assignmentId: assignment?.id // Real Job UUID
             };

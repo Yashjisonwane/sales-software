@@ -8,7 +8,7 @@ const generateShortId = (prefix) => {
 // @desc    Create a new lead from the website
 const createLead = async (req, res) => {
     try {
-        const { customerName, name, email, phone, categoryId, categoryName, servicePlan, location, description, preferredDate } = req.body;
+        const { customerName, name, email, phone, categoryId, categoryName, servicePlan, location, description, preferredDate, latitude, longitude } = req.body;
 
         if (!email || !phone) {
             return res.status(400).json({ success: false, message: "Email and Phone are required to create a lead." });
@@ -65,6 +65,8 @@ const createLead = async (req, res) => {
                 customerId: customer.id,
                 categoryId: finalCategoryId,
                 location: location || 'Not Specified',
+                latitude: latitude ? parseFloat(latitude) : null,
+                longitude: longitude ? parseFloat(longitude) : null,
                 description: description || '',
                 servicePlan: servicePlan || 'Starter',
                 preferredDate: preferredDate || null,
@@ -184,6 +186,8 @@ const assignLead = async (req, res) => {
                 workerId: workerId,
                 categoryName: lead.category.name,
                 location: lead.location,
+                latitude: lead.latitude,
+                longitude: lead.longitude,
                 description: lead.description,
                 preferredDate: lead.preferredDate,
                 status: 'SCHEDULED',
@@ -192,11 +196,14 @@ const assignLead = async (req, res) => {
             }
         });
 
-        // 3. Create Chat for this Job
-        await prisma.chat.create({
+        // 3. Create Chat for this Job (Properly mapping to the 'chats' model)
+        const { v4: uuidv4 } = require('uuid');
+        await prisma.chats.create({
             data: {
-                jobId: newJob.id,
-                lastMessage: 'Conversation started'
+                id: uuidv4(),
+                job_id: newJob.id,
+                last_message: 'Conversation started',
+                updated_at: new Date()
             }
         });
 

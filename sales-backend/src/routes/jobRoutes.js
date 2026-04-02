@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { getJobs, updateJob, submitCompliance, submitInspection, createEstimate, createInvoice, deleteJob, createJob, getEstimates, getInvoices, getJobHistory, addJobPhoto } = require('../controllers/jobController');
-const { protect, authorize } = require('../middlewares/authMiddleware');
+const { getJobs, updateJob, submitCompliance, submitInspection, createEstimate, createInvoice, deleteJob, createJob, getEstimates, getInvoices, getJobHistory, addJobPhoto, getJobsForMap } = require('../controllers/jobController');
+const { protect, optionalProtect, authorize } = require('../middlewares/authMiddleware');
 
 // @route   GET /POST /api/v1/jobs
-router.get('/', protect, getJobs);
+router.get('/', optionalProtect, getJobs);
 router.post('/', protect, authorize('ADMIN', 'WORKER'), createJob);
+
+// @route   GET /api/v1/jobs/map  — all jobs with coordinates for APK map (guest ok)
+router.get('/map', optionalProtect, getJobsForMap);
 
 // @route   GET /api/v1/jobs/estimates
 router.get('/estimates', protect, authorize('ADMIN'), getEstimates);
@@ -14,7 +17,7 @@ router.get('/estimates', protect, authorize('ADMIN'), getEstimates);
 router.get('/invoices', protect, authorize('ADMIN'), getInvoices);
 
 // @route   GET /api/v1/jobs/:id/history
-router.get('/:id/history', protect, getJobHistory);
+router.get('/:id/history', optionalProtect, getJobHistory);
 
 // @route   PATCH /api/v1/jobs/:id
 router.patch('/:id', protect, updateJob);
