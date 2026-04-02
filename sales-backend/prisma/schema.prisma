@@ -7,70 +7,60 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model User {
-  id                          String                       @id @default(uuid())
-  name                        String
-  email                       String                       @unique
-  phone                       String                       @unique
-  password                    String
-  role                        Role                         @default(CUSTOMER)
-  isAvailable                 Boolean                      @default(true) @map("is_available")
-  lat                         Float?
-  lng                         Float?
-  fcmToken                    String?                      @map("fcm_token")
-  address                     String?                      @db.Text
-  city                        String?
-  state                       String?
-  pincode                     String?
-  createdAt                   DateTime                     @default(now()) @map("created_at")
-  updatedAt                   DateTime                     @updatedAt @map("updated_at")
-  planId                      String?                      @map("plan_id")
-  subscriptionExpiresAt       DateTime?                    @map("subscription_expires_at")
-  completedJobs               Int                          @default(0) @map("completed_jobs")
-  rating                      Float                        @default(0)
-  availability                String?
-  bio                         String?                      @db.Text
-  businessName                String?                      @map("business_name")
-  experience                  String?
-  serviceRadius               Int?                         @default(15) @map("service_radius")
-  jobsAsCustomer              Job[]                        @relation("CustomerJobs")
-  jobsAsWorker                Job[]                        @relation("WorkerJobs")
-  leadsAsCustomer             Lead[]                       @relation("CustomerLeads")
-  notifications               Notification[]
-  subscriptionUpgradeRequests SubscriptionUpgradeRequest[]
-  plan                        SubscriptionPlan?            @relation(fields: [planId], references: [id])
-  categories                  WorkerCategory[]
+  id                    String    @id @default(uuid())
+  name                  String
+  email                 String
+  phone                 String
+  password              String
+  role                  Role      @default(CUSTOMER)
+  isAvailable           Boolean   @default(true) @map("is_available")
+  lat                   Float?
+  lng                   Float?
+  fcmToken              String?   @map("fcm_token")
+  address               String?   @db.Text
+  city                  String?
+  state                 String?
+  pincode               String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+  planId                String?   @map("plan_id")
+  subscriptionExpiresAt DateTime? @map("subscription_expires_at")
+  completedJobs         Int       @default(0) @map("completed_jobs")
+  rating                Float     @default(0)
+  availability          String?
+  bio                   String?   @db.Text
+  businessName          String?   @map("business_name")
+  experience            String?
+  serviceRadius         Int?      @default(15) @map("service_radius")
 
-  @@index([planId], map: "users_plan_id_fkey")
   @@map("users")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Category {
-  id        String           @id @default(uuid())
-  name      String           @unique
+  id        String   @id @default(uuid())
+  name      String
   icon      String?
-  createdAt DateTime         @default(now()) @map("created_at")
-  leads     Lead[]
-  workers   WorkerCategory[]
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@map("categories")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model WorkerCategory {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  categoryId String   @map("category_id")
-  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String @id @default(uuid())
+  userId     String @map("user_id")
+  categoryId String @map("category_id")
 
-  @@unique([userId, categoryId])
-  @@index([categoryId], map: "worker_categories_category_id_fkey")
   @@map("worker_categories")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Lead {
   id            String     @id @default(uuid())
-  leadNo        String     @unique @default(cuid()) @map("lead_no")
+  leadNo        String     @default(cuid()) @map("lead_no")
   customerId    String     @map("customer_id")
   categoryId    String     @map("category_id")
   location      String
@@ -80,103 +70,89 @@ model Lead {
   createdAt     DateTime   @default(now()) @map("created_at")
   updatedAt     DateTime   @updatedAt @map("updated_at")
   preferredDate String?    @map("preferred_date")
-  job           Job?
-  category      Category   @relation(fields: [categoryId], references: [id])
-  customer      User       @relation("CustomerLeads", fields: [customerId], references: [id])
 
-  @@index([categoryId], map: "leads_category_id_fkey")
-  @@index([customerId], map: "leads_customer_id_fkey")
   @@map("leads")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Job {
-  id            String         @id @default(uuid())
-  jobNo         String         @unique @default(cuid()) @map("job_no")
-  leadId        String?        @unique @map("lead_id")
-  customerId    String         @map("customer_id")
-  workerId      String         @map("worker_id")
-  categoryName  String         @map("category_name")
-  status        JobStatus      @default(SCHEDULED)
+  id            String    @id @default(uuid())
+  jobNo         String    @default(cuid()) @map("job_no")
+  leadId        String?   @map("lead_id")
+  customerId    String    @map("customer_id")
+  workerId      String    @map("worker_id")
+  categoryName  String    @map("category_name")
+  status        JobStatus @default(SCHEDULED)
   location      String
-  description   String?        @db.Text
-  scheduledDate DateTime       @map("scheduled_date")
-  scheduledTime String         @map("scheduled_time")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  preferredDate String?        @map("preferred_date")
-  contract      JobContract?
-  estimate      JobEstimate?
-  inspection    JobInspection?
-  invoice       JobInvoice?
-  photos        JobPhoto[]
-  customer      User           @relation("CustomerJobs", fields: [customerId], references: [id])
-  lead          Lead?          @relation(fields: [leadId], references: [id])
-  worker        User           @relation("WorkerJobs", fields: [workerId], references: [id])
+  description   String?   @db.Text
+  scheduledDate DateTime  @map("scheduled_date")
+  scheduledTime String    @map("scheduled_time")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  preferredDate String?   @map("preferred_date")
 
-  @@index([customerId], map: "jobs_customer_id_fkey")
-  @@index([workerId], map: "jobs_worker_id_fkey")
   @@map("jobs")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobPhoto {
   id        String   @id @default(uuid())
   jobId     String   @map("job_id")
   url       String
   type      String   @default("BEFORE")
   createdAt DateTime @default(now()) @map("created_at")
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
-  @@index([jobId], map: "job_photos_job_id_fkey")
   @@map("job_photos")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobInspection {
   id        String   @id @default(uuid())
-  jobId     String   @unique @map("job_id")
+  jobId     String   @map("job_id")
   notes     String   @db.Text
   signature String?
   createdAt DateTime @default(now()) @map("created_at")
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_inspections")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobEstimate {
   id         String   @id @default(uuid())
-  jobId      String   @unique @map("job_id")
+  jobId      String   @map("job_id")
   amount     Float
   details    String   @db.Text
   isApproved Boolean  @default(false) @map("is_approved")
   createdAt  DateTime @default(now()) @map("created_at")
-  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_estimates")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobContract {
   id                String   @id @default(uuid())
-  jobId             String   @unique @map("job_id")
+  jobId             String   @map("job_id")
   documentUrl       String   @map("document_url")
   signedByCustomer  Boolean  @default(false) @map("signed_by_customer")
   customerSignature String?  @map("customer_signature")
   createdAt         DateTime @default(now()) @map("created_at")
-  job               Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_contracts")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobInvoice {
   id        String   @id @default(uuid())
-  jobId     String   @unique @map("job_id")
+  jobId     String   @map("job_id")
   amount    Float
   status    String   @default("UNPAID")
   paymentId String?  @map("payment_id")
   createdAt DateTime @default(now()) @map("created_at")
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_invoices")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Location {
   id        String   @id @default(uuid())
   name      String
@@ -190,39 +166,36 @@ model Location {
   @@map("locations")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model SubscriptionPlan {
-  id              String                       @id @default(uuid())
-  name            String                       @unique
-  price           Float
-  leads           Int                          @default(0)
-  features        String?                      @db.Text
-  createdAt       DateTime                     @default(now()) @map("created_at")
-  upgradeRequests SubscriptionUpgradeRequest[]
-  users           User[]
+  id        String   @id @default(uuid())
+  name      String
+  price     Float
+  leads     Int      @default(0)
+  features  String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@map("subscription_plans")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model SubscriptionUpgradeRequest {
-  id        String           @id @default(uuid())
-  userId    String           @map("user_id")
-  planId    String           @map("plan_id")
-  status    String           @default("PENDING")
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
-  plan      SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  planId    String   @map("plan_id")
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([planId], map: "subscription_upgrade_requests_plan_id_fkey")
-  @@index([userId], map: "subscription_upgrade_requests_user_id_fkey")
   @@map("subscription_upgrade_requests")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model ProfessionalRequest {
   id            String   @id @default(uuid())
   name          String
   businessName  String?  @map("business_name")
-  email         String   @unique
+  email         String
   phone         String
   category      String
   address       String?  @db.Text
@@ -237,6 +210,7 @@ model ProfessionalRequest {
   @@map("professional_requests")
 }
 
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Notification {
   id        String   @id @default(uuid())
   userId    String?  @map("user_id")
@@ -245,9 +219,7 @@ model Notification {
   type      String   @default("INFO")
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
   @@map("notifications")
 }
 
