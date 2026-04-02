@@ -1,7 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-<<<<<<< HEAD
 async function main() {
   try {
     const tables = await prisma.$queryRawUnsafe(`SHOW TABLES`);
@@ -20,15 +19,3 @@ async function main() {
 }
 
 main();
-=======
-async function check() {
-    try {
-        const users = await prisma.user.findMany({ select: { name: true, email: true, role: true } });
-        console.log('Users found in DB:', users);
-        await prisma.$disconnect();
-    } catch (error) {
-        console.error('Error fetching users:', error);
-    }
-}
-check();
->>>>>>> adf8db8c7d6db8d79d01c12eac07be4b0251f65c

@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { getJobs, updateJob, submitCompliance, submitInspection, createEstimate, createInvoice, deleteJob, createJob, getEstimates, getInvoices, getJobHistory, addJobPhoto } = require('../controllers/jobController');
-const { protect, authorize } = require('../middlewares/authMiddleware');
+const { protect, optionalProtect, authorize } = require('../middlewares/authMiddleware');
 
 // @route   GET /POST /api/v1/jobs
-router.get('/', protect, getJobs);
+router.get('/', optionalProtect, authorize('ADMIN', 'WORKER', 'GUEST'), getJobs);
 router.post('/', protect, authorize('ADMIN', 'WORKER'), createJob);
 
 // @route   GET /api/v1/jobs/estimates
@@ -14,7 +14,7 @@ router.get('/estimates', protect, authorize('ADMIN'), getEstimates);
 router.get('/invoices', protect, authorize('ADMIN'), getInvoices);
 
 // @route   GET /api/v1/jobs/:id/history
-router.get('/:id/history', protect, getJobHistory);
+router.get('/:id/history', optionalProtect, getJobHistory);
 
 // @route   PATCH /api/v1/jobs/:id
 router.patch('/:id', protect, updateJob);

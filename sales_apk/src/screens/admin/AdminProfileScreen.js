@@ -58,9 +58,15 @@ const MODULES = [
 export default function AdminProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [user, setUser] = React.useState(null);
+  const [isGuest, setIsGuest] = React.useState(false);
 
   React.useEffect(() => {
     const fetchProfile = async () => {
+      const token = await storage.getItem('userToken');
+      if (!token) {
+        setIsGuest(true);
+        return;
+      }
       const res = await getProfile();
       if (res.success) {
         setUser(res.data);
@@ -103,50 +109,76 @@ export default function AdminProfileScreen({ navigation }) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
-        <View style={styles.profileHeaderCard}>
-          <View style={styles.profileRow}>
-            <Image 
-              source={{ uri: user?.avatar || 'https://i.pravatar.cc/100?u=admin' }} 
-              style={styles.profileAvatar} 
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.profileName}>{user?.name || 'Admin User'}</Text>
-              <Text style={styles.profileTeam}>{user?.email || 'System Admin'}</Text>
+        {isGuest ? (
+          <View style={styles.guestContainer}>
+            <View style={styles.guestIconCircle}>
+              <Ionicons name="lock-closed-outline" size={60} color="#0062E1" />
             </View>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleBadgeText}>Manager Account</Text>
-            </View>
+            <Text style={styles.guestTitle}>Access Restricted</Text>
+            <Text style={styles.guestSub}>Log in to access your profile, manage team accounts, and view detailed analytics.</Text>
+            
+            <TouchableOpacity 
+              style={styles.guestLoginBtn}
+              onPress={() => navigation.navigate('Welcome')}
+            >
+              <Text style={styles.guestLoginBtnText}>Log In Now</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.guestSignUpBtn}
+              onPress={() => navigation.navigate('RoleSelect')}
+            >
+              <Text style={styles.guestSignUpBtnText}>Create Account</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.manageProfileBtn}
-            onPress={() => navigation.navigate('SettingsProfile')}
-          >
-            <Text style={styles.manageProfileBtnText}>Manage Profile</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.sectionHeading}>Automation Modules</Text>
-
-        {MODULES.map(module => (
-          <TouchableOpacity
-            key={module.id}
-            style={styles.moduleCard}
-            onPress={() => navigation.navigate(module.screen, { title: module.title })}
-          >
-            <View style={styles.moduleIconContainer}>
-              <Ionicons name={module.icon} size={24} color={COLORS.textPrimary} />
+        ) : (
+          <>
+            <View style={styles.profileHeaderCard}>
+              <View style={styles.profileRow}>
+                <Image 
+                  source={{ uri: user?.avatar || 'https://i.pravatar.cc/100?u=admin' }} 
+                  style={styles.profileAvatar} 
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.profileName}>{user?.name || 'Admin User'}</Text>
+                  <Text style={styles.profileTeam}>{user?.email || 'System Admin'}</Text>
+                </View>
+                <View style={styles.roleBadge}>
+                  <Text style={styles.roleBadgeText}>Manager Account</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.manageProfileBtn}
+                onPress={() => navigation.navigate('SettingsProfile')}
+              >
+                <Text style={styles.manageProfileBtnText}>Manage Profile</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.moduleInfo}>
-              <Text style={styles.moduleTitle}>{module.title}</Text>
-              <Text style={styles.moduleDesc}>{module.desc}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.textTertiary} />
-          </TouchableOpacity>
-        ))}
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+            <Text style={styles.sectionHeading}>Automation Modules</Text>
+
+            {MODULES.map(module => (
+              <TouchableOpacity
+                key={module.id}
+                style={styles.moduleCard}
+                onPress={() => navigation.navigate(module.screen, { title: module.title })}
+              >
+                <View style={styles.moduleIconContainer}>
+                  <Ionicons name={module.icon} size={24} color={COLORS.textPrimary} />
+                </View>
+                <View style={styles.moduleInfo}>
+                  <Text style={styles.moduleTitle}>{module.title}</Text>
+                  <Text style={styles.moduleDesc}>{module.desc}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.textTertiary} />
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </>
+        )}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -187,4 +219,14 @@ const styles = StyleSheet.create({
 
   logoutBtn: { marginTop: 20, backgroundColor: '#FEF2F2', paddingVertical: 15, borderRadius: 12, alignItems: 'center' },
   logoutText: { color: '#EF4444', fontWeight: '700' },
+
+  // Guest Styles
+  guestContainer: { padding: 24, alignItems: 'center', marginTop: 40 },
+  guestIconCircle: { width: 120, height: 120, borderRadius: 60, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  guestTitle: { fontSize: 24, fontWeight: '800', color: '#1E293B', marginBottom: 12 },
+  guestSub: { fontSize: 15, color: '#64748B', textAlign: 'center', lineHeight: 22, marginBottom: 40 },
+  guestLoginBtn: { backgroundColor: '#0062E1', width: '100%', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginBottom: 16, ...SHADOWS.medium },
+  guestLoginBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
+  guestSignUpBtn: { backgroundColor: COLORS.white, width: '100%', height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
+  guestSignUpBtnText: { color: '#1E293B', fontSize: 16, fontWeight: '700' },
 });

@@ -80,7 +80,7 @@ const loginUser = async (req, res) => {
         const { email, password } = req.body;
 
         // 1. Find User
-        const user = await prisma.user.findUnique({
+        const user = await prisma.user.findFirst({
             where: { email: email }
         });
 

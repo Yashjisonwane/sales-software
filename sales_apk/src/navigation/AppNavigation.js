@@ -217,7 +217,7 @@ function AdminTabs() {
 export default function AppNavigation() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Welcome" screenOptions={{ headerShown: false }}>
+      <Stack.Navigator initialRouteName="AdminTabs" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />

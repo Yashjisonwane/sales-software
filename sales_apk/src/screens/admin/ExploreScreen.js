@@ -94,6 +94,7 @@ const getCategoryImages = (category) => {
 };
 
 import { getDashboardStats, getAvailableLeads, getAllJobs, getEstimates, getInvoices, getProfessionals } from '../../api/apiService';
+import storage from '../../api/storage';
 
 // Dynamic Pins calculation
 const getDynamicPins = (leads = [], jobs = []) => {
@@ -306,7 +307,7 @@ const CurrentLocationMarker = () => (
   </View>
 );
 
-const JobCard = ({ name, id, tag, time, images, location, category, navigation, onPress }) => (
+const JobCard = ({ name, id, tag, time, images, location, category, navigation, onPress, isGuest }) => (
   <View style={styles.jobCard}>
     <GestureHandlerScrollView
       horizontal
@@ -371,7 +372,7 @@ const JobCard = ({ name, id, tag, time, images, location, category, navigation, 
           label="Share" 
           onPress={() => Share.share({ message: `Job Details: ${name} at ${location}. ID: ${id}` })}
         />
-        {tag === 'ACCEPTED' && (
+        {tag === 'ACCEPTED' && !isGuest && (
           <>
             <ActionButton 
               icon="person-add-outline" 
@@ -386,6 +387,15 @@ const JobCard = ({ name, id, tag, time, images, location, category, navigation, 
               color="#3B82F6"
             />
           </>
+        )}
+        {tag === 'ACCEPTED' && isGuest && (
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: '#F7FAFC', paddingHorizontal: 12 }]} 
+            onPress={() => Alert.alert("Login Required", "Please log in to assign workers or create quotes.", [{ text: "Log In", onPress: () => navigation.navigate('Welcome') }, { text: "Cancel" }])}
+          >
+            <Ionicons name="lock-closed-outline" size={16} color="#718096" />
+            <Text style={[styles.actionBtnText, { color: '#718096' }]}>Locked</Text>
+          </TouchableOpacity>
         )}
       </View>
     </TouchableOpacity>
@@ -564,6 +574,12 @@ export default function ExploreScreen({ navigation, route }) {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [jobStatusFilter, setJobStatusFilter] = useState('All');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+
+  const checkAuth = async () => {
+    const token = await storage.getItem('userToken');
+    setIsGuest(!token);
+  };
 
   const fetchData = async () => {
     setIsRefreshing(true);
@@ -600,6 +616,7 @@ export default function ExploreScreen({ navigation, route }) {
   const animatedIndex = useSharedValue(0);
 
   React.useEffect(() => {
+    checkAuth();
     fetchData();
   }, []);
 
@@ -735,8 +752,14 @@ export default function ExploreScreen({ navigation, route }) {
                   returnKeyType="search"
                 />
                 <Ionicons name="mic" size={20} color="#4A5568" style={{ marginRight: 12 }} />
-                <TouchableOpacity onPress={() => navigation.navigate('Account')}>
-                  <Image source={{ uri: 'https://i.pravatar.cc/100?u=admin' }} style={styles.profileAvatar} />
+                <TouchableOpacity onPress={() => isGuest ? navigation.navigate('Welcome') : navigation.navigate('Account')}>
+                  {isGuest ? (
+                    <View style={[styles.profileAvatar, { backgroundColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center' }]}>
+                      <Ionicons name="person-outline" size={18} color="#718096" />
+                    </View>
+                  ) : (
+                    <Image source={{ uri: 'https://i.pravatar.cc/100?u=admin' }} style={styles.profileAvatar} />
+                  )}
                 </TouchableOpacity>
               </View>
 
@@ -1059,6 +1082,7 @@ export default function ExploreScreen({ navigation, route }) {
                         <JobCard
                           key={job.id}
                           navigation={navigation}
+                          isGuest={isGuest}
                           name={job.customerName || 'Active Job'}
                           id={`#JB-${job.id.slice(-4).toUpperCase()}`}
                           tag={job.status}
@@ -1184,15 +1208,19 @@ export default function ExploreScreen({ navigation, route }) {
       {activeTab === 'Quote' && !selectedJob && (
         <View style={styles.fixedFloatingButtonArea}>
           <TouchableOpacity
-            style={styles.primaryActionBtn}
+            style={[styles.primaryActionBtn, isGuest && { backgroundColor: '#CBD5E0' }]}
             onPress={() => {
+              if (isGuest) {
+                Alert.alert("Login Required", "Please log in to create new quotes.", [{ text: "Log In", onPress: () => navigation.navigate('Welcome') }, { text: "Cancel" }]);
+                return;
+              }
               setIsCreateQuoteOpen(true);
               setQuoteStep(0);
             }}
             activeOpacity={0.8}
           >
-            <Ionicons name="add" size={24} color={COLORS.white} />
-            <Text style={styles.primaryActionBtnText}>Create New Quote</Text>
+            <Ionicons name={isGuest ? "lock-closed" : "add"} size={24} color={COLORS.white} />
+            <Text style={styles.primaryActionBtnText}>{isGuest ? 'Login to Create' : 'Create New Quote'}</Text>
           </TouchableOpacity>
         </View>
       )}

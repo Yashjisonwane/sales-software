@@ -22,7 +22,7 @@ const {
     approveUpgradeRequest,
     rejectUpgradeRequest
 } = require('../controllers/leadController');
-const { protect, authorize } = require('../middlewares/authMiddleware');
+const { protect, optionalProtect, authorize } = require('../middlewares/authMiddleware');
 
 // @route   GET /api/v1/leads/stats
 router.get('/stats', protect, getStats);
@@ -59,7 +59,7 @@ router.delete('/categories/:id', protect, authorize('ADMIN'), deleteCategory);
 router.post('/', createLead);
 
 // @route   GET /api/v1/leads
-router.get('/', protect, authorize('ADMIN', 'WORKER'), getLeads);
+router.get('/', optionalProtect, authorize('ADMIN', 'WORKER', 'GUEST'), getLeads);
 
 // @route   PATCH /api/v1/leads/:id/assign
 router.patch('/:id/assign', protect, authorize('WORKER', 'ADMIN'), assignLead);

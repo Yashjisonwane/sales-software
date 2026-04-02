@@ -11,8 +11,8 @@ datasource db {
 model User {
   id                    String    @id @default(uuid())
   name                  String
-  email                 String
-  phone                 String
+  email                 String    @unique
+  phone                 String    @unique
   password              String
   role                  Role      @default(CUSTOMER)
   isAvailable           Boolean   @default(true) @map("is_available")
@@ -35,6 +35,15 @@ model User {
   experience            String?
   serviceRadius         Int?      @default(15) @map("service_radius")
 
+  // Relations
+  jobs                  Job[]     @relation("WorkerJobs")
+  customerJobs          Job[]     @relation("CustomerJobs")
+  leads                 Lead[]
+  upgradeRequests       SubscriptionUpgradeRequest[]
+  notifications         Notification[]
+  plan                  SubscriptionPlan? @relation(fields: [planId], references: [id])
+  categories            WorkerCategory[]
+
   @@map("users")
 }
 
@@ -45,6 +54,10 @@ model Category {
   icon      String?
   createdAt DateTime @default(now()) @map("created_at")
 
+  // Relations
+  leads     Lead[]
+  workers   WorkerCategory[]
+
   @@map("categories")
 }
 
@@ -53,6 +66,10 @@ model WorkerCategory {
   id         String @id @default(uuid())
   userId     String @map("user_id")
   categoryId String @map("category_id")
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   @@map("worker_categories")
 }
@@ -71,6 +88,11 @@ model Lead {
   updatedAt     DateTime   @updatedAt @map("updated_at")
   preferredDate String?    @map("preferred_date")
 
+  // Relations
+  customer    User    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id])
+  job         Job?
+
   @@map("leads")
 }
 
@@ -78,7 +100,7 @@ model Lead {
 model Job {
   id            String    @id @default(uuid())
   jobNo         String    @default(cuid()) @map("job_no")
-  leadId        String?   @map("lead_id")
+  leadId        String?   @unique @map("lead_id")
   customerId    String    @map("customer_id")
   workerId      String    @map("worker_id")
   categoryName  String    @map("category_name")
@@ -91,6 +113,16 @@ model Job {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   preferredDate String?   @map("preferred_date")
 
+  // Relations
+  lead       Lead?          @relation(fields: [leadId], references: [id])
+  customer   User           @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
+  worker     User           @relation("WorkerJobs", fields: [workerId], references: [id], onDelete: Cascade)
+  photos     JobPhoto[]
+  inspection JobInspection?
+  estimate   JobEstimate?
+  invoices   JobInvoice[]
+  contracts  JobContract[]
+
   @@map("jobs")
 }
 
@@ -102,40 +134,29 @@ model JobPhoto {
   type      String   @default("BEFORE")
   createdAt DateTime @default(now()) @map("created_at")
 
+  // Relations
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
   @@map("job_photos")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobInspection {
-<<<<<<< HEAD
-  id        String   @id @default(uuid())
-  jobId     String   @map("job_id")
-  notes     String   @db.Text
-  signature String?
-  createdAt DateTime @default(now()) @map("created_at")
-=======
   id            String   @id @default(uuid())
   jobId         String   @unique @map("job_id")
   notes         String   @db.Text
   triageAnswers Json?    @map("triage_answers")
   signature     String?
   createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
   job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
->>>>>>> adf8db8c7d6db8d79d01c12eac07be4b0251f65c
 
   @@map("job_inspections")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobEstimate {
-<<<<<<< HEAD
-  id         String   @id @default(uuid())
-  jobId      String   @map("job_id")
-  amount     Float
-  details    String   @db.Text
-  isApproved Boolean  @default(false) @map("is_approved")
-  createdAt  DateTime @default(now()) @map("created_at")
-=======
   id           String   @id @default(uuid())
   jobId        String   @unique @map("job_id")
   amount       Float
@@ -145,8 +166,9 @@ model JobEstimate {
   measurements Json?
   isApproved   Boolean  @default(false) @map("is_approved")
   createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
   job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
->>>>>>> adf8db8c7d6db8d79d01c12eac07be4b0251f65c
 
   @@map("job_estimates")
 }
@@ -160,6 +182,9 @@ model JobContract {
   customerSignature String?  @map("customer_signature")
   createdAt         DateTime @default(now()) @map("created_at")
 
+  // Relations
+  job               Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
   @@map("job_contracts")
 }
 
@@ -171,6 +196,9 @@ model JobInvoice {
   status    String   @default("UNPAID")
   paymentId String?  @map("payment_id")
   createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_invoices")
 }
@@ -198,6 +226,10 @@ model SubscriptionPlan {
   features  String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at")
 
+  // Relations
+  users           User[]
+  upgradeRequests SubscriptionUpgradeRequest[]
+
   @@map("subscription_plans")
 }
 
@@ -209,6 +241,10 @@ model SubscriptionUpgradeRequest {
   status    String   @default("PENDING")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
 
   @@map("subscription_upgrade_requests")
 }
@@ -242,6 +278,9 @@ model Notification {
   type      String   @default("INFO")
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
