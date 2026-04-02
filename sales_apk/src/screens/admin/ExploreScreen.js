@@ -23,7 +23,7 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
-import { RefreshControl } from 'react-native';
+import { RefreshControl, Linking, Share } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,7 +31,8 @@ const getImgSource = (img) => {
   if (!img) return require('../../assets/images/wood_flooring_job.png');
   if (typeof img === 'number') return img;
   if (typeof img === 'string') return { uri: img.startsWith('http') ? img : 'https://images.unsplash.com/photo-1517646272486-a2c99afd9538?q=80&w=500' };
-  if (img.uri) return img;
+  if (img && img.url) return { uri: img.url };
+  if (img && img.uri) return img;
   return require('../../assets/images/wood_flooring_job.png');
 };
 
@@ -210,12 +211,12 @@ const mapStyle = [
   }
 ];
 
-const StatCard = ({ icon, label, value, change, color }) => {
+const StatCard = ({ icon, label, value, change, color, onPress }) => {
   const isJobsCard = label === 'Jobs In Progress' && change.includes('|');
   const isRevenue = label === 'Total Revenue';
 
   return (
-    <View style={styles.statCardRefined}>
+    <TouchableOpacity style={styles.statCardRefined} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.statIconContainerRefined, { backgroundColor: color + '12' }]}>
         <Ionicons name={icon} size={22} color={color} />
       </View>
@@ -242,7 +243,7 @@ const StatCard = ({ icon, label, value, change, color }) => {
           </Text>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -311,13 +312,11 @@ const JobCard = ({ name, id, tag, time, images, location, category, navigation, 
       horizontal
       showsHorizontalScrollIndicator={false}
       style={styles.jobImages}
-      contentContainerStyle={{ gap: 10, paddingRight: 20, paddingLeft: 16 }}
-      snapToInterval={150} 
+      contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}
       decelerationRate="fast"
-      snapToAlignment="start"
       disallowInterruption={true}
     >
-      {images.map((img, i) => (
+      {images && images.length > 0 ? images.map((img, i) => (
         <TouchableOpacity 
           key={i} 
           onPress={onPress}
@@ -325,40 +324,78 @@ const JobCard = ({ name, id, tag, time, images, location, category, navigation, 
         >
           <Image source={getImgSource(img)} style={styles.jobImage} />
         </TouchableOpacity>
-      ))}
+      )) : (
+        <View style={styles.jobImagePlaceholder}>
+           <Ionicons name="images-outline" size={32} color="#CBD5E0" />
+        </View>
+      )}
     </GestureHandlerScrollView>
     <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.jobInfo}>
       <View style={styles.jobInfoHeader}>
         <View style={styles.jobNameRow}>
-          <Text style={styles.jobName}>{name}</Text>
-          <View style={[styles.jobStatusBadge, { backgroundColor: tag === 'New' ? '#F5F3FF' : '#EFF6FF' }]}>
-            <Text style={[styles.jobStatusText, { color: tag === 'New' ? '#8B5CF6' : '#3B82F6' }]}>{tag}</Text>
+          <Text style={styles.jobName} numberOfLines={1}>{name}</Text>
+          <View style={[styles.jobStatusBadge, { backgroundColor: tag === 'COMPLETED' ? '#ECFDF5' : '#F5F3FF' }]}>
+            <Text style={[styles.jobStatusText, { color: tag === 'COMPLETED' ? '#10B981' : '#8B5CF6' }]}>{tag}</Text>
           </View>
         </View>
         <Text style={styles.jobId}>{id}</Text>
       </View>
-      <Text style={styles.jobSubText}>{location || 'Indore, MP, India'}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+      <Text style={styles.jobSubText} numberOfLines={1}>{location || 'Location not specified'}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
         <Text style={styles.jobDistTime}>4.5 mi</Text>
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#64748B' }} />
+        <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: '#CBD5E0' }} />
         <Text style={styles.jobDistTime}>12 m</Text>
       </View>
-      <Text style={styles.jobTime}><Text style={{ color: '#0E56D0' }}>{category || 'Service'}</Text> • {time}</Text>
+      <Text style={styles.jobTime}>
+        <Text style={{ color: '#0E56D0', fontWeight: '700' }}>{category || 'Service'}</Text> • {time}
+      </Text>
 
       <View style={styles.jobActions}>
-        <ActionButton icon="navigate" label="Directions" />
-        <ActionButton icon="call" label="Call" />
-        <ActionButton icon="bookmark" label="Save" />
-        <ActionButton icon="share-outline" label="Share" />
+        <ActionButton 
+          icon="navigate-outline" 
+          label="Directions" 
+          onPress={() => location && Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`)} 
+        />
+        <ActionButton 
+          icon="call-outline" 
+          label="Call" 
+          onPress={() => Linking.openURL('tel:1234567890')} 
+        />
+        <ActionButton 
+          icon="bookmark-outline" 
+          label="Save" 
+          onPress={() => Alert.alert("Success", "Job saved to your bookmarks")}
+        />
+        <ActionButton 
+          icon="share-outline" 
+          label="Share" 
+          onPress={() => Share.share({ message: `Job Details: ${name} at ${location}. ID: ${id}` })}
+        />
+        {tag === 'ACCEPTED' && (
+          <>
+            <ActionButton 
+              icon="person-add-outline" 
+              label="Assign" 
+              onPress={() => navigation.navigate('AssignJob', { job: { id: id.replace('#JB-', ''), customerName: name, location } })}
+              color="#00BFA5"
+            />
+            <ActionButton 
+              icon="document-text-outline" 
+              label="Quote" 
+              onPress={() => navigation.navigate('QuoteScope', { job: { id: id.replace('#JB-', ''), customerName: name, location } })}
+              color="#3B82F6"
+            />
+          </>
+        )}
       </View>
     </TouchableOpacity>
   </View>
 );
 
-const ActionButton = ({ icon, label, onPress }) => (
+const ActionButton = ({ icon, label, onPress, color = "#0062E1" }) => (
   <TouchableOpacity style={styles.actionBtn} onPress={onPress}>
-    <Ionicons name={icon} size={18} color="#0062E1" />
-    <Text style={styles.actionBtnText}>{label}</Text>
+    <Ionicons name={icon} size={18} color={color} />
+    <Text style={[styles.actionBtnText, { color }]}>{label}</Text>
   </TouchableOpacity>
 );
 
@@ -394,7 +431,7 @@ const AgendaItem = ({ item, index, isLast, navigation }) => (
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.agendaBtnPrimaryClean}
-            onPress={() => navigation.navigate('LeadDetails', { job: item })}
+            onPress={() => navigation.navigate('JobDetails', { job: item })}
           >
             <Text style={styles.agendaBtnPrimaryText}>Details</Text>
           </TouchableOpacity>
@@ -647,7 +684,7 @@ export default function ExploreScreen({ navigation, route }) {
             <TouchableOpacity
               key={pin.id}
               style={[styles.pin, { top: pin.latitude ? `${(parseFloat(pin.latitude) % 100)}%` : `${Math.random() * 40 + 20}%`, left: pin.longitude ? `${(parseFloat(pin.longitude) % 100)}%` : `${Math.random() * 40 + 20}%` }]}
-              onPress={() => setSelectedPin(pin)}
+              onPress={() => navigation.navigate('JobDetails', { job: pin })}
             >
               <LocationPin color={pin.status === 'OPEN' ? '#8B5CF6' : '#10B981'} />
             </TouchableOpacity>
@@ -661,7 +698,7 @@ export default function ExploreScreen({ navigation, route }) {
             <TouchableOpacity
               key={job.id}
               style={[styles.pin, { top: job.latitude ? `${(parseFloat(job.latitude) % 100)}%` : `${Math.random() * 40 + 40}%`, left: job.longitude ? `${(parseFloat(job.longitude) % 100)}%` : `${Math.random() * 40 + 40}%` }]}
-              onPress={() => setSelectedJob({ ...job, name: job.customerName, images: getCategoryImages(job.categoryName) })}
+              onPress={() => navigation.navigate('JobDetails', { job })}
             >
               <LocationPin color={job.status === 'IN_PROGRESS' ? '#0E56D0' : '#004D40'} />
             </TouchableOpacity>
@@ -780,297 +817,11 @@ export default function ExploreScreen({ navigation, route }) {
           )}
         </Animated.View>
       </View>
-
-      {/* Selected Job Modal - Lead/Job Detail (Alistair Hughes UI) */}
-      <Modal
-        visible={!!selectedJob}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSelectedJob(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContentRefined}>
-            <View style={styles.sheetHandleContainer}>
-              <View style={styles.sheetHandleBar} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.modalHeader}>
-                <TouchableOpacity onPress={() => setSelectedJob(null)} style={styles.headerActionIcon}>
-                  <Ionicons name="chevron-down" size={24} color="#1A202C" />
-                </TouchableOpacity>
-                <View style={styles.modalHeaderActions}>
-                  <TouchableOpacity style={styles.headerActionIcon}>
-                    <Ionicons name="share-social-outline" size={22} color="#1A202C" />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.headerActionIcon}>
-                    <Ionicons name="ellipsis-horizontal" size={22} color="#1A202C" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScroll}>
-                <View style={styles.jobHeadline}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={styles.jobTitleName}>{selectedJob?.name || 'Alistair Hughes'}</Text>
-                      <View style={styles.newBadgeRefined}>
-                        <Text style={styles.newBadgeTextRefined}>New</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.jobAddressRefined}>{selectedJob?.location || 'Indore, MP, India'}</Text>
-                    <Text style={styles.jobDistTime}>4.5 mi  •  12 m</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.jobRateValue}>${selectedJob?.amount || '0'} <Text style={styles.jobRateSub}>{selectedJob?.status === 'OPEN' ? 'Estimate' : 'Budget'}</Text></Text>
-                  </View>
-                </View>
-
-                <View style={styles.shortcutActionsRow}>
-                  <TouchableOpacity style={styles.shortcutBtnFilled}>
-                    <Ionicons name="navigate" size={20} color="#FFF" />
-                    <Text style={[styles.shortcutBtnText, { color: '#FFF' }]}>Directions</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.shortcutBtnOutline}>
-                    <Ionicons name="call" size={20} color="#0062E1" />
-                    <Text style={styles.shortcutBtnText}>Call</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.shortcutBtnOutline}>
-                    <Ionicons name="bookmark" size={20} color="#0062E1" />
-                    <Text style={styles.shortcutBtnText}>Save</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.shortcutBtnOutline}>
-                    <Ionicons name="share-outline" size={20} color="#0062E1" />
-                    <Text style={styles.shortcutBtnText}>Share</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.imageGridRefined}>
-                  <View style={styles.largeImageWrapper}>
-                    <Image source={getImgSource(selectedJob?.images?.[0])} style={styles.largeImageDetail} />
-                    <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>Recent</Text></View>
-                  </View>
-                  <View style={styles.smallImagesColumn}>
-                    <View style={{ gap: 10 }}>
-                      <View style={styles.smallImageWrapper}>
-                        <Image source={getImgSource(selectedJob?.images?.[1])} style={styles.smallImageDetail} />
-                        <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>Recent</Text></View>
-                      </View>
-                      <View style={styles.smallImageWrapper}>
-                        <Image source={getImgSource(selectedJob?.images?.[2])} style={styles.smallImageDetail} />
-                        <View style={styles.imgTimeBadge}><Text style={styles.imgTimeText}>Recent</Text></View>
-                      </View>
-                    </View>
-                  </View>
-                </View>
+      {/* Navigating to full JobDetails instead of showing local modals */}
 
 
-                <View style={styles.overlayTabsRow}>
-                  {['Job Details', 'Description', 'Photos', 'Updates'].map(t => (
-                    <TouchableOpacity
-                      key={t}
-                      style={[styles.overlayTabBtn, overlayTab === t && styles.overlayTabBtnActive]}
-                      onPress={() => setOverlayTab(t)}
-                    >
-                      <Text style={[styles.overlayTabTextRefined, overlayTab === t && styles.overlayTabTextActive]}>{t}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <View style={styles.detailsContentBody}>
-                  {overlayTab === 'Job Details' && (
-                    <>
-                      <InfoRow label="Service Type" value={selectedJob?.categoryName || 'Service'} />
-                      <InfoRow label="Preferred Schedule" value={selectedJob?.scheduledDate ? new Date(selectedJob.scheduledDate).toLocaleDateString() : 'ASAP'} />
-                      <InfoRow label="Budget Range" value={selectedJob?.budget || "$2,000 - $5,000"} />
-                      <InfoRow label="Urgency Level" value={selectedJob?.priority || "High Priority"} />
-                      <View style={{ marginTop: 24, marginBottom: 16 }}>
-                        <Text style={[styles.breakdownCardTitle, { marginBottom: 12 }]}>Site Details</Text>
-                      </View>
-                      <InfoRow label="Area Zone" value={selectedJob?.location || "Main Site"} />
-                    </>
-                  )}
-
-                  {overlayTab === 'Description' && (
-                    <View style={{ padding: 10 }}>
-                      <Text style={{ fontSize: 16, color: '#4A5568', lineHeight: 24 }}>
-                        {selectedJob?.description || "No detailed description available for this job yet. Standard service protocols are being followed."}
-                      </Text>
-                    </View>
-                  )}
-
-                  {overlayTab === 'Photos' && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
-                      {selectedJob?.images?.map((img, idx) => (
-                        <Image key={idx} source={getImgSource(img)} style={{ width: (width - 60) / 2, height: 120, borderRadius: 12 }} />
-                      ))}
-                      <TouchableOpacity style={{ width: (width - 60) / 2, height: 120, borderRadius: 12, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#CBD5E0' }}>
-                        <Ionicons name="add" size={24} color="#94A3B8" />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {overlayTab === 'Updates' && (
-                    <View style={{ gap: 16 }}>
-                      <ActivityItem 
-                        icon="checkmark-circle" 
-                        label="Job Accepted" 
-                        sub={`Worker ${selectedJob?.workerName || 'assigned'} started the process.`}
-                        time="2h ago"
-                        iconColor="#10B981"
-                        iconBg="#ECFDF5"
-                      />
-                      <ActivityItem 
-                        icon="camera" 
-                        label="Progress Photo Uploaded" 
-                        sub="Front backyard area survey completed."
-                        time="5h ago"
-                        iconColor="#3B82F6"
-                        iconBg="#EFF6FF"
-                      />
-                      <ActivityItem 
-                        icon="document-text" 
-                        label="Estimate Created" 
-                        sub="Initial consultation done."
-                        time="Yesterday"
-                        iconColor="#8B5CF6"
-                        iconBg="#F5F3FF"
-                      />
-                    </View>
-                  )}
-                </View>
-                <View style={{ height: 100 }} />
-              </ScrollView>
-
-              <View style={[styles.modalFooterRefined, { paddingBottom: insets.bottom + 16 }]}>
-                <TouchableOpacity
-                  style={[styles.modalFooterBtnRefined, { backgroundColor: '#10B981' }]}
-                  onPress={() => { setSelectedJob(null); navigation.navigate('AssignJob', { job: selectedJob }); }}
-                >
-                  <Text style={styles.modalFooterBtnTextRefined}>Assign</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalFooterBtnRefined, { backgroundColor: '#0062E1' }]}
-                  onPress={() => {
-                    setSelectedJob(null);
-                    setIsCreateQuoteOpen(true);
-                    setQuoteStep(0);
-                  }}
-                >
-                  <Text style={styles.modalFooterBtnTextRefined}>Create Quote</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Selected Pin Modal - Manage Worker / Location UI (John Carter UI) */}
-      <Modal
-        visible={!!selectedPin}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setSelectedPin(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContentRefined}>
-            <View style={styles.sheetHandleContainer}>
-              <View style={styles.sheetHandleBar} />
-            </View>
-            <View style={{ flex: 1, backgroundColor: '#F8F9FB' }}>
-              <View style={[styles.modalHeader, { backgroundColor: '#FFF' }]}>
-                <TouchableOpacity onPress={() => setSelectedPin(null)} style={styles.headerActionIcon}>
-                  <Ionicons name="close" size={24} color="#1A202C" />
-                </TouchableOpacity>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: '#1A202C' }}>Location Details</Text>
-                <View style={{ width: 44 }} />
-              </View>
-              <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScroll}>
-                <View style={styles.pinSectionCardWhite}>
-                  <View style={styles.pinDetailHeader}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pinNameText}>{selectedPin?.name}</Text>
-                      <Text style={styles.pinIdText}>Job ID #1024</Text>
-                      <View style={styles.pinBadgeRow}>
-                        <View style={[styles.miniBadge, { backgroundColor: '#F5F3FF', borderRadius: 20 }]}>
-                          <Text style={[styles.miniBadgeText, { color: '#8B5CF6' }]}>Lead Job</Text>
-                        </View>
-                        <View style={[styles.miniBadge, { backgroundColor: '#EFF6FF', borderRadius: 20 }]}>
-                          <Text style={[styles.miniBadgeText, { color: '#3B82F6' }]}>In Progress</Text>
-                        </View>
-                      </View>
-                      <View style={styles.pinInfoSectionCompact}>
-                        <View style={styles.pinInfoItem}>
-                          <Ionicons name="time-outline" size={16} color="#718096" />
-                          <Text style={styles.pinInfoValueCompact}>09:00 AM</Text>
-                        </View>
-                        <View style={styles.pinInfoItem}>
-                          <Ionicons name="location-outline" size={16} color="#718096" />
-                          <Text style={styles.pinInfoValueCompact}>123 E Market St Boulder, CO 80304</Text>
-                        </View>
-                      </View>
-                    </View>
-                    <Text style={styles.pinAmountTextGreen}>${selectedPin?.amount?.replace('$', '')}</Text>
-                  </View>
-                  <Text style={styles.pinSectionLabelSmall}>Job Photos</Text>
-                  <View style={styles.pinPhotoRow}>
-                    {getCategoryImages(selectedPin?.categoryName).slice(0, 2).map((img, idx) => (
-                      <Image key={idx} source={getImgSource(img)} style={styles.pinSquareImageDetail} />
-                    ))}
-                  </View>
-                </View>
-
-                <View style={styles.pinSectionCardWhite}>
-                  <Text style={styles.pinSectionLabelCard}>Assigned Worker</Text>
-                  <View style={styles.workerSubCardClean}>
-                    <View style={styles.workerMainInfoRow}>
-                      <View style={styles.workerAvatarCircleBlue}><Text style={styles.workerAvatarTextWhite}>JC</Text></View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.workerNameBold}>John Carter</Text>
-                        <View style={styles.workerTagRow}>
-                          <View style={styles.tinyBadgePurple}><Text style={styles.tinyBadgeTextPurple}>Plumber</Text></View>
-                          <View style={styles.tinyBadgeGreen}><Text style={styles.tinyBadgeTextGreen}>Active</Text></View>
-                        </View>
-                      </View>
-                    </View>
-                    <View style={styles.workerStatsContainerGrey}>
-                      <View style={styles.statBoxItem}><Text style={styles.statBoxValue}>3</Text><Text style={styles.statBoxLabel}>Active Jobs</Text></View>
-                      <View style={styles.statBoxItem}><Text style={styles.statBoxValue}>32</Text><Text style={styles.statBoxLabel}>Jobs Completed</Text></View>
-                      <View style={styles.statBoxItem}><Text style={styles.statBoxValueGreen}>92%</Text><Text style={styles.statBoxLabel}>Completion</Text></View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.viewProfileBtnOutline}
-                      onPress={() => { 
-                        setSelectedPin(null); 
-                        navigation.navigate('WorkerProfile', { 
-                          workerId: selectedPin?.workerId || 'W001', 
-                          name: selectedPin?.workerName || 'Assigned Worker' 
-                        }); 
-                      }}
-                    >
-                      <Text style={styles.viewProfileBtnText}>View Worker Profile</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                <View style={{ height: 100 }} />
-              </ScrollView>
-              <View style={[styles.locationFooterActions, { paddingBottom: insets.bottom + 16 }]}>
-                <TouchableOpacity style={styles.locationFooterBtnOutline} onPress={() => { setSelectedPin(null); navigation.navigate('LeadDetails', { job: selectedPin }); }}>
-                  <Text style={styles.locationFooterBtnOutlineText}>View Job</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.locationFooterBtnOutline} onPress={() => { setSelectedPin(null); navigation.navigate('AssignJob', { job: selectedPin }); }}>
-                  <Text style={styles.locationFooterBtnOutlineText}>Reassign Work</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.locationFooterBtnFilled} onPress={() => { setSelectedPin(null); setIsCreateQuoteOpen(true); setQuoteStep(0); }}>
-                  <Text style={styles.locationFooterBtnFilledText}>Create Quote</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Bottom Sheet Dashboard */}
-      {!selectedJob && (
-        <BottomSheet
+      {/* Bottom Sheet Dashboard - Always visible for quick access */}
+      <BottomSheet
           style={{ zIndex: 100, elevation: 10 }}
           ref={bottomSheetRef}
           index={1}
@@ -1143,6 +894,7 @@ export default function ExploreScreen({ navigation, route }) {
                       value={stats?.mainStats?.[0]?.value?.toString() || "0"} 
                       change={stats?.mainStats?.[0]?.trend || "+0%"} 
                       color="#3B82F6" 
+                      onPress={() => navigation.navigate('WorkerManagement')}
                     />
                     <StatCard 
                       icon="briefcase-outline" 
@@ -1150,6 +902,7 @@ export default function ExploreScreen({ navigation, route }) {
                       value={stats?.mainStats?.[1]?.value?.toString() || "0"} 
                       change={stats?.mainStats?.[1]?.trend || "Lead: 0 | Sub: 0"} 
                       color="#8B5CF6" 
+                      onPress={() => setActiveTab('Jobs')}
                     />
                     <StatCard 
                       icon="checkmark-circle-outline" 
@@ -1157,6 +910,10 @@ export default function ExploreScreen({ navigation, route }) {
                       value={stats?.mainStats?.[2]?.value?.toString() || "0"} 
                       change={stats?.mainStats?.[2]?.trend || "+0%"} 
                       color="#10B981" 
+                      onPress={() => {
+                        setActiveTab('Jobs');
+                        setJobStatusFilter('All');
+                      }}
                     />
                     <StatCard 
                       icon="cash-outline" 
@@ -1164,6 +921,7 @@ export default function ExploreScreen({ navigation, route }) {
                       value={stats?.mainStats?.[3]?.value?.toString() || "$0"} 
                       change={stats?.mainStats?.[3]?.trend || "+0%"} 
                       color="#0062E1" 
+                      onPress={() => setActiveTab('Invoice')}
                     />
                   </View>
                 </View>
@@ -1191,11 +949,8 @@ export default function ExploreScreen({ navigation, route }) {
                     <Text style={styles.breakdownCardTitle}>Active Workers</Text>
                     <TouchableOpacity onPress={() => navigation.navigate('WorkerManagement')}><Text style={styles.viewAllText}>View all</Text></TouchableOpacity>
                   </View>
-                  {stats?.growthStats ? (
-                    // Show actual workers here if available, or a fallback
-                    stats.mainStats[0].value > 0 ? (
-                      <Text style={{ fontSize: 13, color: '#718096', marginBottom: 10 }}>Displaying top registered professionals</Text>
-                    ) : null
+                  {stats?.mainStats?.[0]?.value > 0 ? (
+                    <Text style={{ fontSize: 13, color: '#718096', marginBottom: 10 }}>Displaying {stats?.mainStats?.[0]?.value} registered professionals</Text>
                   ) : null}
                   {/* Using available workers instead of dummy ones */}
                   {workers && workers.length > 0 ? workers.slice(0, 3).map(w => (
@@ -1225,7 +980,7 @@ export default function ExploreScreen({ navigation, route }) {
                     <TouchableOpacity 
                       key={lead.id} 
                       style={styles.availableLeadRow}
-                      onPress={() => setSelectedPin(lead)}
+                      onPress={() => navigation.navigate('JobDetails', { job: lead })}
                     >
                       <View style={[styles.leadIcon, { backgroundColor: '#F5F3FF' }]}>
                         <Ionicons name="flash-outline" size={18} color="#7C3AED" />
@@ -1311,11 +1066,7 @@ export default function ExploreScreen({ navigation, route }) {
                           category={job.categoryName}
                           time={`Scheduled: ${new Date(job.scheduledDate).toLocaleDateString()}`}
                           images={photoList}
-                          onPress={() => setSelectedJob({
-                            ...job,
-                            name: job.customerName,
-                            images: photoList
-                          })}
+                          onPress={() => navigation.navigate('JobDetails', { job })}
                         />
                       );
                     });
@@ -1407,8 +1158,8 @@ export default function ExploreScreen({ navigation, route }) {
                   q.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
                   q.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
                 ).length > 0 ? quotes.filter(q => 
-                  q.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                  q.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
+                  (q.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  q.categoryName?.toLowerCase().includes(searchQuery.toLowerCase()))
                 ).map(q => (
                   <QuoteCard 
                     key={q.id}
@@ -1419,6 +1170,7 @@ export default function ExploreScreen({ navigation, route }) {
                     date={new Date(q.createdAt).toLocaleDateString()} 
                     amount={q.amount.toLocaleString()} 
                     status={q.isApproved ? 'Approved' : 'Sent'} 
+                    onPress={() => navigation.navigate('QuoteDetails', { quote: q })}
                   />
                 )) : (
                   <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No quotes found</Text>
@@ -1427,7 +1179,6 @@ export default function ExploreScreen({ navigation, route }) {
             )}
           </BottomSheetScrollView>
         </BottomSheet>
-      )}
 
       {/* FIXED BUTTON FOR QUOTE TAB - Outside BottomSheet to ensure visibility */}
       {activeTab === 'Quote' && !selectedJob && (
@@ -1814,9 +1565,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white, borderRadius: 24, marginBottom: 20,
     overflow: 'hidden', ...SHADOWS.small, borderWidth: 1, borderColor: '#F1F5F9',
   },
-  jobImages: { height: 110, marginTop: 16 },
-  jobImage: { width: 130, height: 130, marginLeft: 16, borderRadius: 12 },
-  jobInfo: { padding: 16 },
+  jobImages: { height: 130, marginTop: 12 },
+  jobImage: { width: 140, height: 130, borderRadius: 16, backgroundColor: '#F1F5F9' },
+  jobImagePlaceholder: { width: width - 64, height: 130, marginHorizontal: 16, backgroundColor: '#F8FAFC', borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#CBD5E0' },
+  jobInfo: { padding: 20 },
   jobInfoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   jobNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   jobName: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },

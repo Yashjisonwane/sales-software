@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { getProfessionals, assignLeadToWorker } from '../../api/apiService';
 import { Alert, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const AssignJobScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -36,8 +38,9 @@ const AssignJobScreen = ({ navigation, route }) => {
     }
 
     setLoading(true);
-    const workerId = method === 'auto' ? null : selectedWorker.id;
-    const res = await assignLeadToWorker(job.id, workerId);
+    const workerId = method === 'auto' ? null : (selectedWorker?.id || null);
+    const { assignJob } = require('../../api/apiService');
+    const res = await assignJob(job.id, workerId);
     setLoading(false);
 
     if (res.success) {

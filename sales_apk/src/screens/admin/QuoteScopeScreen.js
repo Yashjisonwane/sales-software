@@ -12,6 +12,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const QuoteScopeScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const { job } = route.params || {};
+  
+  const [serviceType, setServiceType] = React.useState(job?.categoryName || 'General Service');
+  const [materialsCount, setMaterialsCount] = React.useState(0);
+  const [laborHours, setLaborHours] = React.useState(0);
+
+  // Reaction to inspection tool results if any (passed back via params)
+  React.useEffect(() => {
+    if (route.params?.inspectionResults) {
+      const { materials, labor } = route.params.inspectionResults;
+      if (materials) setMaterialsCount(materials.length);
+      if (labor) setLaborHours(labor);
+    }
+  }, [route.params?.inspectionResults]);
 
   return (
     <View style={styles.container}>
@@ -48,16 +62,19 @@ const QuoteScopeScreen = ({ navigation, route }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Select Service Type</Text>
-          <TouchableOpacity style={styles.dropdown}>
-            <Text style={styles.dropdownText}>HVAC Instalation</Text>
+          <TouchableOpacity style={styles.dropdown} onPress={() => {}}>
+            <Text style={styles.dropdownText}>{serviceType}</Text>
             <Ionicons name="chevron-down" size={20} color="#1A202C" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Measurement input</Text>
-          <Text style={styles.sectionSub}>Use the tool ro auto-fill measurements.</Text>
-          <TouchableOpacity style={styles.outlineBtn}>
+          <Text style={styles.sectionSub}>Use the tool to auto-fill measurements and suggested materials.</Text>
+          <TouchableOpacity 
+            style={styles.outlineBtn}
+            onPress={() => navigation.navigate('PreInspection', { job })}
+          >
             <Text style={styles.outlineBtnText}>Start Pre-Inspection Tool</Text>
           </TouchableOpacity>
         </View>
@@ -66,11 +83,11 @@ const QuoteScopeScreen = ({ navigation, route }) => {
           <Text style={styles.sectionTitle}>Add Materials & Labor</Text>
           <View style={styles.itemRow}>
             <Text style={styles.itemLabel}>Total Materials Added:</Text>
-            <Text style={styles.itemValue}>5 Items</Text>
+            <Text style={styles.itemValue}>{materialsCount} Items</Text>
           </View>
           <View style={styles.itemRow}>
             <Text style={styles.itemLabel}>Estimated Labor Hours:</Text>
-            <Text style={styles.itemValue}>8.5 hrs</Text>
+            <Text style={styles.itemValue}>{laborHours} hrs</Text>
           </View>
           <TouchableOpacity style={styles.outlineBtn}>
             <Text style={styles.outlineBtnText}>Edit Item List</Text>
@@ -81,7 +98,10 @@ const QuoteScopeScreen = ({ navigation, route }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
           style={styles.continueBtn}
-          onPress={() => navigation.navigate('QuotePricing', { ...route.params })}
+          onPress={() => navigation.navigate('QuotePricing', { 
+            job, 
+            scope: { serviceType, materialsCount, laborHours, inspectionResults: route.params?.inspectionResults } 
+          })}
         >
           <Text style={styles.continueBtnText}>Continue to Pricing</Text>
         </TouchableOpacity>

@@ -13,14 +13,24 @@ const getJobs = async (req, res) => {
 
         if (user.role === 'ADMIN') {
             jobs = await prisma.job.findMany({
-                include: { customer: { select: { name: true } }, worker: { select: { name: true } } },
+                include: { 
+                    customer: { select: { name: true, phone: true } }, 
+                    worker: { select: { name: true } },
+                    photos: true,
+                    estimate: true 
+                },
                 orderBy: { createdAt: 'desc' }
             });
         } else {
             // Workers only see their own assigned jobs
             jobs = await prisma.job.findMany({
                 where: { workerId: user.id },
-                include: { customer: { select: { name: true } }, worker: { select: { name: true } } },
+                include: { 
+                    customer: { select: { name: true, phone: true } }, 
+                    worker: { select: { name: true } },
+                    photos: true,
+                    estimate: true 
+                },
                 orderBy: { createdAt: 'desc' }
             });
         }
@@ -28,6 +38,7 @@ const getJobs = async (req, res) => {
         const formattedJobs = jobs.map(j => ({
             ...j,
             customerName: j.customer?.name || 'Valued Customer',
+            customerPhone: j.customer?.phone || null,
             workerName: j.worker?.name || 'Unassigned',
             displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`
         }));
@@ -109,26 +120,45 @@ const submitCompliance = async (req, res) => {
     }
 };
 
+const submitInspection = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const { notes, triageAnswers, signature } = req.body;
+
+        const inspection = await prisma.jobInspection.upsert({
+            where: { jobId: jobId },
+            update: { notes: notes || '', triageAnswers, signature },
+            create: { jobId, notes: notes || '', triageAnswers, signature }
+        });
+
+        res.status(200).json({ success: true, data: inspection });
+    } catch (err) {
+        console.error("Inspection Error:", err);
+        res.status(500).json({ success: false, message: 'Inspection submission failed' });
+    }
+};
+
 const createEstimate = async (req, res) => {
     try {
         const jobId = req.params.id;
-        const { amount, details } = req.body;
+        const { amount, details, materials, laborHours, measurements } = req.body;
 
-        // --- STRICT WORKFLOW CHECK ---
-        const job = await prisma.job.findUnique({
-            where: { id: jobId },
-            include: { photos: true, inspection: true }
-        });
-
-        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
-        if (job.photos.length === 0) return res.status(400).json({ success: false, message: 'Photos are required before estimate' });
-        if (!job.inspection) return res.status(400).json({ success: false, message: 'Inspection is required before estimate' });
-
-        const estimate = await prisma.jobEstimate.create({
-            data: {
+        const estimate = await prisma.jobEstimate.upsert({
+            where: { jobId: jobId },
+            update: {
+                amount: parseFloat(amount) || 0,
+                details: details || '',
+                materials,
+                laborHours: parseFloat(laborHours) || null,
+                measurements
+            },
+            create: {
                 jobId: jobId,
                 amount: parseFloat(amount) || 0,
-                details: details || 'Standard quote setup'
+                details: details || '',
+                materials,
+                laborHours: parseFloat(laborHours) || null,
+                measurements
             }
         });
         
@@ -139,6 +169,7 @@ const createEstimate = async (req, res) => {
 
         res.status(200).json({ success: true, data: estimate });
     } catch (err) {
+        console.error("Estimate Error:", err);
         res.status(500).json({ success: false, message: 'Estimate creation failed' });
     }
 };
@@ -155,7 +186,9 @@ const createInvoice = async (req, res) => {
         });
 
         if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
-        if (!job.estimate) return res.status(400).json({ success: false, message: 'Estimate is required before invoice' });
+        if (req.user.role !== 'ADMIN') {
+            if (!job.estimate) return res.status(400).json({ success: false, message: 'Estimate is required before invoice' });
+        }
         
         // Calculate amount based on milestone if totalAmount is provided
         let invoiceAmount = parseFloat(amount) || 0;
@@ -272,6 +305,117 @@ const getEstimates = async (req, res) => {
     }
 };
 
+const getJobHistory = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const job = await prisma.job.findUnique({
+            where: { id: jobId },
+            include: { 
+                worker: true, 
+                estimate: true, 
+                invoice: true, 
+                photos: true,
+                lead: true 
+            }
+        });
+
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+
+        const history = [];
+
+        // 1. Job Created / Lead Source
+        history.push({
+            id: 'h1',
+            title: 'Job Created',
+            sub: `Lead converted to job for ${job.categoryName}.`,
+            time: job.createdAt,
+            icon: 'add-circle',
+            color: '#4A5568',
+            bg: '#EDF2F7'
+        });
+
+        // 2. Assignment
+        if (job.workerId) {
+            history.push({
+                id: 'h2',
+                title: 'Job Assigned',
+                sub: `Professional ${job.worker?.name || 'Assigned'} selected.`,
+                time: job.updatedAt,
+                icon: 'person',
+                color: '#ED8936',
+                bg: '#FFFAF0'
+            });
+        }
+
+        // 3. Status Updates (Simplified)
+        if (job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS' || job.status === 'COMPLETED') {
+            history.push({
+                id: 'h3',
+                title: `Status: ${job.status}`,
+                sub: `Job current progress state updated.`,
+                time: job.updatedAt,
+                icon: 'sync',
+                color: '#3182CE',
+                bg: '#EBF8FF'
+            });
+        }
+
+        // 4. Estimate
+        if (job.estimate) {
+            history.push({
+                id: 'h4',
+                title: 'Estimate Created',
+                sub: `Quote of $${job.estimate.amount} generated.`,
+                time: job.estimate.createdAt,
+                icon: 'document-text',
+                color: '#805AD5',
+                bg: '#F5F3FF'
+            });
+        }
+
+        // 5. Photos
+        if (job.photos.length > 0) {
+            history.push({
+                id: 'h5',
+                title: 'Photos Uploaded',
+                sub: `${job.photos.length} site documentation photo(s) added.`,
+                time: job.photos[job.photos.length-1].createdAt,
+                icon: 'camera',
+                color: '#38A169',
+                bg: '#F0FFF4'
+            });
+        }
+
+        // Sort by time descending
+        history.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+        res.status(200).json({ success: true, data: history });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch job history' });
+    }
+};
+
+const addJobPhoto = async (req, res) => {
+    try {
+        const jobId = req.params.id;
+        const { url } = req.body;
+
+        if (!url) return res.status(400).json({ success: false, message: 'Photo URL is required' });
+
+        const photo = await prisma.jobPhoto.create({
+            data: {
+                jobId: jobId,
+                url: url,
+            }
+        });
+
+        res.status(201).json({ success: true, data: photo });
+    } catch (err) {
+        console.error("Add Job Photo Error:", err);
+        res.status(500).json({ success: false, message: 'Failed to add photo' });
+    }
+};
+
 const getInvoices = async (req, res) => {
     try {
         const invoices = await prisma.jobInvoice.findMany({
@@ -292,10 +436,13 @@ module.exports = {
     getJobs,
     updateJob,
     submitCompliance,
+    submitInspection,
     createEstimate,
     createInvoice,
     createJob,
     deleteJob,
     getEstimates,
-    getInvoices
+    getInvoices,
+    getJobHistory,
+    addJobPhoto
 };

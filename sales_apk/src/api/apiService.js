@@ -120,6 +120,15 @@ export const assignLeadToWorker = async (leadId, workerId) => {
     }
 };
 
+export const submitInspection = async (jobId, notes, triageAnswers) => {
+    try {
+        const response = await apiClient.post(`/jobs/${jobId}/inspection`, { notes, triageAnswers });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to submit inspection' };
+    }
+};
+
 export const submitCompliance = async (jobId) => {
     try {
         const response = await apiClient.post(`/jobs/${jobId}/compliance`);
@@ -129,9 +138,11 @@ export const submitCompliance = async (jobId) => {
     }
 };
 
-export const createEstimate = async (jobId, amount, details) => {
+export const createEstimate = async (jobId, amount, details, materials, laborHours, measurements) => {
     try {
-        const response = await apiClient.post(`/jobs/${jobId}/estimate`, { amount, details });
+        const response = await apiClient.post(`/jobs/${jobId}/estimate`, { 
+            amount, details, materials, laborHours, measurements 
+        });
         return response.data;
     } catch (error) {
         return { success: false, message: 'Failed to create estimate' };
@@ -156,9 +167,36 @@ export const rescheduleJob = async (jobId, date, time) => {
     }
 };
 
+export const getJobHistory = async (jobId) => {
+    try {
+        const response = await apiClient.get(`/jobs/${jobId}/history`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to fetch job activity' };
+    }
+};
+
+export const uploadJobPhoto = async (jobId, photoUrl) => {
+    try {
+        const response = await apiClient.post(`/jobs/${jobId}/photos`, { url: photoUrl });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Failed to upload photo' };
+    }
+};
+
 /**
  * SERVICE: User Management
  */
+export const assignJob = async (jobId, workerId) => {
+    try {
+        const response = await apiClient.patch(`/jobs/${jobId}`, { professionalId: workerId });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Failed to assign job' };
+    }
+};
+
 export const getDashboardStats = async () => {
     try {
         const response = await apiClient.get('/users/dashboard-stats');
@@ -244,5 +282,11 @@ export default {
     updateProfessional,
     getDirectMessages,
     sendDirectMessage,
-    resetPassword
+    resetPassword,
+    uploadJobPhoto,
+    assignJob,
+    getJobHistory,
+    getEstimates,
+    getInvoices,
+    submitInspection
 };

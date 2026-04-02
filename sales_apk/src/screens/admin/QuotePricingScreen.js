@@ -6,12 +6,48 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { createEstimate } from '../../api/apiService';
+
 const QuotePricingScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const { job, scope } = route.params || {};
+  const [loading, setLoading] = React.useState(false);
+
+  // Constants for pricing calculation
+  const materialCost = scope?.materialsCount ? scope.materialsCount * 110 : 550; // Mock calculation
+  const laborCost = scope?.laborHours ? scope.laborHours * 75 : 637.5;
+  const travelCost = 45;
+  const subtotal = materialCost + laborCost + travelCost;
+  const margin = 0.35; // 35%
+  const finalPrice = subtotal / (1 - margin);
+
+  const handleCreateQuote = async () => {
+    setLoading(true);
+    const details = `Service: ${scope.serviceType}. Quote generated via APK.`;
+    
+    const res = await createEstimate(
+      job.id, 
+      finalPrice, 
+      details, 
+      scope.inspectionResults?.materials, 
+      scope.laborHours, 
+      scope.inspectionResults?.measurements
+    );
+    
+    setLoading(false);
+    if (res.success) {
+      Alert.alert("Success", "Quote created and sent to customer");
+      navigation.navigate('JobDetails', { job: { ...job, status: 'ESTIMATED' } });
+    } else {
+      Alert.alert("Error", res.message || "Failed to create quote");
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -21,7 +57,7 @@ const QuotePricingScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pricing</Text>
+        <Text style={styles.headerTitle}>Pricing Calculation</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -49,30 +85,30 @@ const QuotePricingScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Measurement input</Text>
-          <Text style={styles.sectionSub}>The AI assistant is applying rules to generate the final price.</Text>
+          <Text style={styles.sectionTitle}>Calculated Costs</Text>
+          <Text style={styles.sectionSub}>AI suggested pricing based on inspection data.</Text>
           
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Material Cost (Auto-lookup)</Text>
-            <Text style={styles.priceValue}>$550.00</Text>
+            <Text style={styles.priceLabel}>Material Cost</Text>
+            <Text style={styles.priceValue}>${materialCost.toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Labor Cost (8.5 hrs @ $75/hr)</Text>
-            <Text style={styles.priceValue}>$637.50</Text>
+            <Text style={styles.priceLabel}>Labor Cost ({scope?.laborHours || 0} hrs)</Text>
+            <Text style={styles.priceValue}>${laborCost.toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Travel/ Distance Surcharge</Text>
-            <Text style={styles.priceValue}>$45.00</Text>
+            <Text style={styles.priceLabel}>Travel Surcharge</Text>
+            <Text style={styles.priceValue}>${travelCost.toFixed(2)}</Text>
           </View>
           <View style={[styles.priceRow, styles.subtotalRow]}>
             <Text style={styles.subtotalLabel}>Subtotal</Text>
-            <Text style={styles.subtotalValue}>$1,232.50</Text>
+            <Text style={styles.subtotalValue}>${subtotal.toFixed(2)}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profit Margin Rules</Text>
-          <Text style={styles.sectionSub}>This margin represents the organization's net profit on this job.</Text>
+          <Text style={styles.sectionTitle}>Final Adjustments</Text>
+          <Text style={styles.sectionSub}>Standard 35% organizational margin applied.</Text>
           
           <View style={styles.marginRow}>
             <Text style={styles.marginLabel}>Desired margin (%)</Text>
@@ -80,7 +116,7 @@ const QuotePricingScreen = ({ navigation, route }) => {
           </View>
           <View style={[styles.priceRow, styles.finalRow]}>
             <Text style={styles.finalLabel}>Final Quote Price</Text>
-            <Text style={styles.finalValue}>$1,896.15</Text>
+            <Text style={styles.finalValue}>${finalPrice.toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -88,9 +124,10 @@ const QuotePricingScreen = ({ navigation, route }) => {
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
           style={styles.reviewBtn}
-          onPress={() => navigation.navigate('QuoteReview', { ...route.params })}
+          onPress={handleCreateQuote}
+          disabled={loading}
         >
-          <Text style={styles.reviewBtnText}>Review Contract</Text>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.reviewBtnText}>Finalize & Send Quote</Text>}
         </TouchableOpacity>
       </View>
     </View>
