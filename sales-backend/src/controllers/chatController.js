@@ -18,7 +18,7 @@ const getChats = async (req, res) => {
                         jobNo: true,
                         guestName: true,
                         categoryName: true,
-                        updated_at: true,
+                        updatedAt: true,
                         customer: {
                             select: {
                                 id: true,
@@ -35,21 +35,21 @@ const getChats = async (req, res) => {
             }
         });
 
-        const formatted = chats.map(chat => ({
+        const formatted = (chats || []).map(chat => ({
             id: chat.id,
             jobId: chat.job_id,
-            customerName: chat.jobs.guestName || chat.jobs.customer?.name || 'Customer',
+            customerName: chat.jobs?.guestName || chat.jobs?.customer?.name || 'Customer',
             lastMessage: chat.last_message,
             time: chat.updated_at,
-            status: chat.jobs.customer?.isAvailable ? 'online' : 'offline',
-            service: chat.jobs.categoryName,
-            leadId: chat.jobs.jobNo
+            status: chat.jobs?.customer?.isAvailable ? 'online' : 'offline',
+            service: chat.jobs?.categoryName || 'Service',
+            leadId: chat.jobs?.jobNo || 'N/A'
         }));
 
         res.status(200).json({ success: true, count: formatted.length, data: formatted });
     } catch (error) {
-        console.error("Fetch Chats Error:", error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("❌ [CHATS] Fetch Chats Error:", error);
+        res.status(500).json({ success: false, message: 'Server error: ' + error.message });
     }
 };
 
@@ -83,8 +83,8 @@ const getMessages = async (req, res) => {
 
         res.status(200).json({ success: true, data: messages });
     } catch (error) {
-        console.error("Fetch Messages Error:", error);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error("❌ [CHATS] Fetch Messages Error:", error);
+        res.status(500).json({ success: false, message: 'Server error: ' + error.message });
     }
 };
 
@@ -201,7 +201,7 @@ const getDirectMessages = async (req, res) => {
 
         res.status(200).json({ success: true, data: conversation });
     } catch (error) {
-        console.error("Direct Messages Error:", error);
+        console.error("Direct Messages Error:", error.stack);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };

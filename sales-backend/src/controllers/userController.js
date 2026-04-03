@@ -260,7 +260,7 @@ const getProfile = async (req, res) => {
             include: {
                 plan: true,
                 categories: { include: { category: true } },
-                subscriptionUpgradeRequests: {
+                upgradeRequests: {
                     where: { status: 'PENDING' },
                     include: { plan: true }
                 }

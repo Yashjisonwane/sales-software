@@ -204,6 +204,15 @@ export const uploadJobPhoto = async (jobId, photoUrl) => {
     }
 };
 
+export const getReviews = async () => {
+    try {
+        const response = await apiClient.get('/reviews');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: 'Could not fetch reviews' };
+    }
+};
+
 /**
  * SERVICE: User Management
  */
@@ -339,5 +348,6 @@ export default {
     getJobChatMessages,
     sendJobChatMessage,
     registerWithInvite,
-    getWorkerChats
+    getWorkerChats,
+    getReviews
 };

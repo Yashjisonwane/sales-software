@@ -139,9 +139,11 @@ const getLeads = async (req, res) => {
 
         const formattedLeads = leads.map(l => ({
             ...l,
-            customerName: l.guestName || l.customer?.name || 'Valued Customer',
-            customerEmail: l.customer?.email,
-            customerPhone: l.customer?.phone,
+            customerName: l.customer?.name || l.guestName || 'Valued Customer',
+            customerEmail: l.customer?.email || l.guestEmail || '—',
+            customerPhone: l.customer?.phone || l.guestPhone || '—',
+            guestEmail: l.guestEmail,
+            guestPhone: l.guestPhone,
             categoryName: l.category?.name || 'Uncategorized',
             displayId: l.leadNo
         }));
@@ -166,8 +168,12 @@ const assignLead = async (req, res) => {
             include: { category: true }
         });
 
-        if (!lead || lead.status !== 'OPEN') {
-            return res.status(400).json({ success: false, message: 'Lead not available' });
+        if (!lead) {
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+
+        if (lead.status !== 'OPEN') {
+            return res.status(400).json({ success: false, message: `Lead is already ${lead.status.toLowerCase()}` });
         }
 
         // 1. Update Lead Status

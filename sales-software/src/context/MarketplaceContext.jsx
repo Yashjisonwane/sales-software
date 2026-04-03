@@ -61,9 +61,9 @@ export const MarketplaceProvider = ({ children }) => {
                 const flattenedLeads = (leadsRes.data || []).map(l => ({
                     ...l,
                     displayId: l.leadNo || `LD-${l.id.slice(-4).toUpperCase()}`,
-                    customerName: l.customer?.name || 'Unknown Customer',
-                    customerPhone: l.customer?.phone || '',
-                    customerEmail: l.customer?.email || '',
+                    customerName: l.customerName || l.guestName || l.customer?.name || 'Unknown Customer',
+                    customerPhone: l.customerPhone || l.guestPhone || l.customer?.phone || '—',
+                    customerEmail: l.customerEmail || l.guestEmail || l.customer?.email || '—',
                     serviceCategory: l.category?.name || 'General Service',
                     servicePlan: l.servicePlan || 'Basic',
                     description: l.description || '',

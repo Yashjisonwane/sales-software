@@ -17,10 +17,38 @@ const TrackStatus = () => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [isChatOpen, setIsChatOpen] = useState(false);
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewComment, setReviewComment] = useState('');
+    const [isReviewing, setIsReviewing] = useState(false);
+    const [isReviewed, setIsReviewed] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const socketRef = useRef();
     const messagesEndRef = useRef();
+
+    useEffect(() => {
+        if (data?.isReviewed) setIsReviewed(true);
+    }, [data?.isReviewed]);
+
+    const handleReviewSubmit = async (e) => {
+        if (e) e.preventDefault();
+        setIsReviewing(true);
+        try {
+            const res = await axios.post(`${API_BASE_URL}/guest/review`, {
+                sessionToken: token,
+                rating: reviewRating,
+                comment: reviewComment
+            });
+            if (res.data.success) {
+                setIsReviewed(true);
+            }
+        } catch (err) {
+            console.error("Review error", err);
+            alert("Could not submit review. Please try again.");
+        } finally {
+            setIsReviewing(false);
+        }
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -217,6 +245,51 @@ const TrackStatus = () => {
                          </div>
                     </div>
                 </div>
+
+                {/* Review Section (Only when Completed) */}
+                {data.status === 'COMPLETED' && !isReviewed && (
+                    <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-xl mb-6 animate-in slide-in-from-bottom-5">
+                       <h4 className="font-black text-[#111827] text-lg mb-2">How was your experience?</h4>
+                       <p className="text-gray-400 text-xs mb-6 font-medium">Your feedback helps us maintain professional standards.</p>
+                       
+                       <div className="flex gap-2 justify-center mb-8">
+                           {[1, 2, 3, 4, 5].map(star => (
+                               <button 
+                                   key={star} 
+                                   onClick={() => setReviewRating(star)}
+                                   className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${reviewRating >= star ? 'bg-orange-50 text-orange-400' : 'bg-gray-50 text-gray-300'}`}
+                               >
+                                   <Star size={24} fill={reviewRating >= star ? 'currentColor' : 'none'} strokeWidth={2.5} />
+                               </button>
+                           ))}
+                       </div>
+
+                       <textarea 
+                           placeholder="Tell us more about the service..."
+                           value={reviewComment}
+                           onChange={(e) => setReviewComment(e.target.value)}
+                           className="w-full bg-[#F9FAFB] border border-[#F3F4F6] rounded-2xl p-4 text-sm font-medium outline-none focus:bg-white focus:border-[#7C3AED] transition-all resize-none min-h-[100px] mb-6"
+                       />
+
+                       <button 
+                           disabled={isReviewing}
+                           onClick={handleReviewSubmit}
+                           className="w-full bg-[#111827] text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                       >
+                           {isReviewing ? 'Submitting...' : 'Post Review'}
+                       </button>
+                    </div>
+                )}
+
+                {isReviewed && data.status === 'COMPLETED' && (
+                    <div className="bg-green-50 rounded-[2rem] p-8 border border-green-100 shadow-sm mb-6 text-center">
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-green-500 mx-auto mb-4 shadow-sm">
+                            <CheckCircle2 size={30} />
+                        </div>
+                        <h4 className="font-black text-green-800 text-sm uppercase tracking-widest mb-1">Review Shared!</h4>
+                        <p className="text-green-600/70 text-[10px] font-bold">Thank you for your valuable feedback.</p>
+                    </div>
+                )}
 
                 {/* Safety Badge */}
                 <div className="bg-[#F9FAFB] border border-[#F3F4F6] rounded-3xl p-6 flex items-center gap-4">
