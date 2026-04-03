@@ -22,15 +22,9 @@ import storage from '../../api/storage';
 
 export default function ProfileScreen({ navigation }) {
   const [user, setUser] = useState(null);
-  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const token = await storage.getItem('userToken');
-      if (!token) {
-        setIsGuest(true);
-        return;
-      }
       const res = await getProfile();
       if (res.success) {
         setUser(res.data);
@@ -38,7 +32,6 @@ export default function ProfileScreen({ navigation }) {
         // Fallback to local storage if API fails
         const local = await storage.getItem('userData');
         if (local) setUser(JSON.parse(local));
-        else setIsGuest(true);
       }
     };
     fetchUserData();
@@ -53,45 +46,16 @@ export default function ProfileScreen({ navigation }) {
         onPress: async () => {
           await storage.removeItem('userToken');
           await storage.removeItem('userData');
-          await storage.removeItem('userRole');
-          setUser(null);
-          setIsGuest(true);
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Welcome' }],
+            })
+          );
         }
       },
     ]);
   };
-
-  // Guest View
-  if (isGuest) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Account</Text>
-        </View>
-        <View style={styles.guestContainer}>
-          <View style={styles.guestIconCircle}>
-            <Ionicons name="person-outline" size={48} color="#0E56D0" />
-          </View>
-          <Text style={styles.guestTitle}>You're browsing as a Guest</Text>
-          <Text style={styles.guestSubtitle}>Sign in to manage your jobs, track earnings, and access all features.</Text>
-          <TouchableOpacity
-            style={styles.signInBtn}
-            onPress={() => navigation.navigate('WorkerLogin')}
-          >
-            <Ionicons name="log-in-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.signInBtnText}>Sign In</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.signUpBtn}
-            onPress={() => navigation.navigate('WorkerSignup')}
-          >
-            <Text style={styles.signUpBtnText}>Create an Account</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -112,8 +76,8 @@ export default function ProfileScreen({ navigation }) {
             style={styles.avatar}
           />
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.name || 'User'}</Text>
-            <Text style={styles.profileEmail}>{user?.email || ''}</Text>
+            <Text style={styles.profileName}>{user?.name || 'Loading...'}</Text>
+            <Text style={styles.profileEmail}>{user?.email || 'worker@paired.com'}</Text>
           </View>
           <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
             <Ionicons name="create-outline" size={20} color="#0E56D0" />
@@ -316,64 +280,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#CBD5E0',
     fontWeight: '600',
-  },
-  // ── Guest Mode Styles ──────────────────────
-  guestContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  guestIconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  guestTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1A202C',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  guestSubtitle: {
-    fontSize: 14,
-    color: '#718096',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 36,
-  },
-  signInBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#0E56D0',
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 28,
-    marginBottom: 14,
-  },
-  signInBtnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  signUpBtn: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: '#0E56D0',
-    alignItems: 'center',
-  },
-  signUpBtnText: {
-    color: '#0E56D0',
-    fontSize: 15,
-    fontWeight: '700',
   },
 });

@@ -10,7 +10,6 @@ export const loginWorker = async (email, password) => {
         if (response.data.success) {
             await storage.setItem('userToken', response.data.data.token);
             await storage.setItem('userData', JSON.stringify(response.data.data.user));
-            await storage.setItem('userRole', response.data.data.user.role);
         }
         return response.data;
     } catch (error) {
@@ -34,17 +33,8 @@ export const registerUser = async (userData) => {
     try {
         const response = await apiClient.post('/auth/register', userData);
         return response.data;
-    } catch (error) {
-        return { success: false, message: error.response?.data?.message || 'Registration failed' };
-    }
-};
-
-export const registerWithInvite = async (inviteData) => {
-    try {
-        const response = await apiClient.post('/auth/register-invited', inviteData);
-        return response.data;
-    } catch (error) {
-        return { success: false, message: error.response?.data?.message || 'Invalid invite code' };
+    } catch (err) {
+        return { success: false, message: err.response?.data?.message || err.message };
     }
 };
 
@@ -100,15 +90,6 @@ export const getAllJobs = async () => {
         return response.data;
     } catch (error) {
         return { success: false, message: 'Could not fetch all jobs' };
-    }
-};
-
-export const getJobsForMap = async () => {
-    try {
-        const response = await apiClient.get('/jobs/map');
-        return response.data;
-    } catch (error) {
-        return { success: false, message: 'Could not fetch jobs for map' };
     }
 };
 
@@ -204,15 +185,6 @@ export const uploadJobPhoto = async (jobId, photoUrl) => {
     }
 };
 
-export const getReviews = async () => {
-    try {
-        const response = await apiClient.get('/reviews');
-        return response.data;
-    } catch (error) {
-        return { success: false, message: 'Could not fetch reviews' };
-    }
-};
-
 /**
  * SERVICE: User Management
  */
@@ -285,39 +257,12 @@ export const getDirectMessages = async (userId) => {
     }
 };
 
-export const getWorkerChats = async () => {
-    try {
-        const response = await apiClient.get('/chats');
-        return response.data;
-    } catch (error) {
-        return { success: false, message: 'Failed to load inbox' };
-    }
-};
-
 export const sendDirectMessage = async (userId, text) => {
     try {
         const response = await apiClient.post(`/chats/direct/${userId}`, { text });
         return response.data;
     } catch (error) {
         return { success: false, message: 'Failed to send message' };
-    }
-};
-
-export const getJobChatMessages = async (chatId) => {
-    try {
-        const response = await apiClient.get(`/chats/${chatId}/messages`);
-        return response.data;
-    } catch (error) {
-        return { success: false, message: 'Failed to fetch job chat' };
-    }
-};
-
-export const sendJobChatMessage = async (chatId, text) => {
-    try {
-        const response = await apiClient.post(`/chats/${chatId}/messages`, { text });
-        return response.data;
-    } catch (error) {
-        return { success: false, message: 'Failed to send job message' };
     }
 };
 
@@ -343,11 +288,5 @@ export default {
     getJobHistory,
     getEstimates,
     getInvoices,
-    submitInspection,
-    getJobsForMap,
-    getJobChatMessages,
-    sendJobChatMessage,
-    registerWithInvite,
-    getWorkerChats,
-    getReviews
+    submitInspection
 };

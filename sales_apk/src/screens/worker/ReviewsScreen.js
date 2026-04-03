@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,33 +7,32 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
-  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
-import { getReviews } from '../../api/apiService';
 
 export default function ReviewsScreen({ navigation }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ averageRating: 0, count: 0 });
 
-  useEffect(() => {
-    fetchReviews();
-  }, []);
-
-  const fetchReviews = async () => {
-    setLoading(true);
-    const res = await getReviews();
-    if (res.success) {
-      setReviews(res.data);
-      setStats({ averageRating: res.averageRating, count: res.count });
-    }
-    setLoading(false);
-  };
+  const existingReviews = [
+    {
+      id: '1', name: 'John Wilson', service: 'Plumbing',
+      rating: 5, comment: 'Excellent work! Fixed the leak in 30 minutes. Very professional.',
+      date: 'Mar 5, 2026', avatar: 'JW', color: '#3B82F6',
+    },
+    {
+      id: '2', name: 'Sarah Martinez', service: 'Electrical',
+      rating: 4, comment: 'Good service. Replaced all faulty switches efficiently.',
+      date: 'Mar 1, 2026', avatar: 'SM', color: '#F59E0B',
+    },
+    {
+      id: '3', name: 'Mike Chen', service: 'Cleaning',
+      rating: 5, comment: 'My house has never been this clean! Will definitely book again.',
+      date: 'Feb 25, 2026', avatar: 'MC', color: '#10B981',
+    },
+  ];
 
   return (
     <View style={styles.container}>
@@ -102,43 +101,32 @@ export default function ReviewsScreen({ navigation }) {
         </View>
 
         {/* Past Reviews */}
-        <Text style={styles.sectionTitle}>Your Reviews ({stats.count})</Text>
-        {loading ? (
-          <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 20 }} />
-        ) : reviews.length === 0 ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <Ionicons name="chatbubble-outline" size={48} color={COLORS.border} />
-            <Text style={{ color: COLORS.textTertiary, marginTop: 10 }}>No reviews received yet.</Text>
-          </View>
-        ) : (
-          reviews.map((review) => (
-            <View key={review.id} style={styles.reviewCard}>
-              <View style={styles.reviewTopRow}>
-                <View style={[styles.reviewAvatar, { backgroundColor: COLORS.primary + '20' }]}>
-                  <Text style={[styles.reviewAvatarText, { color: COLORS.primary }]}>
-                    {(review.author || 'CU').substring(0, 2).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.reviewInfo}>
-                  <Text style={styles.reviewName}>{review.author || 'Customer'}</Text>
-                  <Text style={styles.reviewService}>Job #{review.jobNo}</Text>
-                </View>
-                <Text style={styles.reviewDate}>{review.date}</Text>
+        <Text style={styles.sectionTitle}>Your Past Reviews</Text>
+        {existingReviews.map((review) => (
+          <View key={review.id} style={styles.reviewCard}>
+            <View style={styles.reviewTopRow}>
+              <View style={[styles.reviewAvatar, { backgroundColor: review.color }]}>
+                <Text style={styles.reviewAvatarText}>{review.avatar}</Text>
               </View>
-              <View style={styles.reviewStars}>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Ionicons
-                    key={s}
-                    name={s <= review.rating ? 'star' : 'star-outline'}
-                    size={14}
-                    color="#F59E0B"
-                  />
-                ))}
+              <View style={styles.reviewInfo}>
+                <Text style={styles.reviewName}>{review.name}</Text>
+                <Text style={styles.reviewService}>{review.service}</Text>
               </View>
-              <Text style={styles.reviewComment}>{review.comment}</Text>
+              <Text style={styles.reviewDate}>{review.date}</Text>
             </View>
-          ))
-        )}
+            <View style={styles.reviewStars}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Ionicons
+                  key={s}
+                  name={s <= review.rating ? 'star' : 'star-outline'}
+                  size={14}
+                  color="#F59E0B"
+                />
+              ))}
+            </View>
+            <Text style={styles.reviewComment}>{review.comment}</Text>
+          </View>
+        ))}
       </ScrollView>
     </View>
   );
