@@ -1,8 +1,8 @@
 // Centralized API Configuration
 // This ensures that both the APK and Software use the same versioning and paths.
 
-export const API_BASE_URL = 'http://localhost:4000/api/v1';
-// export const API_BASE_URL = 'https://sales-software-production.up.railway.app/api/v1';
+// export const API_BASE_URL = 'http://localhost:4000/api/v1';
+export const API_BASE_URL = 'https://sales-software-production.up.railway.app/api/v1';
 
 
 export const ENDPOINTS = {
