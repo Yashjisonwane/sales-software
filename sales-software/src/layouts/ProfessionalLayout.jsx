@@ -37,16 +37,16 @@ const ProfessionalLayout = () => {
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-          if (nRef.current && !nRef.current.contains(event.target)) {
-            setNotifMenuOpen(false);
-          }
+            if (nRef.current && !nRef.current.contains(event.target)) {
+                setNotifMenuOpen(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     if (isAuthenticated === null) return null; // Wait for checkAuth
-    if (isAuthenticated === false) return <Navigate to="/login" replace />;
+    if (isAuthenticated === false) return <Navigate to="/professional/login" replace />;
 
     const unreadCount = (notifications || []).filter(n => !n.isRead).length;
 
@@ -121,7 +121,7 @@ const ProfessionalLayout = () => {
                                     <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                                         <h3 className="font-bold text-gray-900 text-sm">Action Alerts</h3>
                                         {unreadCount > 0 && (
-                                            <button 
+                                            <button
                                                 onClick={clearNotifications}
                                                 className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-tight"
                                             >
@@ -132,7 +132,7 @@ const ProfessionalLayout = () => {
                                     <div className="max-h-[350px] overflow-y-auto custom-scrollbar">
                                         {(notifications || []).length > 0 ? (
                                             notifications.map((n) => (
-                                                <div 
+                                                <div
                                                     key={n.id}
                                                     onClick={() => !n.isRead && markNotificationRead(n.id)}
                                                     className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer relative ${!n.isRead ? 'bg-blue-50/30' : ''}`}

@@ -25,12 +25,10 @@ export const MarketplaceProvider = ({ children }) => {
     const [reviewStats, setReviewStats] = useState({ averageRating: 0, distribution: [] });
     const [chats, setChats] = useState([]);
     const [activeChatMessages, setActiveChatMessages] = useState([]);
-    const [locationLogs, setLocationLogs] = useState([]);
-    const [earningsHistory, setEarningsHistory] = useState([]);
     const [notifications, setNotifications] = useState([]);
     const [toast, setToast] = useState(null);
 
-    // --- TOASTS ---
+    // --- UTILITIES (Defined first to avoid TDZ) ---
     const showToast = useCallback((message, type = 'success') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
@@ -39,12 +37,14 @@ export const MarketplaceProvider = ({ children }) => {
     const addNotification = async (notif) => {
         setNotifications(prev => [{ id: Date.now(), createdAt: new Date().toISOString(), isRead: false, ...notif }, ...prev]);
     };
+
     const markNotificationRead = async (id) => {
         const res = await apiService.markNotificationRead(id);
         if (res.success) {
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
         }
     };
+
     const clearNotifications = async () => {
         const res = await apiService.clearNotifications();
         if (res.success) {
@@ -53,53 +53,7 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    // --- AUTHENTICATION ACTIONS ---
-    const login = async (email, password) => {
-        const res = await apiService.loginUser(email, password);
-        if (res.success) {
-            localStorage.setItem('userToken', res.data.token);
-            setCurrentUser(res.data.user);
-            setIsAuthenticated(true);
-            showToast('Login successful!', 'success');
-            await loadInitialData();
-            return true;
-        } else {
-            showToast(res.error || 'Login failed', 'error');
-            return false;
-        }
-    };
-
-    const logout = () => {
-        localStorage.removeItem('userToken');
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-        setLeads([]);
-        setJobs([]);
-    };
-
-    // Auto-login check
-    useEffect(() => {
-        const checkAuth = async () => {
-            const token = localStorage.getItem('userToken');
-            if (token) {
-                const res = await apiService.fetchUserProfile();
-                if (res.success) {
-                    setIsAuthenticated(true);
-                    setCurrentUser(res.data);
-                    await loadInitialData();
-                } else {
-                    localStorage.removeItem('userToken');
-                    setIsAuthenticated(false);
-                    setCurrentUser(null);
-                }
-            } else {
-                setIsAuthenticated(false);
-            }
-        };
-        checkAuth();
-    }, []);
-
-    // --- DATA FETCHING ---
+    // --- DATA FETCHING (Depends on showToast) ---
     const loadInitialData = useCallback(async () => {
         try {
             const leadsRes = await apiService.fetchAllLeads();
@@ -122,9 +76,7 @@ export const MarketplaceProvider = ({ children }) => {
             const jobsRes = await apiService.fetchAllJobs();
             if (jobsRes.success) {
                 const flattenedJobs = (jobsRes.data || []).map(j => {
-                    // Fallback to lead data if job record is partial
                     const relatedLead = (leadsRes.data || []).find(l => l.id === j.leadId);
-                    
                     return {
                         ...j,
                         displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`,
@@ -153,13 +105,10 @@ export const MarketplaceProvider = ({ children }) => {
             if (profRes.success) {
                 const workers = (profRes.data || []).map(w => ({
                     ...w,
-                    address: w.address || '',
-                    city: w.city || '',
-                    pincode: w.pincode || '',
                     location: w.city || w.address || '—',
                     status: w.status ? w.status : (w.isAvailable ? 'Active' : 'Offline')
                 }));
-                setProfessionals(workers); 
+                setProfessionals(workers);
             }
 
             const catRes = await apiService.fetchAllCategories();
@@ -205,9 +154,56 @@ export const MarketplaceProvider = ({ children }) => {
                 }
             }
         } catch (error) {
-            console.error('Initial Data Load Error:', error);
+            console.error('[MARKETPLACE] Initial Data Load Error:', error);
         }
     }, [showToast]);
+
+    // --- AUTH ACTIONS (Depends on loadInitialData and showToast) ---
+    const login = async (email, password) => {
+        const res = await apiService.loginUser(email, password);
+        if (res.success) {
+            localStorage.setItem('userToken', res.data.token);
+            setCurrentUser(res.data.user);
+            setIsAuthenticated(true);
+            showToast('Login successful!', 'success');
+            await loadInitialData();
+            return true;
+        } else {
+            showToast(res.error || 'Login failed', 'error');
+            return false;
+        }
+    };
+
+    const logout = () => {
+        localStorage.removeItem('userToken');
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setLeads([]);
+        setJobs([]);
+        showToast('Logged out', 'info');
+    };
+
+    // Auto-login check
+    useEffect(() => {
+        const checkAuth = async () => {
+            const token = localStorage.getItem('userToken');
+            if (token) {
+                const res = await apiService.fetchUserProfile();
+                if (res.success) {
+                    setIsAuthenticated(true);
+                    setCurrentUser(res.data);
+                    await loadInitialData();
+                } else {
+                    localStorage.removeItem('userToken');
+                    setIsAuthenticated(false);
+                    setCurrentUser(null);
+                }
+            } else {
+                setIsAuthenticated(false);
+            }
+        };
+        checkAuth();
+    }, [loadInitialData]);
 
     // --- LEADS ---
     const addLead = async (formData) => {
@@ -278,6 +274,8 @@ export const MarketplaceProvider = ({ children }) => {
         if (res.success) {
             showToast('Job record updated!', 'success');
             loadInitialData();
+        } else {
+            showToast(res.error || 'Update failed', 'error');
         }
     };
 
@@ -302,7 +300,6 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    // --- CHATS & REVIEWS ---
     const startJob = async (jobId) => {
         const res = await apiService.updateJob(jobId, { status: 'IN_PROGRESS' });
         if (res.success) {
@@ -324,7 +321,7 @@ export const MarketplaceProvider = ({ children }) => {
     };
 
     const fetchChatMessages = async (chatId) => {
-        setActiveChatMessages([]); // Clear previous chat messages first
+        setActiveChatMessages([]);
         const res = await apiService.fetchChatMessages(chatId);
         if (res.success) {
             setActiveChatMessages(res.data);
@@ -337,8 +334,6 @@ export const MarketplaceProvider = ({ children }) => {
         const res = await apiService.sendChatMessage(chatId, text);
         if (res.success) {
             setActiveChatMessages(prev => [...prev, res.data]);
-            const chatsRes = await apiService.fetchAllChats();
-            if (chatsRes.success) setChats(chatsRes.data);
             return true;
         }
         return false;
@@ -396,7 +391,6 @@ export const MarketplaceProvider = ({ children }) => {
         }
     };
 
-    // --- SUBSCRIPTIONS ---
     const updateSubscription = async (planName) => {
         const res = await apiService.enrollInSubscription({ 
             professionalId: currentUser?.id, 
@@ -497,7 +491,6 @@ export const MarketplaceProvider = ({ children }) => {
             notifications,
             setNotifications,
             currentUser,
-            earningsHistory,
             toast,
             showToast,
             addLead,

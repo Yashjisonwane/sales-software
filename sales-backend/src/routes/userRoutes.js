@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    getProfessionals, 
-    updateLocation, 
-    toggleAvailability, 
-    createProfessional, 
-    updateProfessional, 
+const {
+    getProfessionals,
+    updateLocation,
+    toggleAvailability,
+    createProfessional,
+    updateProfessional,
     deleteProfessional,
     getProfile,
     updateProfile,

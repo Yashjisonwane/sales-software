@@ -7,15 +7,15 @@ const getProfessionals = async (req, res) => {
     try {
         const workers = await prisma.user.findMany({
             where: { role: 'WORKER' },
-            include: { 
-                categories: { 
-                    include: { 
-                        category: true 
-                    } 
-                } 
+            include: {
+                categories: {
+                    include: {
+                        category: true
+                    }
+                }
             }
         });
-        
+
         // Fetch additional stats for each worker
         const flattened = await Promise.all(workers.map(async (w) => {
             const [activeCount, completedCount] = await Promise.all([
@@ -81,7 +81,7 @@ const createProfessional = async (req, res) => {
 
         const phoneInUse = await prisma.user.findUnique({ where: { phone } });
         if (phoneInUse) return res.status(400).json({ success: false, message: 'A professional with this phone number already exists!' });
-        
+
         // 1. Hash Password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -160,7 +160,7 @@ const updateProfessional = async (req, res) => {
         const result = await prisma.$transaction(async (tx) => {
             const dataToUpdate = {};
             if (name) dataToUpdate.name = name;
-            
+
             // Map status to isAvailable field in DB
             if (status !== undefined) {
                 dataToUpdate.isAvailable = (status === 'Active' || status === 'Available');
@@ -219,7 +219,7 @@ const updateProfessional = async (req, res) => {
         res.status(200).json({ success: true, data: result });
     } catch (err) {
         console.error("DEBUG - Full Update Error:", err);
-        
+
         // Handle specific custom errors or Prisma Unique Constraint Errors
         if (err.message === 'EMAIL_EXISTS') {
             return res.status(400).json({ success: false, message: 'This email is already registered to another user.' });
@@ -229,14 +229,14 @@ const updateProfessional = async (req, res) => {
         }
 
         if (err.code === 'P2002') {
-            return res.status(400).json({ 
-                success: false, 
-                message: `The ${err.meta?.target} provided already exists.` 
+            return res.status(400).json({
+                success: false,
+                message: `The ${err.meta?.target} provided already exists.`
             });
         }
 
-        res.status(500).json({ 
-            success: false, 
+        res.status(500).json({
+            success: false,
             message: 'Database Error: ' + err.message,
             stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
@@ -257,13 +257,13 @@ const getProfile = async (req, res) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.user.id },
-            include: { 
-                plan: true, 
-                categories: { include: { category: true } }, 
-                subscriptionUpgradeRequests: { 
+            include: {
+                plan: true,
+                categories: { include: { category: true } },
+                subscriptionUpgradeRequests: {
                     where: { status: 'PENDING' },
                     include: { plan: true }
-                } 
+                }
             }
         });
         res.status(200).json({ success: true, data: user });
@@ -274,19 +274,19 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
     try {
-        const { 
-            name, email, phone, address, city, state, pincode, 
-            isAvailable, password, businessName, bio, 
-            availability, experience, serviceRadius, location 
+        const {
+            name, email, phone, address, city, state, pincode,
+            isAvailable, password, businessName, bio,
+            availability, experience, serviceRadius, location
         } = req.body;
-        
-        const dataToUpdate = { 
-            name, email, phone, address, 
-            city: city || (location ? location.split(',')[0]?.trim() : undefined), 
-            state: state || (location ? location.split(',')[1]?.trim() : undefined), 
-            pincode, isAvailable, businessName, bio, 
-            availability, experience, 
-            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined 
+
+        const dataToUpdate = {
+            name, email, phone, address,
+            city: city || (location ? location.split(',')[0]?.trim() : undefined),
+            state: state || (location ? location.split(',')[1]?.trim() : undefined),
+            pincode, isAvailable, businessName, bio,
+            availability, experience,
+            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined
         };
 
         if (password && password.trim() !== '') {
@@ -309,7 +309,7 @@ const getDashboardStats = async (req, res) => {
         const user = await prisma.user.findUnique({ where: { id: req.user.id } });
         const now = new Date();
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
-        
+
         if (user.role === 'ADMIN') {
             const [totalLeads, completedJobs, totalPros, leadsToday] = await Promise.all([
                 prisma.lead.count(),

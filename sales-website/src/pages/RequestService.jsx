@@ -126,24 +126,27 @@ const RequestService = () => {
         setIsSubmitting(true);
 
         try {
-            const res = await axios.post(`${API_BASE_URL}/leads`, {
+            const res = await axios.post(`${API_BASE_URL}/guest/request`, {
                 name: formData.name,
                 email: formData.email,
                 phone: formData.phone,
-                categoryId: formData.categoryId,
+                categoryName: formData.categoryName,
                 location: `${formData.address}, ${formData.city}, ${formData.state} - ZIP: ${formData.zipCode}`,
                 description: formData.description,
                 preferredDate: formData.preferredDate
             });
 
             if (res.data.success) {
+                // Store guest session token for tracking/chat
+                localStorage.setItem('guestSessionToken', res.data.sessionToken);
                 setIsSuccess(true);
-                setTimeout(() => navigate('/'), 3000);
+                // Redirect after status awareness
+                setTimeout(() => navigate(`/track/${res.data.sessionToken}`), 3000);
             } else {
-                setError(res.data.error || 'Failed to submit request');
+                setError(res.data.message || 'Failed to submit request');
             }
         } catch (err) {
-            setError('Connection failed. Please check your backend.');
+            setError('Connection failed. Please try again later.');
         } finally {
             setIsSubmitting(false);
         }

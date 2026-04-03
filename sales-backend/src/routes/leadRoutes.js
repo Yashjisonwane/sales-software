@@ -1,22 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const { 
-    createLead, 
-    getLeads, 
-    assignLead, 
-    deleteLead, 
-    updateLead, 
-    getCategories, 
-    getStats, 
-    createCategory, 
-    updateCategory, 
-    deleteCategory, 
-    getLocations, 
-    getSubscriptions, 
-    enrollInPlan, 
-    getActiveSubscriptions, 
-    createSubscriptionPlan, 
-    updateSubscriptionPlan, 
+const {
+    createLead,
+    getLeads,
+    assignLead,
+    deleteLead,
+    updateLead,
+    getCategories,
+    getStats,
+    createCategory,
+    updateCategory,
+    deleteCategory,
+    getLocations,
+    getSubscriptions,
+    enrollInPlan,
+    getActiveSubscriptions,
+    createSubscriptionPlan,
+    updateSubscriptionPlan,
     deleteSubscriptionPlan,
     getUpgradeRequests,
     approveUpgradeRequest,
@@ -25,7 +25,7 @@ const {
 const { protect, optionalProtect, authorize } = require('../middlewares/authMiddleware');
 
 // @route   GET /api/v1/leads/stats
-router.get('/stats', protect, getStats);
+router.get('/stats', optionalProtect, getStats);
 
 // @route   GET /api/v1/leads/locations
 router.get('/locations', getLocations);
@@ -58,6 +58,7 @@ router.delete('/categories/:id', protect, authorize('ADMIN'), deleteCategory);
 // @route   POST /api/v1/leads
 router.post('/', createLead);
 
+// @route   GET /api/v1/leads
 // @route   GET /api/v1/leads
 router.get('/', optionalProtect, authorize('ADMIN', 'WORKER', 'GUEST'), getLeads);
 

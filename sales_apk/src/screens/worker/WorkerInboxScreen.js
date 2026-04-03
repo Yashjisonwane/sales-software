@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -8,42 +8,43 @@ import {
     StatusBar,
     TextInput,
     Image,
+    ActivityIndicator,
+    RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { SHADOWS } from '../../constants/theme';
-
-const MessageItem = ({ initial, name, lastMessage, time, unread, onPress }) => (
-    <TouchableOpacity style={styles.messageItem} onPress={onPress} activeOpacity={0.7}>
-        <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-        </View>
-        <View style={styles.messageContent}>
-            <View style={styles.messageHeader}>
-                <Text style={styles.senderName}>{name}</Text>
-                <Text style={styles.timeText}>{time}</Text>
-            </View>
-            <View style={styles.messageFooter}>
-                <Text style={[styles.lastMessage, unread && styles.unreadText]} numberOfLines={1}>
-                    {lastMessage}
-                </Text>
-                {unread && <View style={styles.unreadDot} />}
-            </View>
-        </View>
-    </TouchableOpacity>
-);
+import { SHADOWS, COLORS } from '../../constants/theme';
+import { getWorkerChats } from '../../api/apiService';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function WorkerInboxScreen({ navigation }) {
     const [activeFilter, setActiveFilter] = useState('All');
+    const [chats, setChats] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const filters = ['All', 'Messages', 'Team Chats', 'Updates'];
 
-    const messages = [
-        { initial: 'JM', name: 'Sarah Johnson', lastMessage: 'Hi, what time will the team arrive today?', time: '09:15 AM' },
-        { initial: 'JM', name: 'Team Alpha', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Sarah Noah', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Mike Thompson', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'John Miller', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-    ];
+    const fetchChats = async () => {
+        setLoading(true);
+        const res = await getWorkerChats();
+        if (res.success) {
+            setChats(res.data || []);
+        }
+        setLoading(false);
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchChats();
+        }, [])
+    );
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        const res = await getWorkerChats();
+        if (res.success) setChats(res.data || []);
+        setRefreshing(false);
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -52,7 +53,7 @@ export default function WorkerInboxScreen({ navigation }) {
             <View style={styles.header}>
                 <View style={styles.searchContainer}>
                     <Ionicons name="search" size={20} color="#94A3B8" />
-                    <TextInput placeholder="Search Team Member" style={styles.searchInput} placeholderTextColor="#94A3B8" />
+                    <TextInput placeholder="Search Conversations" style={styles.searchInput} placeholderTextColor="#94A3B8" />
                 </View>
             </View>
 
@@ -70,35 +71,56 @@ export default function WorkerInboxScreen({ navigation }) {
                 </ScrollView>
             </View>
 
-            <ScrollView style={styles.messagesList} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.messagesList} 
+                showsVerticalScrollIndicator={false}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            >
                 <View style={styles.listCard}>
-                    {messages.map((msg, index) => (
-                        <TouchableOpacity 
-                            key={index} 
-                            style={styles.messageItem} 
-                            onPress={() => navigation.navigate('WorkerChat', { name: msg.name })} 
-                            activeOpacity={0.7}
-                        >
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>{msg.initial}</Text>
-                            </View>
-                            <View style={styles.messageTextContent}>
-                                <View style={styles.messageHeaderRow}>
-                                    <Text style={styles.senderName}>{msg.name}</Text>
-                                    <Text style={styles.timeText}>{msg.time}</Text>
+                    {loading && chats.length === 0 ? (
+                        <View style={{ padding: 40, alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color="#3B82F6" />
+                            <Text style={{ marginTop: 10, color: '#64748B' }}>Loading messages...</Text>
+                        </View>
+                    ) : chats.length === 0 ? (
+                        <View style={{ padding: 40, alignItems: 'center' }}>
+                            <Ionicons name="chatbubbles-outline" size={50} color="#CBD5E1" />
+                            <Text style={{ marginTop: 10, color: '#64748B', fontWeight: '700' }}>No messages yet</Text>
+                            <Text style={{ color: '#94A3B8', fontSize: 12 }}>New job chats will appear here.</Text>
+                        </View>
+                    ) : (
+                        chats.map((chat, index) => (
+                            <TouchableOpacity 
+                                key={chat.id} 
+                                style={styles.messageItem} 
+                                onPress={() => navigation.navigate('Chat', { 
+                                    chatId: chat.id, 
+                                    customerName: chat.customerName,
+                                    jobNo: chat.leadId,
+                                    serviceType: chat.service
+                                })} 
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.avatar}>
+                                    <Text style={styles.avatarText}>{chat.customerName?.charAt(0) || 'C'}</Text>
                                 </View>
-                                <View style={styles.messageFooterRow}>
-                                    <Text style={styles.lastMessage} numberOfLines={3}>
-                                        {msg.lastMessage}
-                                        {msg.subMessage && (
-                                            <Text style={styles.subMessageText}>{` \n${msg.subMessage}`}</Text>
-                                        )}
-                                    </Text>
+                                <View style={styles.messageTextContent}>
+                                    <View style={styles.messageHeaderRow}>
+                                        <Text style={styles.senderName}>{chat.customerName}</Text>
+                                        <Text style={styles.timeText}>
+                                            {chat.time ? new Date(chat.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.messageFooterRow}>
+                                        <Text style={styles.lastMessage} numberOfLines={2}>
+                                            {chat.lastMessage || 'No messages yet'}
+                                        </Text>
+                                    </View>
                                 </View>
-                            </View>
-                            {index < messages.length - 1 && <View style={styles.itemDivider} />}
-                        </TouchableOpacity>
-                    ))}
+                                {index < chats.length - 1 && <View style={styles.itemDivider} />}
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </View>
                 <View style={{ height: 100 }} />
             </ScrollView>

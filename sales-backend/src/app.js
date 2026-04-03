@@ -12,6 +12,7 @@ const professionalRequestRoutes = require('./routes/professionalRequestRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const guestRoutes = require('./routes/guestRoutes');
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/v1/professional-requests', professionalRequestRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/chats', chatRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
+app.use('/api/v1/guest', guestRoutes);
 
 // Health Check Route
 app.get('/api/v1/health', (req, res) => {

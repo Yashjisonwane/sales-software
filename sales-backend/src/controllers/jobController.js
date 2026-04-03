@@ -8,16 +8,28 @@ const generateShortId = (prefix) => {
 // @desc    Get all jobs (ADMIN) or professional-specific jobs (WORKER)
 const getJobs = async (req, res) => {
     try {
-        const user = req.user;
+        const user = req.user; // null for guests
         let jobs;
 
-        if (user.role === 'ADMIN') {
+        if (!user) {
+            // Guest: return all jobs with limited public info
             jobs = await prisma.job.findMany({
-                include: { 
-                    customer: { select: { name: true, phone: true } }, 
+                include: {
                     worker: { select: { name: true } },
                     photos: true,
-                    estimate: true 
+                    chats: { select: { id: true } }
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+        } else if (user.role === 'ADMIN') {
+            jobs = await prisma.job.findMany({
+                include: {
+                    customer: { select: { name: true, phone: true } },
+                    worker: { select: { name: true } },
+                    photos: true,
+                    estimate: true,
+                    inspection: true,
+                    chats: { select: { id: true } }
                 },
                 orderBy: { createdAt: 'desc' }
             });
@@ -25,11 +37,13 @@ const getJobs = async (req, res) => {
             // Workers only see their own assigned jobs
             jobs = await prisma.job.findMany({
                 where: { workerId: user.id },
-                include: { 
-                    customer: { select: { name: true, phone: true } }, 
+                include: {
+                    customer: { select: { name: true, phone: true } },
                     worker: { select: { name: true } },
                     photos: true,
-                    estimate: true 
+                    estimate: true,
+                    inspection: true,
+                    chats: { select: { id: true } }
                 },
                 orderBy: { createdAt: 'desc' }
             });
@@ -40,12 +54,14 @@ const getJobs = async (req, res) => {
             customerName: j.customer?.name || 'Valued Customer',
             customerPhone: j.customer?.phone || null,
             workerName: j.worker?.name || 'Unassigned',
-            displayId: j.jobNo || `JB-${j.id.slice(-4).toUpperCase()}`
+            chatId: j.chats?.id || null,
+            displayId: j.jobNo || (j.id ? `JB-${String(j.id).slice(-4).toUpperCase()}` : 'JB-0000')
         }));
 
         res.status(200).json({ success: true, count: jobs.length, data: formattedJobs });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Server Error" });
+        console.error("❌ [API] getJobs error:", error);
+        res.status(500).json({ success: false, message: "Server Error", error: error.message });
     }
 };
 
@@ -57,15 +73,15 @@ const updateJob = async (req, res) => {
         // 1. Perform update in a transaction
         const result = await prisma.$transaction(async (tx) => {
             // A. Get existing job first for Lead ID (Support both UUID and Short ID)
-            const existingJob = await tx.job.findFirst({ 
-                where: { 
+            const existingJob = await tx.job.findFirst({
+                where: {
                     OR: [
                         { id: jobId },
                         { jobNo: jobId }
                     ]
-                } 
+                }
             });
-            
+
             if (!existingJob) throw new Error("JOB_NOT_FOUND");
 
             // Use the real UUID for the actual update
@@ -100,9 +116,9 @@ const updateJob = async (req, res) => {
         res.status(200).json({ success: true, data: result });
     } catch (err) {
         console.error("Job Update Error:", err);
-        res.status(err.message === "JOB_NOT_FOUND" ? 404 : 500).json({ 
-            success: false, 
-            message: err.message === 'JOB_NOT_FOUND' ? 'Job not found' : 'Job update failed' 
+        res.status(err.message === "JOB_NOT_FOUND" ? 404 : 500).json({
+            success: false,
+            message: err.message === 'JOB_NOT_FOUND' ? 'Job not found' : 'Job update failed'
         });
     }
 };
@@ -161,7 +177,7 @@ const createEstimate = async (req, res) => {
                 measurements
             }
         });
-        
+
         await prisma.job.update({
             where: { id: jobId },
             data: { status: 'ESTIMATED' }
@@ -189,7 +205,7 @@ const createInvoice = async (req, res) => {
         if (req.user.role !== 'ADMIN') {
             if (!job.estimate) return res.status(400).json({ success: false, message: 'Estimate is required before invoice' });
         }
-        
+
         // Calculate amount based on milestone if totalAmount is provided
         let invoiceAmount = parseFloat(amount) || 0;
         if (totalAmount && milestone) {
@@ -208,7 +224,7 @@ const createInvoice = async (req, res) => {
                 status: 'UNPAID'
             }
         });
-        
+
         await prisma.job.update({
             where: { id: jobId },
             data: { status: 'INVOICED' }
@@ -223,7 +239,7 @@ const createInvoice = async (req, res) => {
 
 const createJob = async (req, res) => {
     try {
-        const { customerName, phone, category, professionalId, location, description, date, time } = req.body;
+        const { customerName, phone, category, professionalId, location, description, date, time, latitude, longitude } = req.body;
 
         // 1. Upsert Customer (find or create)
         let customer = await prisma.user.findFirst({
@@ -235,7 +251,7 @@ const createJob = async (req, res) => {
                 data: {
                     name: customerName,
                     phone: phone,
-                    email: `${phone}@temp.com`, // Required in schema but we might only have phone
+                    email: `${phone}@temp.com`,
                     role: 'CUSTOMER',
                     password: 'MOCK_PASSWORD'
                 }
@@ -244,15 +260,16 @@ const createJob = async (req, res) => {
 
         const jobNo = generateShortId('J');
 
-        // 2. Create Job directly
+        // 2. Create Job with location coordinates
         const job = await prisma.job.create({
             data: {
-                jobId: jobNo, // Ensure schema compatibility if this field name differs
-                jobNo: jobNo, 
+                jobNo: jobNo,
                 customerId: customer.id,
                 workerId: professionalId,
                 categoryName: category,
                 location: location,
+                latitude: latitude ? parseFloat(latitude) : null,
+                longitude: longitude ? parseFloat(longitude) : null,
                 description: description || '',
                 status: 'SCHEDULED',
                 scheduledDate: new Date(date),
@@ -261,12 +278,67 @@ const createJob = async (req, res) => {
             include: { customer: { select: { name: true } }, worker: { select: { name: true } } }
         });
 
+        // 🟢 Create Chat for this Job (Manual Creation)
+        const { v4: uuidv4 } = require('uuid');
+        await prisma.chats.create({
+            data: {
+                id: uuidv4(),
+                job_id: job.id,
+                last_message: 'Manual Job Created',
+                updated_at: new Date()
+            }
+        });
+
         res.status(201).json({ success: true, data: job });
     } catch (err) {
         console.error("Direct Job Creation Error:", err);
         res.status(500).json({ success: false, message: 'Job creation failed: ' + err.message });
     }
 };
+
+// @route   GET /api/v1/jobs/map
+// @desc    Get all jobs with coordinates for map display (guest-accessible)
+const getJobsForMap = async (req, res) => {
+    try {
+        const jobs = await prisma.job.findMany({
+            select: {
+                id: true,
+                jobNo: true,
+                categoryName: true,
+                status: true,
+                location: true,
+                latitude: true,
+                longitude: true,
+                scheduledDate: true,
+                customer: { select: { name: true } },
+                worker: { select: { name: true } },
+                chats: { select: { id: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Only return jobs that have coordinates OR have a location string
+        const mapJobs = jobs.map(j => ({
+            id: j.id,
+            jobNo: j.jobNo,
+            category: j.categoryName,
+            status: j.status,
+            location: j.location,
+            latitude: j.latitude,
+            longitude: j.longitude,
+            scheduledDate: j.scheduledDate,
+            customerName: j.customer?.name || 'Customer',
+            workerName: j.worker?.name || 'Unassigned',
+            chatId: j.chats?.id || null
+        }));
+
+        res.status(200).json({ success: true, count: mapJobs.length, data: mapJobs });
+    } catch (error) {
+        console.error('getJobsForMap error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch map data' });
+    }
+};
+
 
 const deleteJob = async (req, res) => {
     try {
@@ -310,12 +382,12 @@ const getJobHistory = async (req, res) => {
         const jobId = req.params.id;
         const job = await prisma.job.findUnique({
             where: { id: jobId },
-            include: { 
-                worker: true, 
-                estimate: true, 
-                invoice: true, 
+            include: {
+                worker: true,
+                estimate: true,
+                invoice: true,
                 photos: true,
-                lead: true 
+                lead: true
             }
         });
 
@@ -379,7 +451,7 @@ const getJobHistory = async (req, res) => {
                 id: 'h5',
                 title: 'Photos Uploaded',
                 sub: `${job.photos.length} site documentation photo(s) added.`,
-                time: job.photos[job.photos.length-1].createdAt,
+                time: job.photos[job.photos.length - 1].createdAt,
                 icon: 'camera',
                 color: '#38A169',
                 bg: '#F0FFF4'
@@ -444,5 +516,6 @@ module.exports = {
     getEstimates,
     getInvoices,
     getJobHistory,
-    addJobPhoto
+    addJobPhoto,
+    getJobsForMap
 };

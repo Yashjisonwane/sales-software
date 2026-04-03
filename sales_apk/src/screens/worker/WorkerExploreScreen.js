@@ -21,7 +21,8 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import { COLORS, SHADOWS, SIZES, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
-import { getAvailableLeads, acceptLead, getWorkerJobs } from '../../api/apiService';
+import { getAvailableLeads, acceptLead, getWorkerJobs, getJobsForMap } from '../../api/apiService';
+import storage from '../../api/storage';
 
 const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
 
@@ -30,7 +31,7 @@ const getImgSource = (img) => {
     return typeof img === 'number' ? img : { uri: img };
 };
 
-const TABS = ['Overview', 'Jobs', 'Schedule', 'Invoice', 'Quote'];
+const TABS = ['Summary', 'Jobs'];
 
 // Removed PINS_WORKER, JOBS_DATA, INVOICES_DATA, QUOTES_DATA, AGENDA_DATA mock data
 
@@ -77,14 +78,13 @@ const ProgressBar = ({ label, value, progress, color }) => (
 );
 
 export default function WorkerExploreScreen({ navigation, route }) {
-    const [activeTab, setActiveTab] = useState('Overview');
+    const [activeTab, setActiveTab] = useState('Summary');
     const [selectedPin, setSelectedPin] = useState(null);
     const [quoteFilter, setQuoteFilter] = useState('All');
     const [invoiceFilter, setInvoiceFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
-    // Clean 'Silver' style Map URL matching the screenshot
-    const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin&hl=en&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0xf5f5f5&style:feature:water|element:geometry|color:0xc9c9c9');
+    const [isSearchFocused, setIsSearchFocused] = useState('');
+    const webViewRef = useRef(null);
     const bottomSheetRef = useRef(null);
     const snapPoints = useMemo(() => ['18%', '40%', '92%'], []);
     const insets = useSafeAreaInsets();
@@ -151,12 +151,13 @@ export default function WorkerExploreScreen({ navigation, route }) {
 
     useEffect(() => {
         if (route.params?.activeTab) {
-            setActiveTab(route.params.activeTab);
+            setActiveTab(route.params.activeTab || 'Summary');
         }
     }, [route.params?.activeTab]);
 
     const [leads, setLeads] = useState([]);
     const [jobs, setJobs] = useState([]);
+    const [mapJobs, setMapJobs] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchLeads = async () => {
@@ -175,9 +176,17 @@ export default function WorkerExploreScreen({ navigation, route }) {
         }
     };
 
+    const fetchMapData = async () => {
+        const res = await getJobsForMap();
+        if (res.success) {
+            setMapJobs(res.data || []);
+        }
+    };
+
     useEffect(() => {
         fetchLeads();
         fetchJobs();
+        fetchMapData();
     }, []);
 
     useEffect(() => {
@@ -187,20 +196,126 @@ export default function WorkerExploreScreen({ navigation, route }) {
     }, [activeTab]);
 
     const handleAcceptLead = async (leadId) => {
+        // Check if guest — redirect to login
+        const token = await storage.getItem('userToken');
+        if (!token) {
+            alert('Please log in to accept leads and start working.');
+            navigation.navigate('WorkerLogin');
+            return;
+        }
         const res = await acceptLead(leadId);
         if (res.success) {
             alert('Lead Accepted! A new job has been created for you.');
-            fetchLeads(); // Refresh list
+            fetchLeads();
         } else {
             alert(res.message || 'Failed to accept lead');
         }
     };
 
-    const renderOverview = () => (
+    // Build Leaflet HTML with real leads & jobs markers
+    const buildLeafletHTML = (leadsData, jobsMapData) => {
+        const leadMarkers = leadsData.map((lead, i) => {
+            // Using actual coords if available, otherwise fallback to spread Indore city coords
+            const lat = lead.latitude || (22.6 + (i * 0.04) % 0.5);
+            const lng = lead.longitude || (75.8 + (i * 0.05) % 0.5);
+            const title = lead.customer?.name || 'Lead';
+            const loc = lead.location || '';
+            const cat = lead.category?.name || 'Service';
+            return `L.circleMarker([${lat}, ${lng}], {
+                radius: 14, color: '#fff', weight: 2,
+                fillColor: '#F59E0B', fillOpacity: 1
+            }).addTo(map).bindPopup('<b>${title}</b><br>${cat}<br><small>${loc}</small>')
+            .on('click', function() {
+                window.ReactNativeWebView.postMessage(JSON.stringify({type:'lead',id:'${lead.id}',name:'${title}',loc:'${loc}',cat:'${cat}'}));
+            });`;
+        }).join('\n');
+
+        const jobMarkers = jobsMapData.map((job, i) => {
+            // Using actual coords if available, otherwise fallback
+            const lat = job.latitude || (22.7 + (i * 0.03) % 0.4);
+            const lng = job.longitude || (75.9 + (i * 0.04) % 0.4);
+            const title = job.customerName || 'Job';
+            const loc = job.location || '';
+            const statusLabel = job.status || '';
+            return `L.circleMarker([${lat}, ${lng}], {
+                radius: 12, color: '#fff', weight: 2,
+                fillColor: '#8B5CF6', fillOpacity: 1
+            }).addTo(map).bindPopup('<b>${title}</b><br>Status: ${statusLabel}<br><small>${loc}</small>')
+            .on('click', function() {
+                window.ReactNativeWebView.postMessage(JSON.stringify({type:'job',id:'${job.id}',name:'${title}',loc:'${loc}'}));
+            });`;
+        }).join('\n');
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #map { width: 100%; height: 100%; }
+  .leaflet-control-zoom { display: none; }
+  .leaflet-popup-content-wrapper { border-radius: 12px; font-family: sans-serif; font-size: 13px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([22.7196, 75.8577], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(map);
+
+  ${leadMarkers}
+  ${jobMarkers}
+
+  // Current location pulse marker
+  var currentLoc = L.circleMarker([22.7196, 75.8577], {
+    radius: 10, color: '#0062E1', weight: 3,
+    fillColor: '#4299E1', fillOpacity: 0.9
+  }).addTo(map).bindPopup('You are here');
+<\/script>
+</body>
+</html>`;
+    };
+
+    // Handle messages from WebView (pin taps)
+    const handleMapMessage = (event) => {
+        try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'lead') {
+                navigation.navigate('Chat', {
+                    name: data.name,
+                    id: data.id,
+                    location: data.loc
+                });
+            } else if (data.type === 'job') {
+                navigation.navigate('Chat', { 
+                    name: data.name,
+                    jobId: data.id, 
+                    location: data.loc 
+                });
+            }
+        } catch (e) { /* ignore parse errors */ }
+    };
+
+    // Inject updated markers into Leaflet map when data changes
+    const injectMapMarkers = () => {
+        if (!webViewRef.current) return;
+        const js = `
+            document.querySelectorAll('.leaflet-interactive').forEach(el => {
+                if (!el.classList.contains('current-loc')) el.remove();
+            });
+        `;
+        webViewRef.current.injectJavaScript(js);
+    };
+
+    const renderSummary = () => (
         <View style={styles.tabScrollContent}>
             <View style={styles.overviewMainCard}>
-                <Text style={styles.overviewTitle}>Good Morning, David!</Text>
-                <Text style={styles.overviewSub}>Here's what's happening today.</Text>
+                <Text style={styles.overviewTitle}>Welcome Back!</Text>
+                <Text style={styles.overviewSub}>Manage your jobs via chat.</Text>
                 
                 <View style={styles.statsGrid}>
                     <StatCard 
@@ -263,60 +378,6 @@ export default function WorkerExploreScreen({ navigation, route }) {
         </View>
     );
 
-    const renderJobPinModal = () => (
-        <Modal
-            transparent
-            visible={!!selectedPin}
-            animationType="fade"
-            onRequestClose={() => setSelectedPin(null)}
-        >
-            <TouchableOpacity
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setSelectedPin(null)}
-            >
-                <View style={styles.pinCard}>
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => {
-                            setSelectedPin(null);
-                            navigation.navigate('JobOfferDetail', { state: 'accepted' });
-                        }}
-                        style={styles.cardImagesRow}
-                    >
-                        <Image source={getImgSource(require('../../assets/images/wood_flooring_job.png'))} style={styles.cardThumb} />
-                        <Image source={getImgSource(require('../../assets/images/modern_kitchen_flooring.png'))} style={styles.cardThumb} />
-                        <Image source={getImgSource(require('../../assets/images/construction_site_overview.png'))} style={[styles.cardThumb, { marginRight: 0 }]} />
-                    </TouchableOpacity>
-
-                    <View style={styles.cardContent}>
-                        <View style={styles.cardHeaderRow}>
-                            <View style={{ flex: 1 }}>
-                                <View style={styles.cardNameLine}>
-                                    <Text style={styles.cardName}>{selectedPin?.customer?.name || 'Customer'}</Text>
-                                    <View style={styles.upcomingBadge}><Text style={styles.upcomingText}>Lead</Text></View>
-                                </View>
-                                <Text style={styles.cardAddr}>{selectedPin?.location || 'Location'}</Text>
-                            </View>
-                            <View style={styles.cardPriceBox}>
-                                <Text style={styles.cardPriceText}>$43 <Text style={styles.cardPerHr}>per hour</Text></Text>
-                            </View>
-                        </View>
-
-                        <View style={styles.cardActions}>
-                            <TouchableOpacity 
-                                style={[styles.loginBtn, { height: 40, marginTop: 10, backgroundColor: '#10B981' }]}
-                                onPress={() => handleAcceptLead(selectedPin.id)}
-                            >
-                                <Text style={styles.loginBtnText}>Accept Lead</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
-            </TouchableOpacity>
-        </Modal>
-    );
-
     const renderJobs = () => (
         <View style={styles.tabScrollContent}>
             <View style={styles.detailedSearchRow}>
@@ -335,11 +396,11 @@ export default function WorkerExploreScreen({ navigation, route }) {
                 </View>
             ) : (
                 <View style={{ gap: 20 }}>
-                    {leads.map(lead => (
+                    {leads.map((lead) => (
                         <TouchableOpacity
                             key={lead.id}
                             style={styles.detailedVerticalCard}
-                            onPress={() => navigation.navigate('JobOfferDetail', { lead, state: 'pending' })}
+                            onPress={() => navigation.navigate('Chat', { name: lead.customer?.name, id: lead.id, location: lead.location })}
                             activeOpacity={0.9}
                         >
                             <Image 
@@ -360,9 +421,9 @@ export default function WorkerExploreScreen({ navigation, route }) {
                                     <Text style={styles.jobPrice}>$43 <Text style={styles.priceUnit}>/hr</Text></Text>
                                     <TouchableOpacity 
                                         style={[styles.actionBtn, { maxWidth: 120 }]}
-                                        onPress={() => handleAcceptLead(lead.id)}
+                                        onPress={() => navigation.navigate('Chat', { name: lead.customer?.name, id: lead.id, location: lead.location })}
                                     >
-                                        <Text style={styles.actionText}>Accept Now</Text>
+                                        <Text style={styles.actionText}>Chat Now</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -370,182 +431,6 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     ))}
                 </View>
             )}
-        </View>
-    );
-
-    const renderInvoice = () => (
-        <View style={styles.tabScrollContent}>
-            {/* Inline Search */}
-            <View style={styles.inlineSearch}>
-                <Ionicons name="search" size={20} color="#CBD5E0" />
-                <BottomSheetTextInput 
-                    placeholder="Search location here" 
-                    style={styles.inlineSearchInput} 
-                    placeholderTextColor="#A0AEC0" 
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    onSubmitEditing={() => {
-                        if (searchQuery.trim()) {
-                            setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(searchQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`);
-                        }
-                    }}
-                />
-                <Ionicons name="mic-outline" size={20} color="#CBD5E0" />
-            </View>
-
-            {/* Filter Chips */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusChipsRow}>
-                {['All', 'Draft', 'Sent', 'Paid', 'Pending'].map(s => (
-                    <TouchableOpacity
-                        key={s}
-                        onPress={() => setInvoiceFilter(s)}
-                        style={[styles.statusChip, invoiceFilter === s && styles.activeStatusChipDark]}
-                    >
-                        <Text style={[styles.statusChipText, invoiceFilter === s && styles.activeStatusChipTextWhite]}>{s}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-
-            {/* Billing Summary Card */}
-            <View style={styles.billingSummaryCard}>
-                <View style={styles.summaryHeaderRow}>
-                    <View>
-                        <Text style={styles.summaryTitle}>Billing Summary</Text>
-                        <Text style={styles.summarySub}>Invoices and payments in one place.</Text>
-                    </View>
-                    <TouchableOpacity style={styles.monthPicker}>
-                        <Text style={styles.monthText}>January</Text>
-                        <Ionicons name="chevron-down" size={16} color="#4A5568" />
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.summaryTable}>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Total Billed</Text>
-                        <Text style={styles.summaryValue}>$148,500</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Pending</Text>
-                        <Text style={styles.summaryValue}>$12,450</Text>
-                    </View>
-                    <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Paid Invoices</Text>
-                        <Text style={styles.summaryValue}>186</Text>
-                    </View>
-                    <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-                        <Text style={styles.summaryLabel}>Overdue</Text>
-                        <Text style={[styles.summaryValue, { color: '#EF4444' }]}>8</Text>
-                    </View>
-                </View>
-
-                <TouchableOpacity
-                    style={styles.newInvoiceBtn}
-                    onPress={() => navigation.navigate('CreateInvoice')}
-                >
-                    <Ionicons name="add" size={22} color="#fff" />
-                    <Text style={styles.newInvoiceBtnText}>New Invoice</Text>
-                </TouchableOpacity>
-            </View>
-
-            <Text style={styles.sectionTitleSmall}>Invoices</Text>
-
-            {jobs.filter(job => job.invoice).map(job => (
-                <View key={job.invoice.id} style={styles.quoteCardDetailed}>
-                    <View style={styles.cardHeaderDetailed}>
-                        <Text style={styles.billingId}>#{job.invoice.id.substring(0, 8)}</Text>
-                        <View style={[styles.statusBadgeDetailed, {
-                            backgroundColor: job.invoice.status === 'PAID' ? '#DCFCE7' : '#FEF2F2'
-                        }]}>
-                            <Text style={[styles.statusBadgeTextDetailed, {
-                                color: job.invoice.status === 'PAID' ? '#16A34A' : '#EF4444'
-                            }]}>{job.invoice.status}</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.billingRow}>
-                        <Text style={styles.billingLabel}>Customer Name</Text>
-                        <Text style={styles.billingValue}>{job.customer?.name}</Text>
-                    </View>
-                    <View style={styles.billingRow}>
-                        <Text style={styles.billingLabel}>Job Type</Text>
-                        <Text style={styles.billingValue}>{job.categoryName}</Text>
-                    </View>
-                    <View style={styles.billingRow}>
-                        <Text style={styles.billingLabel}>Amount</Text>
-                        <Text style={[styles.billingValue, { fontWeight: '700' }]}>${job.invoice.amount}</Text>
-                    </View>
-
-                    <TouchableOpacity style={styles.viewDetailsLink}>
-                        <Text style={styles.viewDetailsText}>View Details</Text>
-                    </TouchableOpacity>
-                </View>
-            ))}
-        </View>
-    );
-
-    const renderQuote = () => (
-        <View style={styles.tabScrollContent}>
-            {/* Inline Search */}
-            <View style={styles.inlineSearch}>
-                <Ionicons name="search-outline" size={24} color="#1A202C" />
-                <BottomSheetTextInput placeholder="Search here" placeholderTextColor="#A0AEC0" style={styles.inlineSearchInput} />
-                <Ionicons name="mic-outline" size={24} color="#718096" />
-            </View>
-
-            {/* Status Chips */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statusChipsRow}>
-                {['All', 'Draft', 'Sent', 'Approved', 'Rejected'].map(s => (
-                    <TouchableOpacity
-                        key={s}
-                        onPress={() => setQuoteFilter(s)}
-                        style={[styles.statusChip, quoteFilter === s && styles.activeStatusChipDark]}
-                    >
-                        <Text style={[styles.statusChipText, quoteFilter === s && styles.activeStatusChipTextWhite]}>{s}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-
-            <Text style={styles.sectionTitleSmall}>All Quotes</Text>
-
-            {jobs.filter(job => job.estimate).map(job => (
-                <View key={job.estimate.id} style={styles.quoteCardDetailed}>
-                    <View style={styles.cardHeaderDetailed}>
-                        <Text style={styles.billingId}>#{job.estimate.id.substring(0, 8)}</Text>
-                        <View style={[styles.statusBadgeDetailed, {
-                            backgroundColor: job.estimate.isApproved ? '#DCFCE7' : '#DBEAFE'
-                        }]}>
-                            <Text style={[styles.statusBadgeTextDetailed, {
-                                color: job.estimate.isApproved ? '#22C55E' : '#0062E1'
-                            }]}>{job.estimate.isApproved ? 'Approved' : 'Pending'}</Text>
-                        </View>
-                    </View>
-
-                    <View style={styles.billingRow}>
-                        <Text style={styles.billingLabel}>Customer Name</Text>
-                        <Text style={styles.billingValue}>{job.customer?.name}</Text>
-                    </View>
-                    <View style={styles.billingRow}>
-                        <Text style={styles.billingLabel}>Service Type</Text>
-                        <Text style={styles.billingValue}>{job.categoryName}</Text>
-                    </View>
-                    <View style={styles.billingRow}>
-                        <Text style={styles.billingLabel}>Amount</Text>
-                        <Text style={[styles.billingValue, { fontWeight: '700' }]}>${job.estimate.amount}</Text>
-                    </View>
-
-                    <TouchableOpacity
-                        style={styles.viewDetailsLinkLeft}
-                        onPress={() => navigation.navigate('QuoteDetails', { quoteId: job.estimate.id, role: 'worker' })}
-                    >
-                        <Text style={styles.viewDetailsTextPurple}>View Details</Text>
-                    </TouchableOpacity>
-                </View>
-            ))}
-
-            <TouchableOpacity style={styles.createBtnFloatingPill} onPress={() => navigation.navigate('QuoteScope', { role: 'worker' })}>
-                <Ionicons name="add" size={24} color="#fff" />
-                <Text style={styles.createBtnTextPill}>Create New Quote</Text>
-            </TouchableOpacity>
         </View>
     );
 
@@ -570,28 +455,27 @@ export default function WorkerExploreScreen({ navigation, route }) {
                             <View style={styles.agendaContent}>
                                 <View style={styles.agendaCard}>
                                     <View style={styles.activeTopBar} />
-                                    <Text style={styles.agendaName}>{job.lead?.customer?.name || 'Customer'}</Text>
-                                    <Text style={styles.agendaType}>{job.lead?.category?.name || 'Service'}</Text>
+                                    <Text style={styles.agendaName}>{job.customerName || 'Customer'}</Text>
+                                    <Text style={styles.agendaType}>{job.categoryName || 'Service'}</Text>
                                     <View style={styles.agendaInfoRow}>
                                         <Ionicons name="time-outline" size={14} color="#718096" />
                                         <Text style={styles.agendaInfoText}>Today, 09:00 AM</Text>
                                     </View>
                                     <View style={styles.agendaInfoRow}>
                                         <Ionicons name="location-outline" size={14} color="#718096" />
-                                        <Text style={styles.agendaInfoText} numberOfLines={1}>{job.lead?.location || 'Address not set'}</Text>
+                                        <Text style={styles.agendaInfoText} numberOfLines={1}>{job.location || 'Address not set'}</Text>
                                     </View>
                                     <View style={styles.agendaActions}>
                                         <TouchableOpacity 
-                                           style={styles.agendaBtnSecondary}
-                                           onPress={() => navigation.navigate('JobOfferDetail', { lead: job.lead, state: 'accepted' })}
+                                            style={[styles.agendaBtnSecondary, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}
+                                            onPress={() => navigation.navigate('Chat', { 
+                                                jobId: job.id, 
+                                                name: job.customerName,
+                                                location: job.location
+                                            })}
                                         >
-                                            <Text style={styles.agendaBtnTextSecondary}>Details</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity 
-                                           style={styles.agendaBtnPrimary}
-                                           onPress={() => navigation.navigate('JobProofCompliance', { jobId: job.id })}
-                                        >
-                                            <Text style={styles.agendaBtnTextPrimary}>Start Work</Text>
+                                            <Ionicons name="chatbubble-ellipses-outline" size={16} color="#0369A1" />
+                                            <Text style={[styles.agendaBtnTextSecondary, { color: '#0369A1' }]}>Chat</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -607,157 +491,79 @@ export default function WorkerExploreScreen({ navigation, route }) {
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" transparent backgroundColor="transparent" />
 
-            {/* Real Map Content Area */}
+            {/* Leaflet / OpenStreetMap */}
             <View style={styles.mapContainer}>
-                {/* Google Map iframe */}
                 <WebView
-                    source={{ html: `<iframe src="${mapUrl}" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>` }}
+                    ref={webViewRef}
+                    source={{ html: buildLeafletHTML(leads, mapJobs) }}
                     style={styles.mapImg}
-                    scalesPageToFit={true}
+                    originWhitelist={['*']}
+                    onMessage={handleMapMessage}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
                     scrollEnabled={false}
+                    showsVerticalScrollIndicator={false}
+                    showsHorizontalScrollIndicator={false}
                 />
-
-                {/* All Map Pins - fade out when sheet scrolls up */}
-                <Animated.View style={[StyleSheet.absoluteFill, pinsAnimatedStyle]} pointerEvents="box-none">
-                    {/* Job Location Pins - Mix of Mock and Live Leads */}
-                    {!selectedPin && [
-                        ...jobs.map((job, index) => ({
-                            id: job.id,
-                            type: 'job',
-                            color: '#8B5CF6',
-                            top: `${20 + (index * 15) % 50}%`,
-                            left: `${30 + (index * 20) % 40}%`,
-                            customer: job.customer,
-                            location: job.location,
-                            category: { name: job.categoryName },
-                            isRealJob: true
-                        })),
-                        ...leads.map((lead, index) => ({
-                            id: lead.id,
-                            type: 'lead',
-                            color: '#F59E0B',
-                            top: `${30 + (index * 12) % 40}%`,
-                            left: `${20 + (index * 15) % 65}%`,
-                            customer: lead.customer,
-                            location: lead.location,
-                            category: lead.category,
-                            isRealLead: true
-                        }))
-                    ].map(pin => (
-                        <TouchableOpacity
-                            key={`pin-${pin.id}`}
-                            style={[styles.pin, { top: pin.top, left: pin.left }]}
-                            onPress={() => {
-                                if (pin.isRealLead) {
-                                    navigation.navigate('JobOfferDetail', { lead: pin, state: 'pending' });
-                                } else if (pin.isRealJob) {
-                                    navigation.navigate('JobProofCompliance', { jobId: pin.id });
-                                }
-                            }}
-                        >
-                            <LocationPin color={pin.color} />
-                        </TouchableOpacity>
-                    ))}
-
-                    {/* Current Location Marker with Directional Beam */}
-                    <View style={[styles.currentLocMarkerContainer, { position: 'absolute', top: '48%', left: '48%', zIndex: 15 }]}>
-                        <CurrentLocationMarker />
-                    </View>
-                </Animated.View>
 
                 <Animated.View style={[StyleSheet.absoluteFill, mapAnimatedStyle]} pointerEvents="box-none">
 
-                    {/* Float Header / Search */}
+                    {/* Float Header / Search + Add Job */}
                     <View style={[styles.searchContainer, { top: insets.top + 10 }]}>
                         <View style={styles.searchBar}>
-                            <Image source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Google_Maps_icon_%282020%29.svg/512px-Google_Maps_icon_%282020%29.svg.png' }} style={styles.googleIconMap} />
+                            <Ionicons name="search" size={18} color="#718096" style={{ marginLeft: 12 }} />
                             <TextInput
                                 style={[styles.searchInput, { color: '#1A202C' }]}
-                                placeholder="Search here"
+                                placeholder="Search location..."
                                 placeholderTextColor="#718096"
                                 value={searchQuery}
                                 onFocus={() => setIsSearchFocused(true)}
                                 onChangeText={setSearchQuery}
                                 onSubmitEditing={() => {
                                     setIsSearchFocused(false);
-                                    if (searchQuery.trim()) {
-                                        setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(searchQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`);
+                                    if (webViewRef.current && searchQuery.trim()) {
+                                        webViewRef.current.injectJavaScript(`
+                                            fetch('https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}')
+                                            .then(r => r.json()).then(d => {
+                                                if (d[0]) map.setView([d[0].lat, d[0].lon], 14);
+                                            });
+                                        `);
                                     }
                                 }}
                                 returnKeyType="search"
                             />
-                            <Ionicons name="mic" size={20} color="#4A5568" style={{ marginRight: 12 }} />
-                            <TouchableOpacity onPress={() => navigation.navigate('Account')}>
-                                <Image source={{ uri: 'https://i.pravatar.cc/100?u=worker' }} style={styles.avatar} />
+                            <TouchableOpacity
+                                style={styles.addJobMapBtn}
+                                onPress={() => navigation.navigate('RequestService')}
+                            >
+                                <Ionicons name="add" size={18} color="#fff" />
+                                <Text style={styles.addJobMapText}>Add Job</Text>
                             </TouchableOpacity>
-                        </View>
-
-                        {/* Dropdown Suggestions (Lower Option) */}
-                        {isSearchFocused && (
-                            <View style={styles.googleDropdownFloating}>
-                                <ScrollView style={{ maxHeight: 380 }}>
-                                    {[
-                                      { name: 'Indore Marriott Hotel', addr: 'H-2 Scheme No 54, Meghdhoot Garden...', icon: 'location-sharp' },
-                                      { name: 'marriott hotels & resorts', addr: '', icon: 'time-outline' },
-                                      { name: 'Savo Technologies', addr: '139 PU4, Behind C21 Mall, Vijay Nagar...', icon: 'time-outline' },
-                                    ].map((item, idx) => (
-                                        <TouchableOpacity 
-                                            key={idx} 
-                                            style={styles.googleHistoryRow}
-                                            onPress={() => {
-                                                setSearchQuery(item.name);
-                                                setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(item.name)}&t=&z=13&ie=UTF8&iwloc=&output=embed`);
-                                                setIsSearchFocused(false);
-                                                Keyboard.dismiss();
-                                            }}
-                                        >
-                                            <View style={styles.googleIconBox}><Ionicons name={item.icon} size={20} color="#5F6368" /></View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={styles.googlePlaceName}>{item.name}</Text>
-                                                {item.addr && <Text style={styles.googlePlaceAddr}>{item.addr}</Text>}
-                                            </View>
-                                        </TouchableOpacity>
-                                    ))}
-                                    <TouchableOpacity style={styles.closeDropdownLink} onPress={() => setIsSearchFocused(false)}>
-                                        <Text style={styles.closeDropdownText}>Close Suggestions</Text>
-                                    </TouchableOpacity>
-                                </ScrollView>
-                            </View>
-                        )}
-                        <View style={{ alignItems: 'flex-end', marginTop: 12, marginRight: 4 }}>
-                            <View style={styles.weatherWidgetMap}>
-                                <Ionicons name="cloudy" size={24} color="#F59E0B" />
-                                <View style={{ marginLeft: 8 }}>
-                                    <Text style={styles.weatherTempMap}>30°C</Text>
-                                    <Text style={styles.weatherLocMap}>CA, USA</Text>
-                                </View>
-                            </View>
                         </View>
                     </View>
 
-                    {/* Map Interaction Buttons Right - Premium Admin Style */}
-                    {!selectedPin && (
-                        <Animated.View style={[styles.mapButtonsRight, buttonsAnimatedStyle]}>
-                            <TouchableOpacity style={styles.navCircleBtn}>
-                                <Ionicons name="navigate" size={28} color="#0062E1" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.dirSquareBtn}>
-                                <MaterialCommunityIcons name="directions" size={30} color="#FFFFFF" />
-                            </TouchableOpacity>
-                        </Animated.View>
-                    )}
-
-                    {/* Status filter chips on map overlap - now follows the sheet handle */}
-                    <Animated.View style={[styles.mapOverlay, legendAnimatedStyle]}>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#F59E0B' }]}><Text style={styles.legendText}>In Progress</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#8B5CF6' }]}><Text style={styles.legendText}>Upcoming</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#10B981' }]}><Text style={styles.legendText}>Completed</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#EF4444' }]}><Text style={styles.legendText}>Cancelled</Text></TouchableOpacity>
-                        </ScrollView>
+                    {/* Map Interaction Buttons Right */}
+                    <Animated.View style={[styles.mapButtonsRight, buttonsAnimatedStyle]}>
+                        <TouchableOpacity
+                            style={styles.navCircleBtn}
+                            onPress={() => {
+                                if (webViewRef.current) {
+                                    webViewRef.current.injectJavaScript(`map.setView([22.7196, 75.8577], 13); true;`);
+                                }
+                            }}
+                        >
+                            <Ionicons name="navigate" size={28} color="#0062E1" />
+                        </TouchableOpacity>
                     </Animated.View>
 
-                    {renderJobPinModal()}
+                    {/* Legend chips above bottom sheet */}
+                    <Animated.View style={[styles.mapOverlay, legendAnimatedStyle]}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
+                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#F59E0B' }]}><Text style={styles.legendText}>🟡 Leads</Text></TouchableOpacity>
+                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#8B5CF6' }]}><Text style={styles.legendText}>🟣 My Jobs</Text></TouchableOpacity>
+                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#0062E1' }]}><Text style={styles.legendText}>🔵 You</Text></TouchableOpacity>
+                        </ScrollView>
+                    </Animated.View>
                 </Animated.View>
             </View>
 
@@ -794,13 +600,10 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     </GestureHandlerScrollView>
                 </View>
 
-                {/* Scrollable Content inside Sheet */}
+                {/* Consolidated Summary & Jobs */}
                 <BottomSheetScrollView contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 100 }]}>
-                    {activeTab === 'Overview' && renderOverview()}
-                    {activeTab === 'Jobs' && renderJobs()}
-                    {activeTab === 'Invoice' && renderInvoice()}
-                    {activeTab === 'Quote' && renderQuote()}
-                    {activeTab === 'Schedule' && renderSchedule()}
+                    {renderSummary()}
+                    {renderJobs()}
                 </BottomSheetScrollView>
             </BottomSheet>
         </View>
@@ -1171,4 +974,19 @@ const styles = StyleSheet.create({
     progressValue: { fontSize: 13, fontWeight: '700' },
     progressBg: { height: 8, backgroundColor: '#EDF2F7', borderRadius: 4, overflow: 'hidden' },
     progressFill: { height: '100%', borderRadius: 4 },
+    addJobMapBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#0062E1',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        marginRight: 8,
+    },
+    addJobMapText: {
+        color: '#fff',
+        fontSize: 13,
+        fontFamily: FONTS.bold,
+    },
 });

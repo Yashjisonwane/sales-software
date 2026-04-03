@@ -25,6 +25,14 @@ const registerUser = async (req, res) => {
             });
         }
 
+        // Restrict WORKER role to invite-only
+        if (role === 'WORKER') {
+            return res.status(403).json({
+                success: false,
+                message: "Worker registration is invite-only. Please use an invitation link."
+            });
+        }
+
         // 2. Hash Password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -172,8 +180,101 @@ const resetPassword = async (req, res) => {
     }
 };
 
+// @route   POST /api/v1/auth/invite
+// @desc    Admin generates an invitation for a worker
+const generateInvite = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ success: false, message: "Email is required" });
+
+        // Generate 6-digit random token
+        const token = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+
+        const invitation = await prisma.invitation.upsert({
+            where: { email },
+            update: { token, status: 'PENDING', expiresAt },
+            create: {
+                id: Math.random().toString(36).substring(2, 11),
+                email,
+                token,
+                expiresAt
+            }
+        });
+
+        res.status(201).json({ 
+            success: true, 
+            message: "Invite generated", 
+            inviteCode: token,
+            link: `https://salesapp.com/invite/${token}` 
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @route   POST /api/v1/auth/register-invited
+// @desc    Register a worker using an invite token
+const registerWorkerByInvite = async (req, res) => {
+    try {
+        const { token, name, phone, password } = req.body;
+
+        const invite = await prisma.invitation.findUnique({
+            where: { token }
+        });
+
+        if (!invite || invite.status !== 'PENDING' || invite.expiresAt < new Date()) {
+            return res.status(400).json({ success: false, message: "Invalid or expired invitation code" });
+        }
+
+        // Check if user already exists
+        const existingUser = await prisma.user.findFirst({
+            where: { OR: [{ email: invite.email }, { phone }] }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: "User already registered" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        const newUser = await prisma.user.create({
+            data: {
+                name,
+                email: invite.email,
+                phone,
+                password: hashedPassword,
+                role: 'WORKER'
+            }
+        });
+
+        // Mark invite as accepted
+        await prisma.invitation.update({
+            where: { id: invite.id },
+            data: { status: 'ACCEPTED' }
+        });
+
+        const jwtSecret = process.env.JWT_SECRET;
+        const jwtToken = jwt.sign({ id: newUser.id, role: newUser.role }, jwtSecret, { expiresIn: '30d' });
+
+        res.status(201).json({
+            success: true,
+            data: {
+                user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
+                token: jwtToken
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
-    resetPassword
+    resetPassword,
+    generateInvite,
+    registerWorkerByInvite
 };

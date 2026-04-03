@@ -331,7 +331,7 @@ const JobCard = ({ name, id, tag, time, images, location, category, navigation, 
         </View>
       )}
     </GestureHandlerScrollView>
-    <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.jobInfo}>
+    <TouchableOpacity onPress={() => navigation.navigate('AdminProChat', { name: name, userId: id.replace('#JB-', '') })} activeOpacity={0.9} style={styles.jobInfo}>
       <View style={styles.jobInfoHeader}>
         <View style={styles.jobNameRow}>
           <Text style={styles.jobName} numberOfLines={1}>{name}</Text>
@@ -353,9 +353,16 @@ const JobCard = ({ name, id, tag, time, images, location, category, navigation, 
 
       <View style={styles.jobActions}>
         <ActionButton 
+          icon="chatbubbles-outline" 
+          label="Message" 
+          onPress={() => navigation.navigate('AdminProChat', { name: name, userId: id.replace('#JB-', '') })}
+          color="#0062E1"
+        />
+        <ActionButton 
           icon="navigate-outline" 
-          label="Directions" 
+          label="Map" 
           onPress={() => location && Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`)} 
+          color="#718096"
         />
         <ActionButton 
           icon="call-outline" 
@@ -441,9 +448,9 @@ const AgendaItem = ({ item, index, isLast, navigation }) => (
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.agendaBtnPrimaryClean}
-            onPress={() => navigation.navigate('JobDetails', { job: item })}
+            onPress={() => navigation.navigate('AdminProChat', { name: item.name, userId: item.workerId || item.id })}
           >
-            <Text style={styles.agendaBtnPrimaryText}>Details</Text>
+            <Text style={styles.agendaBtnPrimaryText}>Chat</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -560,7 +567,7 @@ export default function ExploreScreen({ navigation, route }) {
   const [showQuoteSuccess, setShowQuoteSuccess] = useState(false);
   const [overlayTab, setOverlayTab] = useState('Job Details');
   const [mapUrl, setMapUrl] = useState('https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29446.420299690402!2d75.85792000000001!3d22.6983936!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1773493713074!5m2!1sen!2sin&hl=en&style=feature:all|element:labels|visibility:on&style=feature:landscape|element:geometry|color:0xf5f5f5&style=feature:water|element:geometry|color:0xc9c9c9');
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [activeTab, setActiveTab] = useState('Summary');
   const [timeFilter, setTimeFilter] = useState('All');
   const [invoiceFilter, setInvoiceFilter] = useState('All');
   const [quoteFilter, setQuoteFilter] = useState('All');
@@ -609,7 +616,7 @@ export default function ExploreScreen({ navigation, route }) {
     }
   };
 
-  const tabs = ['Overview', 'Jobs', 'Schedule', 'Invoice', 'Quote'];
+  const tabs = ['Summary', 'Jobs', 'Invoice', 'Quote'];
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['18%', '45%', '92%'], []);
   const insets = useSafeAreaInsets();
@@ -622,7 +629,7 @@ export default function ExploreScreen({ navigation, route }) {
 
   React.useEffect(() => {
     if (route.params?.activeTab) {
-      setActiveTab(route.params.activeTab || 'Overview');
+      setActiveTab(route.params.activeTab || 'Summary');
     }
   }, [route.params?.activeTab]);
 
@@ -701,13 +708,13 @@ export default function ExploreScreen({ navigation, route }) {
             <TouchableOpacity
               key={pin.id}
               style={[styles.pin, { top: pin.latitude ? `${(parseFloat(pin.latitude) % 100)}%` : `${Math.random() * 40 + 20}%`, left: pin.longitude ? `${(parseFloat(pin.longitude) % 100)}%` : `${Math.random() * 40 + 20}%` }]}
-              onPress={() => navigation.navigate('JobDetails', { job: pin })}
+              onPress={() => navigation.navigate('AdminProChat', { name: pin.clientName, userId: pin.id })}
             >
               <LocationPin color={pin.status === 'OPEN' ? '#8B5CF6' : '#10B981'} />
             </TouchableOpacity>
           ))}
 
-          {/* Jobs Map Pins */}
+          {/* Jobs Map Pin - Changed to go to chat */}
           {!selectedJob && !selectedPin && allJobs.filter(j => 
             j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
             (j.location || '').toLowerCase().includes(searchQuery.toLowerCase())
@@ -715,7 +722,7 @@ export default function ExploreScreen({ navigation, route }) {
             <TouchableOpacity
               key={job.id}
               style={[styles.pin, { top: job.latitude ? `${(parseFloat(job.latitude) % 100)}%` : `${Math.random() * 40 + 40}%`, left: job.longitude ? `${(parseFloat(job.longitude) % 100)}%` : `${Math.random() * 40 + 40}%` }]}
-              onPress={() => navigation.navigate('JobDetails', { job })}
+              onPress={() => navigation.navigate('AdminProChat', { name: job.customerName, userId: job.workerId || job.id })}
             >
               <LocationPin color={job.status === 'IN_PROGRESS' ? '#0E56D0' : '#004D40'} />
             </TouchableOpacity>
@@ -857,21 +864,14 @@ export default function ExploreScreen({ navigation, route }) {
           keyboardBlurBehavior="restore"
           android_keyboardInputMode="adjustResize"
         >
-          {/* Tabs */}
+          {/* Consolidated Summary & Jobs */}
           <View style={styles.tabsContainer}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.tabsInner}
-            >
-              {tabs.map(tab => (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsInner}>
+              {tabs.map((tab) => (
                 <TouchableOpacity
                   key={tab}
-                  onPress={() => {
-                    console.log(`[DASHBOARD] Tab switched to: ${tab}`);
-                    setActiveTab(tab);
-                  }}
                   style={[styles.tabItem, activeTab === tab && styles.activeTabItem]}
+                  onPress={() => setActiveTab(tab)}
                 >
                   <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
                 </TouchableOpacity>
@@ -879,206 +879,98 @@ export default function ExploreScreen({ navigation, route }) {
             </ScrollView>
           </View>
 
-
-
           <BottomSheetScrollView 
             contentContainerStyle={[styles.sheetContent, { paddingBottom: 380 }]}
             refreshControl={
               <RefreshControl refreshing={isRefreshing} onRefresh={fetchData} />
             }
           >
-            {activeTab === 'Overview' && (
+            {activeTab === 'Summary' && (
               <View style={styles.overviewContainer}>
-                <GestureHandlerScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false} 
-                  style={styles.timeFiltersContainerOverview}
-                  contentContainerStyle={{ gap: 8, paddingLeft: 4 }}
-                  disallowInterruption={true}
-                >
-                  {['All', 'Weekly', 'Monthly', 'Yearly'].map(f => (
-                    <TouchableOpacity
-                      key={f}
-                      onPress={() => setTimeFilter(f)}
-                      style={[styles.timeFilterChipOverview, timeFilter === f && styles.activeTimeFilterChipOverview]}
-                    >
-                      <Text style={[styles.timeFilterChipTextOverview, timeFilter === f && styles.activeTimeFilterChipTextOverview]}>{f}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </GestureHandlerScrollView>
-                <View style={styles.dashboardMainCard}>
-                  <Text style={styles.dashboardTitle}>Admin Dashboard</Text>
-                  <Text style={styles.dashboardSub}>Platform Overview & Metrics</Text>
+                  <View style={styles.dashboardMainCard}>
+                    <Text style={styles.dashboardTitle}>Admin Dashboard</Text>
+                    <Text style={styles.dashboardSub}>Platform Overview & Metrics</Text>
 
-                  <View style={styles.statsGridRefined}>
-                    <StatCard 
-                      icon="people-outline" 
-                      label="Active Workers" 
-                      value={stats?.mainStats?.[0]?.value?.toString() || "0"} 
-                      change={stats?.mainStats?.[0]?.trend || "+0%"} 
-                      color="#3B82F6" 
-                      onPress={() => navigation.navigate('WorkerManagement')}
-                    />
-                    <StatCard 
-                      icon="briefcase-outline" 
-                      label="Jobs In Progress" 
-                      value={stats?.mainStats?.[1]?.value?.toString() || "0"} 
-                      change={stats?.mainStats?.[1]?.trend || "Lead: 0 | Sub: 0"} 
+                    <View style={styles.statsGridRefined}>
+                      <StatCard 
+                        icon="people-outline" 
+                        label="Workers" 
+                        value={stats?.mainStats?.[0]?.value?.toString() || "0"} 
+                        change={stats?.mainStats?.[0]?.trend || "+0%"} 
+                        color="#3B82F6" 
+                        onPress={() => navigation.navigate('WorkerManagement')}
+                      />
+                      <StatCard 
+                        icon="briefcase-outline" 
+                        label="Active Jobs" 
+                        value={allJobs.length.toString()} 
+                        change={`+${leads.length} leads`} 
+                        color="#8B5CF6" 
+                      />
+                      <StatCard 
+                        icon="cash-outline" 
+                        label="Revenue" 
+                        value={stats?.mainStats?.[3]?.value?.toString() || "$0"} 
+                        change={stats?.mainStats?.[3]?.trend || "+0%"} 
+                        color="#0062E1" 
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.revenueBreakdownSection}>
+                    <Text style={styles.breakdownCardTitle}>Revenue Breakdown</Text>
+                    <ProgressBar 
+                      label="Platform Fees (10%)" 
+                      value={`$${((stats?.totalRevenue || 0) * 0.1).toLocaleString()}`} 
+                      progress={0.1} 
                       color="#8B5CF6" 
-                      onPress={() => setActiveTab('Jobs')}
+                      labelColor="#718096" 
                     />
-                    <StatCard 
-                      icon="checkmark-circle-outline" 
-                      label="Completed Jobs" 
-                      value={stats?.mainStats?.[2]?.value?.toString() || "0"} 
-                      change={stats?.mainStats?.[2]?.trend || "+0%"} 
+                    <ProgressBar 
+                      label="Worker Revenue (90%)" 
+                      value={`$${((stats?.totalRevenue || 0) * 0.9).toLocaleString()}`} 
+                      progress={0.9} 
                       color="#10B981" 
-                      onPress={() => {
-                        setActiveTab('Jobs');
-                        setJobStatusFilter('All');
-                      }}
-                    />
-                    <StatCard 
-                      icon="cash-outline" 
-                      label="Total Revenue" 
-                      value={stats?.mainStats?.[3]?.value?.toString() || "$0"} 
-                      change={stats?.mainStats?.[3]?.trend || "+0%"} 
-                      color="#0062E1" 
-                      onPress={() => setActiveTab('Invoice')}
+                      labelColor="#718096" 
                     />
                   </View>
-                </View>
 
-                <View style={styles.revenueBreakdownSection}>
-                  <Text style={styles.breakdownCardTitle}>Revenue Breakdown</Text>
-                  <ProgressBar 
-                    label="Platform Fees (Est. 10%)" 
-                    value={`$${((stats?.totalRevenue || 0) * 0.1).toLocaleString()}`} 
-                    progress={0.1} 
-                    color="#8B5CF6" 
-                    labelColor="#718096" 
-                  />
-                  <ProgressBar 
-                    label="Worker Revenue (Est. 90%)" 
-                    value={`$${((stats?.totalRevenue || 0) * 0.9).toLocaleString()}`} 
-                    progress={0.9} 
-                    color="#10B981" 
-                    labelColor="#718096" 
-                  />
-                </View>
-
-                <View style={styles.performersSection}>
-                  <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.breakdownCardTitle}>Active Workers</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('WorkerManagement')}><Text style={styles.viewAllText}>View all</Text></TouchableOpacity>
+                  <View style={styles.performersSection}>
+                      <Text style={styles.breakdownCardTitle}>Recent Leads</Text>
+                      {leads.slice(0, 3).map(lead => (
+                          <TouchableOpacity 
+                          key={lead.id} 
+                          style={styles.availableLeadRow}
+                          onPress={() => navigation.navigate('AdminProChat', { name: lead.customerName, userId: lead.id })}
+                          >
+                              <View style={[styles.leadIcon, { backgroundColor: '#F5F3FF' }]}>
+                                  <Ionicons name="flash-outline" size={18} color="#7C3AED" />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                  <Text style={styles.leadName}>{lead.customerName || 'New Client'}</Text>
+                                  <Text style={styles.leadSub}>{lead.categoryName} • {lead.location}</Text>
+                              </View>
+                              <Text style={styles.leadStatus}>CHAT</Text>
+                          </TouchableOpacity>
+                      ))}
                   </View>
-                  {stats?.mainStats?.[0]?.value > 0 ? (
-                    <Text style={{ fontSize: 13, color: '#718096', marginBottom: 10 }}>Displaying {stats?.mainStats?.[0]?.value} registered professionals</Text>
-                  ) : null}
-                  {/* Using available workers instead of dummy ones */}
-                  {workers && workers.length > 0 ? workers.slice(0, 3).map(w => (
-                    <PerformerItem 
-                      key={w.id} 
-                      name={w.name} 
-                      role={w.role} 
-                      status={w.isAvailable ? 'Active' : 'Busy'} 
-                      initials={w.name.charAt(0)} 
-                      color="#3B82F6" 
-                      onPress={() => navigation.navigate('WorkerProfile', { workerId: w.id, name: w.name })}
-                    />
-                  )) : (
-                    <Text style={{ textAlign: 'center', color: '#718096', padding: 10 }}>No workers registered yet</Text>
-                  )}
-                </View>
-
-                <View style={styles.activitySection}>
-                  <Text style={styles.breakdownCardTitle}>Latest Available Leads</Text>
-                  {leads.filter(l => 
-                    (l.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                     l.location?.toLowerCase().includes(searchQuery.toLowerCase()))
-                  ).length > 0 ? leads.filter(l => 
-                    (l.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                     l.location?.toLowerCase().includes(searchQuery.toLowerCase()))
-                  ).map(lead => (
-                    <TouchableOpacity 
-                      key={lead.id} 
-                      style={styles.availableLeadRow}
-                      onPress={() => navigation.navigate('JobDetails', { job: lead })}
-                    >
-                      <View style={[styles.leadIcon, { backgroundColor: '#F5F3FF' }]}>
-                        <Ionicons name="flash-outline" size={18} color="#7C3AED" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.leadName}>{lead.customerName || 'New Client'}</Text>
-                        <Text style={styles.leadSub}>{lead.categoryName} • {lead.location}</Text>
-                      </View>
-                      <Text style={styles.leadStatus}>OPEN</Text>
-                    </TouchableOpacity>
-                  )) : (
-                    <Text style={{ textAlign: 'center', color: '#718096', padding: 10 }}>No new leads</Text>
-                  )}
-                </View>
-
-                <TouchableOpacity style={[styles.manageWorkersStickyBtn, { marginTop: 20 }]} onPress={() => navigation.navigate('WorkerManagement')}>
-                  <Text style={styles.manageWorkersStickyBtnText}>Manage Workers</Text>
-                </TouchableOpacity>
               </View>
             )}
 
             {activeTab === 'Jobs' && (
               <View style={styles.jobsContainer}>
-                <View style={styles.jobsSearchWrapper}>
-                  <Ionicons name="search" size={20} color="#64748B" />
-                  <BottomSheetTextInput
-                    style={styles.jobsSearchPlaceholder} 
-                    placeholder="Search here"
-                    placeholderTextColor="#718096"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                  <Ionicons name="mic" size={20} color="#64748B" />
-                </View>
+                <TouchableOpacity style={styles.inlineSearch} onPress={() => navigation.navigate('AdminSearch')}>
+                  <Ionicons name="search" size={20} color={COLORS.textTertiary} />
+                  <Text style={[styles.inlineSearchInput, { color: COLORS.textTertiary, marginLeft: 8 }]}>Search Jobs</Text>
+                  <Ionicons name="mic-outline" size={20} color={COLORS.textTertiary} />
+                </TouchableOpacity>
 
-                <GestureHandlerScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false} 
-                  style={styles.jobsFilterRow}
-                  contentContainerStyle={{ gap: 8, paddingLeft: 4 }}
-                  disallowInterruption={true}
-                >
-                  {['All', 'New', 'Assigned', 'Quoted', 'In Progress'].map(s => (
-                    <TouchableOpacity 
-                      key={s} 
-                      onPress={() => setJobStatusFilter(s)}
-                      style={[styles.jobFilterChip, jobStatusFilter === s && styles.jobFilterChipActive]}
-                    >
-                      <Text style={[styles.jobFilterText, jobStatusFilter === s && styles.jobFilterTextActive]}>{s}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </GestureHandlerScrollView>
-
-                <View style={[styles.jobListVertical, { paddingBottom: 100 }]}>
-                  {(() => {
-                    const filtered = allJobs.filter(j => {
-                      const matchesSearch = (j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                            j.location?.toLowerCase().includes(searchQuery.toLowerCase()));
-                      if (jobStatusFilter === 'All') return matchesSearch;
-                      const statusMap = {
-                        'New': 'ACCEPTED',
-                        'Assigned': 'ACCEPTED',
-                        'Quoted': 'QUOTED',
-                        'In Progress': 'IN_PROGRESS'
-                      };
-                      return matchesSearch && j.status === statusMap[jobStatusFilter];
-                    });
-
-                    if (filtered.length === 0) {
-                      return <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No jobs found</Text>;
-                    }
-
-                    return filtered.map(job => {
-                      const photoList = getCategoryImages(job.categoryName);
-                      return (
+                <View style={styles.jobListVertical}>
+                    <Text style={styles.breakdownCardTitle}>Active Jobs ({allJobs.length})</Text>
+                    {allJobs.filter(job => 
+                      job.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      (job.location || '').toLowerCase().includes(searchQuery.toLowerCase())
+                    ).map(job => (
                         <JobCard
                           key={job.id}
                           navigation={navigation}
@@ -1088,43 +980,10 @@ export default function ExploreScreen({ navigation, route }) {
                           tag={job.status}
                           location={job.location}
                           category={job.categoryName}
-                          time={`Scheduled: ${new Date(job.scheduledDate).toLocaleDateString()}`}
-                          images={photoList}
-                          onPress={() => navigation.navigate('JobDetails', { job })}
+                          time={`Today, 09:00 AM`}
+                          images={getCategoryImages(job.categoryName)}
                         />
-                      );
-                    });
-                  })()}
-                </View>
-              </View>
-            )}
-
-            {activeTab === 'Schedule' && (
-              <View style={styles.scheduleContainer}>
-                <Text style={styles.sectionTitle}>Today's Agenda</Text>
-                <View style={{ marginTop: 24 }}>
-                  {allJobs.filter(j => 
-                    j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                    j.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
-                  ).length > 0 ? allJobs.filter(j => 
-                    j.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                    j.categoryName?.toLowerCase().includes(searchQuery.toLowerCase())
-                  ).map((item, index, filteredArr) => (
-                    <AgendaItem
-                      key={item.id}
-                      item={{
-                        ...item,
-                        name: item.customerName,
-                        type: item.categoryName,
-                        time: item.scheduledTime
-                      }}
-                      index={index}
-                      isLast={index === filteredArr.length - 1}
-                      navigation={navigation}
-                    />
-                  )) : (
-                    <Text style={{ textAlign: 'center', color: '#718096', marginTop: 20 }}>No items scheduled for today</Text>
-                  )}
+                    ))}
                 </View>
               </View>
             )}
@@ -1133,18 +992,8 @@ export default function ExploreScreen({ navigation, route }) {
               <View style={styles.billingContainer}>
                 <TouchableOpacity style={styles.inlineSearch} onPress={() => navigation.navigate('AdminSearch')}>
                   <Ionicons name="search" size={20} color={COLORS.textTertiary} />
-                  <Text style={[styles.inlineSearchInput, { color: COLORS.textTertiary, marginLeft: 8 }]}>Search here</Text>
-                  <Ionicons name="mic-outline" size={20} color={COLORS.textTertiary} />
+                  <Text style={[styles.inlineSearchInput, { color: COLORS.textTertiary, marginLeft: 8 }]}>Search Invoices</Text>
                 </TouchableOpacity>
-
-                <View style={styles.billingSummaryCard}>
-                  <View style={styles.summaryHeader}>
-                    <View>
-                      <Text style={styles.summaryTitle}>Billing Summary</Text>
-                      <Text style={styles.summarySub}>Total Billed: ${invoices.reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}</Text>
-                    </View>
-                  </View>
-                </View>
 
                 <Text style={styles.sectionTitleSmall}>Recent Invoices</Text>
                 {invoices.filter(inv => 

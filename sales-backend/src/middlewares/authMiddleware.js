@@ -8,11 +8,20 @@ const protect = async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             token = req.headers.authorization.split(' ')[1];
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            
+
+            const secret = process.env.JWT_SECRET;
+            if (!secret) {
+                console.error("❌ [AUTH] JWT_SECRET is not defined in environment variables!");
+                return res.status(500).json({ success: false, message: 'Server configuration error' });
+            }
+
+            // Verify token
+            const decoded = jwt.verify(token, secret);
+
+            // Get user from db to ensure they still exist and have correct role
             req.user = await prisma.user.findUnique({
                 where: { id: decoded.id },
-                select: { id: true, name: true, email: true, role: true }
+                include: { plan: true }
             });
 
             if (!req.user) {
@@ -20,12 +29,16 @@ const protect = async (req, res, next) => {
             }
             next();
         } catch (error) {
-            return res.status(401).json({ success: false, message: 'Not authorized, session expired or invalid token' });
+            console.error("❌ [AUTH] Token Verification Failed:", error.message);
+            return res.status(401).json({
+                success: false,
+                message: 'Not authorized, session expired or invalid token'
+            });
         }
-    }
-
-    if (!token) {
-        return res.status(401).json({ success: false, message: 'Not authorized, please log in' });
+    } else {
+        if (!token) {
+            return res.status(401).json({ success: false, message: 'Not authorized, please log in' });
+        }
     }
 };
 
@@ -34,20 +47,21 @@ const optionalProtect = async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             const token = req.headers.authorization.split(' ')[1];
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            
-            req.user = await prisma.user.findUnique({
-                where: { id: decoded.id },
-                select: { id: true, name: true, email: true, role: true }
-            });
-
-            if (!req.user) {
-                req.user = { role: 'GUEST', name: 'Guest User' };
+            const secret = process.env.JWT_SECRET;
+            if (secret) {
+                const decoded = jwt.verify(token, secret);
+                
+                req.user = await prisma.user.findUnique({
+                    where: { id: decoded.id },
+                    include: { plan: true }
+                });
             }
         } catch (error) {
-            req.user = { role: 'GUEST', name: 'Guest User' };
+            console.warn("⚠️ [AUTH] Invalid token in optionalProtect, continuing as guest");
         }
-    } else {
+    }
+    
+    if (!req.user) {
         req.user = { role: 'GUEST', name: 'Guest User' };
     }
     next();
@@ -57,13 +71,13 @@ const optionalProtect = async (req, res, next) => {
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!req.user) {
-            return res.status(401).json({ success: false, message: 'Not authenticated' });
+            return res.status(401).json({ success: false, message: 'Authentication required for this action' });
         }
 
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({
                 success: false,
-                message: `Access denied: Role ${req.user.role} is not authorized for this resource`
+                message: `Access denied: Role ${req.user.role} is not authorized`
             });
         }
 
@@ -71,8 +85,18 @@ const authorize = (...roles) => {
     };
 };
 
+// @desc    Admin Only access
+const adminOnly = (req, res, next) => {
+    if (req.user && req.user.role === 'ADMIN') {
+        next();
+    } else {
+        res.status(403).json({ success: false, message: 'Access denied: Admin role required' });
+    }
+};
+
 module.exports = {
     protect,
     optionalProtect,
-    authorize
+    authorize,
+    adminOnly
 };

@@ -34,6 +34,8 @@ model User {
   businessName          String?   @map("business_name")
   experience            String?
   serviceRadius         Int?      @default(15) @map("service_radius")
+  adminCommission       Int       @default(10) @map("admin_commission")
+  workerCommission      Int       @default(90) @map("worker_commission")
 
   // Relations
   jobs                  Job[]     @relation("WorkerJobs")
@@ -43,11 +45,12 @@ model User {
   notifications         Notification[]
   plan                  SubscriptionPlan? @relation(fields: [planId], references: [id])
   categories            WorkerCategory[]
+  messages              messages[]
+  conversations1        conversations[]   @relation("conversations_user1_idTousers")
+  conversations2        conversations[]   @relation("conversations_user2_idTousers")
 
   @@map("users")
 }
-
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model Category {
   id        String   @id @default(uuid())
   name      String
@@ -78,9 +81,16 @@ model WorkerCategory {
 model Lead {
   id            String     @id @default(uuid())
   leadNo        String     @default(cuid()) @map("lead_no")
-  customerId    String     @map("customer_id")
+  customerId    String?    @map("customer_id")
+  guestName     String?    @map("guest_name")
+  guestPhone    String?    @map("guest_phone")
+  guestEmail    String?    @map("guest_email")
+  sessionToken  String?    @unique @map("session_token")
+  isGuest       Boolean    @default(false) @map("is_guest")
   categoryId    String     @map("category_id")
   location      String
+  latitude      Float?     @map("latitude")
+  longitude     Float?     @map("longitude")
   description   String?    @db.Text
   servicePlan   String     @default("Starter") @map("service_plan")
   status        LeadStatus @default(OPEN)
@@ -89,7 +99,7 @@ model Lead {
   preferredDate String?    @map("preferred_date")
 
   // Relations
-  customer    User    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    User?    @relation(fields: [customerId], references: [id], onDelete: Cascade)
   category    Category @relation(fields: [categoryId], references: [id])
   job         Job?
 
@@ -101,11 +111,17 @@ model Job {
   id            String    @id @default(uuid())
   jobNo         String    @default(cuid()) @map("job_no")
   leadId        String?   @unique @map("lead_id")
-  customerId    String    @map("customer_id")
+  customerId    String?   @map("customer_id")
   workerId      String    @map("worker_id")
   categoryName  String    @map("category_name")
   status        JobStatus @default(SCHEDULED)
   location      String
+  latitude      Float?    @map("latitude")
+  longitude     Float?    @map("longitude")
+  guestName     String?   @map("guest_name")
+  guestPhone    String?   @map("guest_phone")
+  sessionToken  String?   @map("session_token")
+  isGuest       Boolean   @default(false) @map("is_guest")
   description   String?   @db.Text
   scheduledDate DateTime  @map("scheduled_date")
   scheduledTime String    @map("scheduled_time")
@@ -115,13 +131,15 @@ model Job {
 
   // Relations
   lead       Lead?          @relation(fields: [leadId], references: [id])
-  customer   User           @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
+  customer   User?          @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
   worker     User           @relation("WorkerJobs", fields: [workerId], references: [id], onDelete: Cascade)
   photos     JobPhoto[]
   inspection JobInspection?
   estimate   JobEstimate?
   invoices   JobInvoice[]
   contracts  JobContract[]
+  chats      chats?
+  reviews    reviews?
 
   @@map("jobs")
 }
@@ -190,15 +208,17 @@ model JobContract {
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model JobInvoice {
-  id        String   @id @default(uuid())
-  jobId     String   @map("job_id")
-  amount    Float
-  status    String   @default("UNPAID")
-  paymentId String?  @map("payment_id")
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  jobId        String   @unique @map("job_id")
+  amount       Float
+  status       String   @default("UNPAID")
+  paymentId    String?  @map("payment_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  milestone    String   @default("SINGLE")
+  totalAmount  Float    @default(0) @map("total_amount")
 
   // Relations
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@map("job_invoices")
 }
@@ -285,6 +305,76 @@ model Notification {
   @@map("notifications")
 }
 
+model chats {
+  id           String     @id
+  job_id       String     @unique
+  last_message String?    @db.Text
+  updated_at   DateTime
+  jobs         Job        @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  messages     messages[]
+}
+
+model conversations {
+  id                                  String            @id
+  user1_id                            String
+  user2_id                            String
+  last_message                        String?           @db.Text
+  updated_at                          DateTime
+  users_conversations_user1_idTousers User              @relation("conversations_user1_idTousers", fields: [user1_id], references: [id])
+  users_conversations_user2_idTousers User              @relation("conversations_user2_idTousers", fields: [user2_id], references: [id])
+  direct_messages                     direct_messages[]
+
+  @@unique([user1_id, user2_id])
+  @@index([user2_id], map: "conversations_user2_id_fkey")
+}
+
+model direct_messages {
+  id              String        @id
+  conversation_id String
+  sender_id       String
+  text            String        @db.Text
+  created_at      DateTime      @default(now())
+  conversations   conversations @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id], map: "direct_messages_conversation_id_fkey")
+}
+
+model Invitation {
+  id        String   @id
+  email     String   @unique
+  token     String   @unique
+  role      Role     @default(WORKER)
+  status    String   @default("PENDING")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+}
+
+model messages {
+  id         String   @id @default(uuid())
+  chat_id    String
+  sender_id  String?  @map("sender_id")
+  text       String   @db.Text
+  is_read    Boolean  @default(false)
+  isGuest    Boolean  @default(false) @map("is_guest")
+  created_at DateTime @default(now())
+  chats      chats    @relation(fields: [chat_id], references: [id], onDelete: Cascade)
+  users      User?    @relation(fields: [sender_id], references: [id])
+
+  @@index([chat_id], map: "messages_chat_id_fkey")
+  @@index([sender_id], map: "messages_sender_id_fkey")
+}
+
+model reviews {
+  id         String   @id
+  job_id     String   @unique
+  rating     Int      @default(5)
+  comment    String?  @db.Text
+  created_at DateTime @default(now())
+  jobs       Job      @relation(fields: [job_id], references: [id], onDelete: Cascade)
+}
+
 enum Role {
   ADMIN
   WORKER
@@ -295,6 +385,8 @@ enum JobStatus {
   SCHEDULED
   ACCEPTED
   REJECTED
+  ON_THE_WAY
+  STARTED
   IN_PROGRESS
   ESTIMATED
   INVOICED
