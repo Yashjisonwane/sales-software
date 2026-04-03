@@ -1,6 +1,7 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const prisma = require("./db");
+const { getJwtSecret } = require("./env");
 const { v4: uuidv4 } = require('uuid');
 
 let io;
@@ -21,7 +22,7 @@ const initSocket = (server) => {
 
         if (token) {
             try {
-                const decoded = jwt.verify(token, process.env.JWT_SECRET);
+                const decoded = jwt.verify(token, getJwtSecret());
                 const user = await prisma.user.findUnique({ where: { id: decoded.id } });
                 if (user) {
                     socket.user = user;

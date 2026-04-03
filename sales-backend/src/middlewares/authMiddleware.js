@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db');
+const { getJwtSecret } = require('../config/env');
 
 // @desc    Protect routes - verify token
 const protect = async (req, res, next) => {
@@ -9,7 +10,7 @@ const protect = async (req, res, next) => {
         try {
             token = req.headers.authorization.split(' ')[1];
 
-            const secret = process.env.JWT_SECRET;
+            const secret = getJwtSecret();
             if (!secret) {
                 console.error("❌ [AUTH] JWT_SECRET is not defined in environment variables!");
                 return res.status(500).json({ success: false, message: 'Server configuration error' });
@@ -47,7 +48,7 @@ const optionalProtect = async (req, res, next) => {
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
         try {
             const token = req.headers.authorization.split(' ')[1];
-            const secret = process.env.JWT_SECRET;
+            const secret = getJwtSecret();
             if (secret) {
                 const decoded = jwt.verify(token, secret);
                 

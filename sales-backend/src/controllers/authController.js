@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/db'); // Database connection
+const { getJwtSecret } = require('../config/env');
 
 // @route   POST /api/v1/auth/register
 // @desc    Register a new user (Customer, Worker, or Admin)
@@ -49,7 +50,7 @@ const registerUser = async (req, res) => {
         });
 
         // 4. Generate JWT Token
-        const secret = process.env.JWT_SECRET;
+        const secret = getJwtSecret();
         if (!secret) {
             console.error("JWT_SECRET NOT DEFINED IN ENV");
             return res.status(500).json({ success: false, message: "Server Configuration Error" });
@@ -103,7 +104,7 @@ const loginUser = async (req, res) => {
         }
 
         // 3. Generate JWT
-        const secret = process.env.JWT_SECRET;
+        const secret = getJwtSecret();
         if (!secret) {
             console.error("JWT_SECRET NOT DEFINED IN ENV");
             return res.status(500).json({ success: false, message: "Server Configuration Error" });
@@ -256,7 +257,10 @@ const registerWorkerByInvite = async (req, res) => {
             data: { status: 'ACCEPTED' }
         });
 
-        const jwtSecret = process.env.JWT_SECRET;
+        const jwtSecret = getJwtSecret();
+        if (!jwtSecret) {
+            return res.status(500).json({ success: false, message: "Server Configuration Error" });
+        }
         const jwtToken = jwt.sign({ id: newUser.id, role: newUser.role }, jwtSecret, { expiresIn: '30d' });
 
         res.status(201).json({
