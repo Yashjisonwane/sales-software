@@ -183,15 +183,25 @@ const LoginSignup = () => {
                             </div>
                         </div>
 
-                        {/* Toggle Flow Link */}
                         <p className="mt-10 text-center text-sm font-bold text-gray-400">
-                            {isLogin ? "New to ServiceHub?" : "Already have an account?"}{' '}
-                            <Link
-                                to={isLogin ? "/signup" : "/login"}
-                                className="text-[#7C3AED] hover:underline"
-                            >
-                                {isLogin ? 'Create one now' : 'Sign in here'}
-                            </Link>
+                            {role === 'professional' ? (
+                                <>
+                                    Want to join our network?{' '}
+                                    <Link to="/become-professional" className="text-[#7C3AED] hover:underline">
+                                        Apply as Professional
+                                    </Link>
+                                </>
+                            ) : (
+                                <>
+                                    {isLogin ? "New to ServiceHub?" : "Already have an account?"}{' '}
+                                    <Link
+                                        to={isLogin ? "/signup" : "/login"}
+                                        className="text-[#7C3AED] hover:underline"
+                                    >
+                                        {isLogin ? 'Create one now' : 'Sign in here'}
+                                    </Link>
+                                </>
+                            )}
                         </p>
                     </div>
 
