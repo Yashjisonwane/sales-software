@@ -38,7 +38,7 @@ const getJobs = async (req, res) => {
             jobs = await prisma.job.findMany({
                 where: { workerId: user.id },
                 include: {
-                    customer: { select: { name: true, phone: true } },
+                    customer: { select: { name: true, phone: true, email: true, address: true } },
                     worker: { select: { name: true } },
                     photos: true,
                     estimate: true,
@@ -51,8 +51,10 @@ const getJobs = async (req, res) => {
 
         const formattedJobs = jobs.map(j => ({
             ...j,
-            customerName: j.customer?.name || 'Valued Customer',
-            customerPhone: j.customer?.phone || null,
+            customerName: j.customer?.name || j.guestName || 'Valued Customer',
+            customerPhone: j.customer?.phone || j.guestPhone || '—',
+            customerEmail: j.customer?.email || j.guestEmail || '—',
+            customerAddress: j.customer?.address || j.location || '—',
             workerName: j.worker?.name || 'Unassigned',
             chatId: j.chats?.id || null,
             displayId: j.jobNo || (j.id ? `JB-${String(j.id).slice(-4).toUpperCase()}` : 'JB-0000')

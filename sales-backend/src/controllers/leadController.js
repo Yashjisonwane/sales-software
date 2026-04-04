@@ -191,6 +191,7 @@ const assignLead = async (req, res) => {
                 customerId: lead.customerId,
                 guestName: lead.guestName,
                 guestPhone: lead.guestPhone,
+                guestEmail: lead.guestEmail,
                 sessionToken: lead.sessionToken,
                 isGuest: lead.isGuest || false,
                 workerId: workerId,
@@ -238,15 +239,79 @@ const assignLead = async (req, res) => {
 const updateLead = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = req.body;
-        const lead = await prisma.lead.update({
+        const {
+            customerName, customerEmail, customerPhone,
+            guestName, guestPhone, guestEmail,
+            location, description, status, servicePlan, preferredDate,
+            categoryId, serviceCategory
+        } = req.body;
+
+        console.log(`[API] Updating Lead ${id}:`, { customerName, serviceCategory, status });
+
+        // Resolve Category ID - Prioritize serviceCategory name from the form if provided
+        let finalCategoryId = null;
+        
+        if (serviceCategory && serviceCategory.length > 0) {
+            const catNameTrimmed = serviceCategory.trim().toLowerCase();
+            const cat = await prisma.category.findFirst({
+                where: { name: { contains: catNameTrimmed } }
+            });
+            if (cat) {
+                finalCategoryId = cat.id;
+            }
+        }
+
+        // Fallback to categoryId if no name provided or no match found
+        if (!finalCategoryId) finalCategoryId = categoryId;
+
+        // 1. Get current lead to find customer
+        const currentLead = await prisma.lead.findUnique({
             where: { id },
-            data,
+            include: { customer: true }
+        });
+
+        if (!currentLead) {
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+
+        // 2. Update Customer details if provided and lead is NOT a guest lead
+        if (currentLead.customerId) {
+            await prisma.user.update({
+                where: { id: currentLead.customerId },
+                data: {
+                    name: customerName || undefined,
+                    email: customerEmail || undefined,
+                    phone: customerPhone || undefined
+                }
+            });
+        }
+
+        // 3. Prepare Lead Update data (Filter only valid Lead fields)
+        const dataToUpdate = {};
+        if (location !== undefined) dataToUpdate.location = location;
+        if (description !== undefined) dataToUpdate.description = description;
+        if (status !== undefined) dataToUpdate.status = status.toUpperCase();
+        if (servicePlan !== undefined) dataToUpdate.servicePlan = servicePlan;
+        if (preferredDate !== undefined) dataToUpdate.preferredDate = preferredDate;
+        
+        // Only update category if we resolved a valid one
+        if (finalCategoryId) dataToUpdate.categoryId = finalCategoryId;
+        
+        // Guest fields
+        if (guestName !== undefined) dataToUpdate.guestName = guestName;
+        if (guestPhone !== undefined) dataToUpdate.guestPhone = guestPhone;
+        if (guestEmail !== undefined) dataToUpdate.guestEmail = guestEmail;
+
+        const updatedLead = await prisma.lead.update({
+            where: { id },
+            data: dataToUpdate,
             include: { customer: true, category: true }
         });
-        res.status(200).json({ success: true, data: lead });
+
+        res.status(200).json({ success: true, message: "Lead updated successfully", data: updatedLead });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lead update failed' });
+        console.error("❌ [API] updateLead Error:", err);
+        res.status(500).json({ success: false, message: 'Lead update failed: ' + err.message, error: err.stack });
     }
 };
 
