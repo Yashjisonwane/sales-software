@@ -103,7 +103,7 @@ const createProfessional = async (req, res) => {
         });
 
         // 2. Map Category (find or create)
-        let cat = await prisma.category.findUnique({ where: { name: category } });
+        let cat = await prisma.category.findFirst({ where: { name: category } });
         if (!cat) {
             cat = await prisma.category.create({ data: { name: category } });
         }
@@ -146,7 +146,7 @@ const createProfessional = async (req, res) => {
 const updateProfessional = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, phone, category, status } = req.body;
+        const { name, email, phone, category, status, password } = req.body;
 
         console.log(`[ADMIN] Updating Professional: ${id}`, req.body);
 
@@ -186,11 +186,19 @@ const updateProfessional = async (req, res) => {
             if (city !== undefined) dataToUpdate.city = city;
             if (state !== undefined) dataToUpdate.state = state;
             if (pincode !== undefined) dataToUpdate.pincode = pincode;
+            // Performance Rating update (if editing a professional)
             if (req.body.rating !== undefined) dataToUpdate.rating = parseFloat(req.body.rating || 0);
 
             // New: Support for Commission adjustment
             if (adminCommission !== undefined) dataToUpdate.adminCommission = parseInt(adminCommission);
             if (workerCommission !== undefined) dataToUpdate.workerCommission = parseInt(workerCommission);
+
+            // ─── NEW: Support for Password Update ───
+            if (password && password.length > 0) {
+                const salt = await bcrypt.genSalt(10);
+                const hashedPassword = await bcrypt.hash(password, salt);
+                dataToUpdate.password = hashedPassword;
+            }
 
             // Perform the update
             const updatedUser = await tx.user.update({
@@ -198,14 +206,13 @@ const updateProfessional = async (req, res) => {
                 data: dataToUpdate
             });
 
-            // Handle Category linking
+            // Handle Category linking manually (upsert requires unique field)
             if (category) {
-                const cat = await tx.category.upsert({
-                    where: { name: category },
-                    update: {},
-                    create: { name: category }
-                });
-
+                let cat = await tx.category.findFirst({ where: { name: category } });
+                if (!cat) {
+                    cat = await tx.category.create({ data: { name: category } });
+                }
+                
                 // Clear and Re-link (MySQL schema has a unique constraint on userId, categoryId)
                 await tx.workerCategory.deleteMany({ where: { userId: id } });
                 await tx.workerCategory.create({

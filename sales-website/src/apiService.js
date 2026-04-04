@@ -40,3 +40,13 @@ export const submitProfessionalRequest = async (requestData) => {
         throw error;
     }
 };
+
+export const login = async (email, password) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+        return response.data;
+    } catch (error) {
+        console.error("Login API Error:", error);
+        throw error;
+    }
+};

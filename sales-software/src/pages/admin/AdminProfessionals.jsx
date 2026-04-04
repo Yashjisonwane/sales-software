@@ -196,7 +196,10 @@ const AdminProfessionals = () => {
     };
 
     const handleSave = async () => {
-        if (!validate()) return;
+        if (!validate()) {
+            showToast('Please fill all required fields marked with *', 'error');
+            return;
+        }
         let res;
         if (modalMode === 'add') res = await addProfessional(formData);
         else res = await editProfessional(formData.id, formData);
@@ -204,6 +207,7 @@ const AdminProfessionals = () => {
         if (res) {
             showToast(modalMode === 'add' ? 'Added successfully' : 'Updated successfully');
             closeModal();
+            if (refreshData) refreshData();
         }
     };
 

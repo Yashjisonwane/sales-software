@@ -13,12 +13,19 @@ import {
     EyeOff
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import * as apiService from '../apiService';
 
 const LoginSignup = () => {
     const location = useLocation();
     const [isLogin, setIsLogin] = useState(true);
     const [role, setRole] = useState('customer'); // 'customer' or 'professional'
     const [showPassword, setShowPassword] = useState(false);
+    
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [name, setName] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     useEffect(() => {
         // Switch to signup mode if accessed via /signup
@@ -29,16 +36,43 @@ const LoginSignup = () => {
         }
     }, [location.pathname]);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Save mock user for demonstration
-        const mockUser = {
-            name: 'Kiaan Developer',
-            email: 'kiaan@example.com',
-            role: role
-        };
-        localStorage.setItem('user', JSON.stringify(mockUser));
-        window.location.href = '/'; // Force reload to update Navbar
+        setLoading(true);
+        setError('');
+        try {
+            if (isLogin) {
+                const res = await apiService.login(email, password);
+                if (res.success) {
+                    // Role check
+                    if (role === 'professional' && res.data.user.role !== 'WORKER') {
+                        setError('This account is not a professional account.');
+                        setLoading(false);
+                        return;
+                    }
+                    
+                    localStorage.setItem('user', JSON.stringify(res.data.user));
+                    localStorage.setItem('token', res.data.token);
+                    
+                    // Redirect based on role
+                    if (res.data.user.role === 'ADMIN') {
+                       window.location.href = 'http://localhost:5173/admin'; 
+                    } else if (res.data.user.role === 'WORKER') {
+                       window.location.href = 'http://localhost:5173/professional';
+                    } else {
+                       window.location.href = '/'; 
+                    }
+                }
+            } else {
+                // Signup logic if needed, but professional is application based
+                setError('Registration is currently disabled. Professionals must apply through "Become Professional".');
+            }
+        } catch (err) {
+            console.error("Login Failed:", err);
+            setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -89,6 +123,13 @@ const LoginSignup = () => {
                     </div>
 
                     <div className="p-8 pb-10">
+                        {error && (
+                            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold animate-shake">
+                                <ShieldCheck className="w-5 h-5 shrink-0" />
+                                {error}
+                            </div>
+                        )}
+
                         <form className="space-y-6" onSubmit={handleSubmit}>
                             {!isLogin && (
                                 <div className="space-y-2">
@@ -100,6 +141,8 @@ const LoginSignup = () => {
                                         <input
                                             type="text"
                                             required
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
                                             className="block w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#7C3AED] focus:bg-white outline-none transition-all font-medium"
                                             placeholder="John Doe"
                                         />
@@ -116,6 +159,8 @@ const LoginSignup = () => {
                                     <input
                                         type="email"
                                         required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
                                         className="block w-full pl-11 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#7C3AED] focus:bg-white outline-none transition-all font-medium"
                                         placeholder="name@example.com"
                                     />
@@ -138,6 +183,8 @@ const LoginSignup = () => {
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
                                         className="block w-full pl-11 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-[#7C3AED] focus:bg-white outline-none transition-all font-medium"
                                         placeholder="••••••••"
                                     />
@@ -153,10 +200,11 @@ const LoginSignup = () => {
 
                             <button
                                 type="submit"
-                                className="w-full py-5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-black text-lg rounded-2xl transition-all shadow-xl shadow-[#7C3AED]/20 flex items-center justify-center group active:scale-[0.98]"
+                                disabled={loading}
+                                className={`w-full py-5 ${loading ? 'bg-gray-400' : 'bg-[#7C3AED] hover:bg-[#6D28D9]'} text-white font-black text-lg rounded-2xl transition-all shadow-xl shadow-[#7C3AED]/20 flex items-center justify-center group active:scale-[0.98]`}
                             >
-                                {isLogin ? 'Sign In' : 'Create Account'}
-                                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                                {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Create Account')}
+                                {!loading && <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />}
                             </button>
                         </form>
 
