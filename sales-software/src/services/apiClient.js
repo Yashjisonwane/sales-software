@@ -25,4 +25,10 @@ apiClient.interceptors.request.use(
     }
 );
 
+export function getSocketOrigin() {
+    const base = apiClient.defaults.baseURL || '';
+    const stripped = String(base).replace(/\/api\/v1\/?$/i, '');
+    return stripped || 'http://localhost:4000';
+}
+
 export default apiClient;

@@ -144,11 +144,20 @@ export const MarketplaceProvider = ({ children }) => {
                     if (chatsRes.success) setChats(chatsRes.data);
 
                     const revRes = await apiService.fetchAllReviews();
-                    if (revRes.success) {
-                        setReviews(revRes.data.data);
+                    if (revRes.success && revRes.data) {
+                        const payload = revRes.data;
+                        const list = Array.isArray(payload.data) ? payload.data : [];
+                        setReviews(
+                            list.map((r) => ({
+                                ...r,
+                                customerName: r.customerName || r.author || '',
+                                serviceName: r.serviceName || r.serviceCategory || '',
+                                locationName: r.locationName || r.location || '',
+                            }))
+                        );
                         setReviewStats({
-                            averageRating: revRes.data.averageRating,
-                            distribution: revRes.data.distribution
+                            averageRating: payload.averageRating ?? 0,
+                            distribution: payload.distribution || [],
                         });
                     }
                 }
@@ -221,8 +230,8 @@ export const MarketplaceProvider = ({ children }) => {
     const assignLead = async (leadId, professionalId) => {
         const res = await apiService.assignLeadToWorker(leadId, professionalId);
         if (res.success) {
-            showToast('Lead Assigned successfully!', 'success');
-            loadInitialData();
+            showToast(res.message || 'Lead assigned successfully!', 'success');
+            await loadInitialData();
         } else {
             showToast(res.error || 'Failed to assign lead', 'error');
         }
@@ -330,10 +339,31 @@ export const MarketplaceProvider = ({ children }) => {
         return [];
     };
 
+    const fetchChatThreadByJobId = async (jobId) => {
+        setActiveChatMessages([]);
+        const res = await apiService.fetchMessagesByRequest(jobId);
+        if (res.success && res.data?.messages) {
+            const mapped = res.data.messages.map((m) => ({
+                id: m.id,
+                text: m.message ?? m.text,
+                isGuest: m.senderType === 'customer',
+                created_at: m.timestamp,
+                senderType: m.senderType,
+            }));
+            setActiveChatMessages(mapped);
+            return res.data;
+        }
+        return null;
+    };
+
+    const appendIncomingChatMessage = useCallback((msg) => {
+        setActiveChatMessages((prev) => (prev.some((p) => p.id === msg.id) ? prev : [...prev, msg]));
+    }, []);
+
     const sendChatMessage = async (chatId, text) => {
         const res = await apiService.sendChatMessage(chatId, text);
         if (res.success) {
-            setActiveChatMessages(prev => [...prev, res.data]);
+            setActiveChatMessages((prev) => (prev.some((p) => p.id === res.data?.id) ? prev : [...prev, res.data]));
             return true;
         }
         return false;
@@ -487,6 +517,8 @@ export const MarketplaceProvider = ({ children }) => {
             chats,
             activeChatMessages,
             fetchChatMessages,
+            fetchChatThreadByJobId,
+            appendIncomingChatMessage,
             sendChatMessage,
             notifications,
             setNotifications,

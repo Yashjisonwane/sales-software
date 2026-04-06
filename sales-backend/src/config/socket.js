@@ -6,6 +6,22 @@ const { v4: uuidv4 } = require('uuid');
 
 let io;
 
+async function authorizeRoomAccess(socket, roomId) {
+    if (!roomId) return { ok: false };
+    const job = await prisma.job.findUnique({ where: { id: roomId } });
+    if (!job) return { ok: false };
+    if (socket.guest) {
+        if (socket.guest.jobId !== job.id || job.sessionToken !== socket.guest.token) {
+            return { ok: false };
+        }
+        return { ok: true, job };
+    }
+    if (socket.user && job.workerId === socket.user.id) {
+        return { ok: true, job };
+    }
+    return { ok: false };
+}
+
 const initSocket = (server) => {
     io = new Server(server, {
         cors: {
@@ -39,11 +55,24 @@ const initSocket = (server) => {
                 include: { job: true }
             });
             if (lead) {
-                socket.guest = { 
-                    token: sessionToken, 
-                    leadId: lead.id, 
+                socket.guest = {
+                    token: sessionToken,
+                    leadId: lead.id,
                     jobId: lead.job?.id,
                     name: lead.guestName || "Customer"
+                };
+                return next();
+            }
+
+            const job = await prisma.job.findFirst({
+                where: { sessionToken: sessionToken }
+            });
+            if (job) {
+                socket.guest = {
+                    token: sessionToken,
+                    leadId: job.leadId,
+                    jobId: job.id,
+                    name: job.guestName || "Customer"
                 };
                 return next();
             }
@@ -53,23 +82,44 @@ const initSocket = (server) => {
     });
 
     io.on("connection", (socket) => {
-        console.log(`🔌 Connection: ${socket.id} | Identity: ${socket.user ? socket.user.name : "Guest (" + socket.guest.name + ")"}`);
+        const label = socket.user ? socket.user.name : (socket.guest ? `Guest (${socket.guest.name})` : "?");
+        console.log(`🔌 Connection: ${socket.id} | Identity: ${label}`);
 
-        socket.on("join_chat", (jobId) => {
-            // Basic validation: guest can only join their assigned job's chat
-            if (socket.guest && socket.guest.jobId !== jobId) {
-                console.warn(`🚫 Unauthorized join attempt by Guest to room ${jobId}`);
+        const doJoin = async (roomId, labelEvt) => {
+            const { ok } = await authorizeRoomAccess(socket, roomId);
+            if (!ok) {
+                console.warn(`🚫 Unauthorized ${labelEvt} to room ${roomId}`);
                 return;
             }
-            socket.join(jobId);
-            console.log(`👥 ${socket.id} joined room: ${jobId}`);
-        });
+            socket.join(roomId);
+            console.log(`👥 ${socket.id} joined room: ${roomId} (${labelEvt})`);
+        };
+
+        socket.on("join_chat", (jobId) => doJoin(jobId, "join_chat"));
+        socket.on("join_room", (requestId) => doJoin(requestId, "join_room"));
 
         socket.on("send_message", async (data) => {
-            const { jobId, text, chatId } = data;
-            if (!text || !chatId || !jobId) return;
+            const { jobId, text, chatId, requestId } = data || {};
+            const roomId = requestId || jobId;
+            if (!text || !chatId || !roomId) return;
 
             try {
+                const job = await prisma.job.findUnique({ where: { id: roomId } });
+                if (!job) return;
+
+                const chat = await prisma.chats.findUnique({ where: { id: chatId } });
+                if (!chat || chat.job_id !== job.id) return;
+
+                let allowed = false;
+                if (socket.user && socket.user.id === job.workerId) allowed = true;
+                if (socket.guest && socket.guest.jobId === job.id && job.sessionToken === socket.guest.token) {
+                    allowed = true;
+                }
+                if (!allowed) {
+                    console.warn(`🚫 send_message denied for socket ${socket.id}`);
+                    return;
+                }
+
                 const message = await prisma.messages.create({
                     data: {
                         id: uuidv4(),
@@ -89,13 +139,15 @@ const initSocket = (server) => {
                     }
                 });
 
-                // Broadcast to room
-                io.to(jobId).emit("new_message", {
+                const payload = {
                     ...message,
                     senderName: socket.user ? socket.user.name : "Customer"
-                });
+                };
 
-                console.log(`✉️ Message from ${socket.user ? socket.user.name : "Guest"} in ${jobId}: ${text}`);
+                io.to(roomId).emit("new_message", payload);
+                io.to(roomId).emit("receive_message", payload);
+
+                console.log(`✉️ Message from ${socket.user ? socket.user.name : "Guest"} in ${roomId}: ${text}`);
 
             } catch (err) {
                 console.error("❌ Socket message processing error:", err);

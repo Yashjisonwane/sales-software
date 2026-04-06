@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMarketplace } from '../../context/MarketplaceContext';
 import { Search, Eye, Edit, Trash2, Plus, Inbox, UserPlus, AlertCircle, Clock, Filter, ChevronDown } from 'lucide-react';
 import AddLeadModal from '../../components/leads/AddLeadModal';
@@ -19,6 +19,14 @@ const AdminLeads = () => {
     const [showReassignModal, setShowReassignModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [selectedLead, setSelectedLead] = useState(null);
+
+    useEffect(() => {
+        if (!selectedLead?.id || showEditModal) return;
+        const fresh = leads.find((l) => l.id === selectedLead.id);
+        if (fresh) {
+            setSelectedLead(fresh);
+        }
+    }, [leads, selectedLead?.id, showEditModal]);
 
     const counts = useMemo(() => {
         const c = { All: leads.length, New: 0, Assigned: 0, Accepted: 0, Completed: 0, Closed: 0 };
