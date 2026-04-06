@@ -85,6 +85,10 @@ const initSocket = (server) => {
         const label = socket.user ? socket.user.name : (socket.guest ? `Guest (${socket.guest.name})` : "?");
         console.log(`🔌 Connection: ${socket.id} | Identity: ${label}`);
 
+        if (socket.user?.role === 'ADMIN') {
+            socket.join('admin_live_map');
+        }
+
         const doJoin = async (roomId, labelEvt) => {
             const { ok } = await authorizeRoomAccess(socket, roomId);
             if (!ok) {
@@ -151,6 +155,36 @@ const initSocket = (server) => {
 
             } catch (err) {
                 console.error("❌ Socket message processing error:", err);
+            }
+        });
+
+        socket.on("location_update", async (data) => {
+            if (!socket.user || socket.user.role !== 'WORKER') return;
+            const lat = Number(data?.lat);
+            const lng = Number(data?.lng);
+            if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+
+            try {
+                const updated = await prisma.user.update({
+                    where: { id: socket.user.id },
+                    data: {
+                        lat,
+                        lng,
+                        isTrackingEnabled: true
+                    }
+                });
+
+                const payload = {
+                    professionalId: updated.id,
+                    lat: updated.lat,
+                    lng: updated.lng,
+                    updatedAt: updated.updatedAt,
+                    trackingEnabled: !!updated.isTrackingEnabled
+                };
+
+                io.to('admin_live_map').emit('update_on_map', payload);
+            } catch (err) {
+                console.error('❌ Socket location update error:', err.message);
             }
         });
 

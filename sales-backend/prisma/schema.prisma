@@ -16,6 +16,7 @@ model User {
   password              String
   role                  Role      @default(CUSTOMER)
   isAvailable           Boolean   @default(true) @map("is_available")
+  isTrackingEnabled     Boolean   @default(false) @map("is_tracking_enabled")
   lat                   Float?
   lng                   Float?
   fcmToken              String?   @map("fcm_token")

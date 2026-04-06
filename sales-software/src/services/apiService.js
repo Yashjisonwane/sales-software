@@ -238,10 +238,25 @@ export const deleteProfessional = async (id) => {
 
 export const updateProfessionalLocation = async (lat, lng) => {
     try {
-        const response = await apiClient.patch('/users/location', { lat, lng });
+        const response = await apiClient.post('/users/update-location', { lat, lng });
         return { success: true, data: response.data.data };
     } catch (err) {
-        return { success: false, error: err.message };
+        // Backward compatibility
+        try {
+            const fallback = await apiClient.patch('/users/location', { lat, lng });
+            return { success: true, data: fallback.data.data };
+        } catch (fallbackErr) {
+            return { success: false, error: fallbackErr.response?.data?.message || fallbackErr.message };
+        }
+    }
+};
+
+export const fetchProfessionalsLocations = async () => {
+    try {
+        const response = await apiClient.get('/users/professionals-locations');
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
     }
 };
 

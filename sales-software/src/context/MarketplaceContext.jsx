@@ -14,6 +14,7 @@ export const MarketplaceProvider = ({ children }) => {
     const [professionals, setProfessionals] = useState([]);
     const [categories, setCategories] = useState([]);
     const [locations, setLocations] = useState([]);
+    const [professionalLocations, setProfessionalLocations] = useState([]);
     const [subscriptionPlans, setSubscriptionPlans] = useState([]);
     const [assignments, setAssignments] = useState([]);
     const [professionalRequests, setProfessionalRequests] = useState([]);
@@ -106,6 +107,7 @@ export const MarketplaceProvider = ({ children }) => {
                 const workers = (profRes.data || []).map(w => ({
                     ...w,
                     location: w.city || w.address || '—',
+                    trackingEnabled: !!(w.trackingEnabled ?? w.isTrackingEnabled),
                     status: w.status ? w.status : (w.isAvailable ? 'Active' : 'Offline')
                 }));
                 setProfessionals(workers);
@@ -122,7 +124,10 @@ export const MarketplaceProvider = ({ children }) => {
 
             const profileRes = await apiService.fetchUserProfile();
             if (profileRes.success) {
-                const user = profileRes.data;
+                const user = {
+                    ...profileRes.data,
+                    trackingEnabled: !!(profileRes.data?.trackingEnabled ?? profileRes.data?.isTrackingEnabled),
+                };
                 setCurrentUser(user);
                 
                 if (user.role === 'ADMIN') {
@@ -134,6 +139,9 @@ export const MarketplaceProvider = ({ children }) => {
 
                     const upgradeRes = await apiService.fetchSubscriptionUpgradeRequests();
                     if (upgradeRes.success) setUpgradeRequests(upgradeRes.data);
+
+                    const liveLocRes = await apiService.fetchProfessionalsLocations();
+                    if (liveLocRes.success) setProfessionalLocations(liveLocRes.data || []);
                 }
 
                 const notifRes = await apiService.fetchNotifications();
@@ -445,14 +453,59 @@ export const MarketplaceProvider = ({ children }) => {
     const toggleTrackingSetting = async (userId, enabled) => {
         const res = await apiService.updateProfessionalTracking(enabled);
         if (res.success) {
-            setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled }));
+            setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled, isTrackingEnabled: enabled }));
         }
     };
 
     const updateProfessionalLocation = async (lat, lng) => {
         const res = await apiService.updateProfessionalLocation(lat, lng);
+        if (res.success) {
+            setCurrentUser(prev => prev ? ({ ...prev, lat, lng }) : prev);
+        }
         return res;
     };
+
+    const refreshProfessionalLocations = useCallback(async () => {
+        const res = await apiService.fetchProfessionalsLocations();
+        if (res.success) {
+            setProfessionalLocations(res.data || []);
+            return res.data || [];
+        }
+        return [];
+    }, []);
+
+    const patchProfessionalLocationRealtime = useCallback((payload) => {
+        if (!payload?.professionalId) return;
+        setProfessionalLocations((prev) => {
+            const exists = prev.some((item) => item.id === payload.professionalId);
+            if (!exists) {
+                return [
+                    ...prev,
+                    {
+                        id: payload.professionalId,
+                        name: 'Professional',
+                        lat: payload.lat,
+                        lng: payload.lng,
+                        updatedAt: payload.updatedAt || new Date().toISOString(),
+                        trackingEnabled: payload.trackingEnabled ?? true,
+                        onlineStatus: 'Online',
+                        currentJob: null,
+                    }
+                ];
+            }
+            return prev.map((item) =>
+                item.id === payload.professionalId
+                    ? {
+                        ...item,
+                        lat: payload.lat,
+                        lng: payload.lng,
+                        updatedAt: payload.updatedAt || new Date().toISOString(),
+                        trackingEnabled: payload.trackingEnabled ?? item.trackingEnabled,
+                    }
+                    : item
+            );
+        });
+    }, []);
 
     // --- CATEGORIES ---
     const addCategory = async (data) => {
@@ -544,8 +597,11 @@ export const MarketplaceProvider = ({ children }) => {
             updateSubscription,
             dashboardStats,
             locations,
+            professionalLocations,
             subscriptionPlans,
             updateProfessionalLocation,
+            refreshProfessionalLocations,
+            patchProfessionalLocationRealtime,
             updateProfessionalStatus,
             toggleTrackingSetting,
             addSubscriptionPlan,

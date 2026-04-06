@@ -33,7 +33,7 @@ const getProfessionals = async (req, res) => {
                 earnings: completedCount * 150, // Real calculation based on completions
                 rating: w.rating || 0,
                 lastLocation: w.lat && w.lng ? { lat: w.lat, lng: w.lng } : null,
-                trackingEnabled: !!(w.lat && w.lng)
+                trackingEnabled: !!(w.isTrackingEnabled ?? (w.lat && w.lng))
             };
         }));
 
@@ -48,13 +48,100 @@ const updateLocation = async (req, res) => {
     try {
         const { lat, lng } = req.body;
         const userId = req.user.id;
+        const numLat = Number(lat);
+        const numLng = Number(lng);
+
+        if (Number.isNaN(numLat) || Number.isNaN(numLng)) {
+            return res.status(400).json({ success: false, message: 'lat and lng must be valid numbers' });
+        }
+
         const user = await prisma.user.update({
             where: { id: userId },
-            data: { lat, lng }
+            data: {
+                lat: numLat,
+                lng: numLng,
+                isTrackingEnabled: true
+            }
         });
-        res.status(200).json({ success: true, data: { lat: user.lat, lng: user.lng } });
+
+        // Realtime broadcast for admin live map
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            io.to('admin_live_map').emit('update_on_map', {
+                professionalId: user.id,
+                lat: user.lat,
+                lng: user.lng,
+                updatedAt: user.updatedAt,
+                trackingEnabled: !!user.isTrackingEnabled
+            });
+        } catch (socketErr) {
+            console.warn('Socket location emit skipped:', socketErr.message);
+        }
+
+        res.status(200).json({ success: true, data: { lat: user.lat, lng: user.lng, updatedAt: user.updatedAt } });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Location update failed' });
+    }
+};
+
+const getProfessionalsLocations = async (req, res) => {
+    try {
+        const workers = await prisma.user.findMany({
+            where: { role: 'WORKER' },
+            include: {
+                categories: { include: { category: true } },
+                jobs: {
+                    where: { status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] } },
+                    orderBy: { updatedAt: 'desc' },
+                    take: 1,
+                    include: {
+                        lead: {
+                            select: {
+                                latitude: true,
+                                longitude: true,
+                                location: true,
+                                guestName: true
+                            }
+                        },
+                        customer: { select: { name: true } }
+                    }
+                }
+            },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        const data = workers.map((w) => {
+            const activeJob = w.jobs?.[0] || null;
+            const customerLat = activeJob?.lead?.latitude ?? activeJob?.latitude ?? null;
+            const customerLng = activeJob?.lead?.longitude ?? activeJob?.longitude ?? null;
+            return {
+                id: w.id,
+                name: w.name,
+                category: w.categories?.[0]?.category?.name || 'General',
+                isAvailable: w.isAvailable,
+                onlineStatus: w.isAvailable ? 'Online' : 'Offline',
+                trackingEnabled: !!(w.isTrackingEnabled ?? false),
+                lat: w.lat,
+                lng: w.lng,
+                updatedAt: w.updatedAt,
+                currentJob: activeJob
+                    ? {
+                        id: activeJob.id,
+                        jobNo: activeJob.jobNo,
+                        location: activeJob.location || activeJob.lead?.location || null,
+                        customerName: activeJob.customer?.name || activeJob.guestName || activeJob.lead?.guestName || 'Customer',
+                        customerLat,
+                        customerLng
+                    }
+                    : null
+            };
+        });
+
+        res.status(200).json({ success: true, count: data.length, data });
+    } catch (error) {
+        console.error('Fetch professional locations error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch professional locations' });
     }
 };
 
@@ -284,7 +371,8 @@ const updateProfile = async (req, res) => {
         const {
             name, email, phone, address, city, state, pincode,
             isAvailable, password, businessName, bio,
-            availability, experience, serviceRadius, location
+            availability, experience, serviceRadius, location,
+            trackingEnabled, isTrackingEnabled
         } = req.body;
 
         const dataToUpdate = {
@@ -293,7 +381,10 @@ const updateProfile = async (req, res) => {
             state: state || (location ? location.split(',')[1]?.trim() : undefined),
             pincode, isAvailable, businessName, bio,
             availability, experience,
-            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined
+            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined,
+            isTrackingEnabled: typeof isTrackingEnabled === 'boolean'
+                ? isTrackingEnabled
+                : (typeof trackingEnabled === 'boolean' ? trackingEnabled : undefined)
         };
 
         if (password && password.trim() !== '') {
@@ -417,6 +508,7 @@ const getDashboardStats = async (req, res) => {
 module.exports = {
     getProfessionals,
     updateLocation,
+    getProfessionalsLocations,
     toggleAvailability,
     createProfessional,
     updateProfessional,
