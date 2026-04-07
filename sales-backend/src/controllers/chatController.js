@@ -128,15 +128,10 @@ const sendMessage = async (req, res) => {
             const io = getIO();
             const payload = {
                 ...message,
-<<<<<<< HEAD
                 senderName: staffSender ? req.user.name : "Customer"
-            });
-=======
-                senderName: isWorker ? req.user.name : "Customer"
             };
             io.to(chat.jobs.id).emit("new_message", payload);
             io.to(chat.jobs.id).emit("receive_message", payload);
->>>>>>> da7126fea389b4b0cf15184dd30779983973d231
             console.log(`📡 Broadcasted message to job room: ${chat.jobs.id}`);
         } catch (socketError) {
             console.error("⚠️ Socket emit failed in REST controller:", socketError.message);

@@ -378,11 +378,7 @@ const updateProfile = async (req, res) => {
             name, email, phone, address, city, state, pincode,
             isAvailable, password, businessName, bio,
             availability, experience, serviceRadius, location,
-<<<<<<< HEAD
-            payoutSettings
-=======
-            trackingEnabled, isTrackingEnabled
->>>>>>> da7126fea389b4b0cf15184dd30779983973d231
+            trackingEnabled, isTrackingEnabled, payoutSettings
         } = req.body;
 
         const dataToUpdate = {

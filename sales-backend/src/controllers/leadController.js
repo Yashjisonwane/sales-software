@@ -1,9 +1,6 @@
 const prisma = require('../config/db');
-<<<<<<< HEAD
 const { haversineKm } = require('../utils/geo');
-=======
 const { v4: uuidv4 } = require('uuid');
->>>>>>> da7126fea389b4b0cf15184dd30779983973d231
 
 const generateShortId = (prefix) => {
     return `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -168,14 +165,9 @@ const getLeads = async (req, res) => {
 const assignLead = async (req, res) => {
     try {
         const leadId = req.params.id;
-<<<<<<< HEAD
         const body = req.body && typeof req.body === 'object' ? req.body : {};
         const { workerId: bodyWorkerId } = body;
         const workerId = bodyWorkerId || req.user.id; 
-=======
-        const { workerId: bodyWorkerId } = req.body;
-        const workerId = bodyWorkerId || req.user.id;
->>>>>>> da7126fea389b4b0cf15184dd30779983973d231
 
         if (!workerId) {
             return res.status(400).json({ success: false, message: 'workerId is required' });

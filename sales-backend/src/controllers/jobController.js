@@ -54,7 +54,6 @@ const getJobs = async (req, res) => {
             });
         }
 
-<<<<<<< HEAD
         const role = user?.role || 'GUEST';
         const uid = user?.id;
 
@@ -71,23 +70,13 @@ const getJobs = async (req, res) => {
                 invoice,
                 customerName: j.customer?.name || j.guestName || 'Valued Customer',
                 customerPhone: j.customer?.phone || j.guestPhone || null,
+                customerEmail: j.customer?.email || j.guestEmail || '—',
+                customerAddress: j.customer?.address || j.location || '—',
                 workerName: j.worker?.name || 'Unassigned',
                 chatId: j.chats?.id || null,
                 displayId: j.jobNo || (j.id ? `JB-${String(j.id).slice(-4).toUpperCase()}` : 'JB-0000'),
             };
         });
-=======
-        const formattedJobs = jobs.map(j => ({
-            ...j,
-            customerName: j.customer?.name || j.guestName || 'Valued Customer',
-            customerPhone: j.customer?.phone || j.guestPhone || '—',
-            customerEmail: j.customer?.email || j.guestEmail || '—',
-            customerAddress: j.customer?.address || j.location || '—',
-            workerName: j.worker?.name || 'Unassigned',
-            chatId: j.chats?.id || null,
-            displayId: j.jobNo || (j.id ? `JB-${String(j.id).slice(-4).toUpperCase()}` : 'JB-0000')
-        }));
->>>>>>> da7126fea389b4b0cf15184dd30779983973d231
 
         res.status(200).json({ success: true, count: jobs.length, data: formattedJobs });
     } catch (error) {
