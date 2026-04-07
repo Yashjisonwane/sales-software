@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Check, X, MessageSquare, Zap } from 'lucide-react';
+import { Eye, Check, X, MessageSquare, Zap, Navigation, Phone, Play, Square } from 'lucide-react';
 
 const LeadTable = ({ leads, onAction }) => {
     const getStatusColor = (status) => {
@@ -79,20 +79,22 @@ const LeadTable = ({ leads, onAction }) => {
                                         )}
                                     </td>
                                     <td className="px-4 py-5 whitespace-nowrap text-right">
-                                        <div className="flex justify-center items-center gap-2">
+                                        <div className="flex justify-center items-center gap-1.5">
                                             {isNew && (
                                                 <>
                                                     <button
                                                         onClick={() => onAction('accept', lead)}
-                                                        className="px-3 py-2 bg-emerald-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-md active:scale-95 whitespace-nowrap"
+                                                        className="h-8 w-8 inline-flex items-center justify-center bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all shadow-sm active:scale-95"
+                                                        title="Accept"
                                                     >
-                                                        Accept
+                                                        <Check size={14} />
                                                     </button>
                                                     <button
                                                         onClick={() => onAction('reject', lead)}
-                                                        className="px-3 py-2 bg-rose-500 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-rose-600 transition-all shadow-md active:scale-95 whitespace-nowrap"
+                                                        className="h-8 w-8 inline-flex items-center justify-center bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-all shadow-sm active:scale-95"
+                                                        title="Reject"
                                                     >
-                                                        Reject
+                                                        <X size={14} />
                                                     </button>
                                                 </>
                                             )}
@@ -100,25 +102,46 @@ const LeadTable = ({ leads, onAction }) => {
                                                 <>
                                                     <button
                                                         onClick={() => onAction('contact', lead)}
-                                                        className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-100 transition-all active:scale-95"
+                                                        className="h-8 w-8 inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg hover:bg-emerald-100 transition-all active:scale-95"
+                                                        title="Contact"
                                                     >
-                                                        <MessageSquare size={12} /> Contact
+                                                        <Phone size={13} />
                                                     </button>
                                                     {isAccepted && (
-                                                        <button
-                                                            onClick={() => onAction('start', lead)}
-                                                            className="px-3 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md active:scale-95 whitespace-nowrap"
-                                                        >
-                                                            Start Job
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                onClick={() => onAction('navigate', lead)}
+                                                                className="h-8 w-8 inline-flex items-center justify-center bg-white text-blue-700 border border-blue-100 rounded-lg hover:bg-blue-50 transition-all shadow-sm active:scale-95"
+                                                                title="Navigate"
+                                                            >
+                                                                <Navigation size={13} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => onAction('start', lead)}
+                                                                className="h-8 w-8 inline-flex items-center justify-center bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm active:scale-95"
+                                                                title="Start Job"
+                                                            >
+                                                                <Play size={13} />
+                                                            </button>
+                                                        </>
                                                     )}
                                                     {isInProgress && (
-                                                        <button
-                                                            onClick={() => onAction('complete', lead)}
-                                                            className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-md active:scale-95 whitespace-nowrap"
-                                                        >
-                                                            Complete Job
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                onClick={() => onAction('toggleTracking', lead)}
+                                                                className="h-8 w-8 inline-flex items-center justify-center bg-white text-amber-700 border border-amber-100 rounded-lg hover:bg-amber-50 transition-all shadow-sm active:scale-95"
+                                                                title={lead.isTrackingActive ? 'Stop Tracking' : 'Go Live Tracking'}
+                                                            >
+                                                                {lead.isTrackingActive ? <Square size={12} /> : <Play size={12} />}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => onAction('complete', lead)}
+                                                                className="h-8 w-8 inline-flex items-center justify-center bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all shadow-sm active:scale-95"
+                                                                title="Complete Job"
+                                                            >
+                                                                <Check size={13} />
+                                                            </button>
+                                                        </>
                                                     )}
                                                 </>
                                             )}
@@ -201,44 +224,65 @@ const LeadTable = ({ leads, onAction }) => {
 
                                     <div className="flex-1">
                                         {isNew && (
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-2 gap-2">
                                                 <button
                                                     onClick={() => onAction('accept', lead)}
-                                                    className="flex items-center justify-center gap-2 py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-50 active:scale-95 transition-all"
+                                                    className="flex items-center justify-center gap-2 py-3 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all"
                                                 >
-                                                    Accept
+                                                    <Check size={14} /> Accept
                                                 </button>
                                                 <button
                                                     onClick={() => onAction('reject', lead)}
-                                                    className="flex items-center justify-center gap-2 py-4 bg-rose-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-50 active:scale-95 transition-all"
+                                                    className="flex items-center justify-center gap-2 py-3 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm active:scale-95 transition-all"
                                                 >
-                                                    Reject
+                                                    <X size={14} /> Reject
                                                 </button>
                                             </div>
                                         )}
                                         {canInteract && (
-                                            <div className="flex flex-col gap-3">
+                                            <div className="flex flex-wrap gap-2">
                                                 <button
                                                     onClick={() => onAction('contact', lead)}
-                                                    className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-50 border-2 border-emerald-100 text-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-sm"
+                                                    className="h-10 w-10 inline-flex items-center justify-center bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl active:scale-95 transition-all shadow-sm"
+                                                    title="Contact"
                                                 >
-                                                    <MessageSquare size={18} /> Contact Customer
+                                                    <Phone size={16} />
                                                 </button>
                                                 {isAccepted && (
-                                                    <button
-                                                        onClick={() => onAction('start', lead)}
-                                                        className="w-full flex items-center justify-center gap-3 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-blue-100"
-                                                    >
-                                                        <Zap size={18} fill="currentColor" /> Start Job
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            onClick={() => onAction('navigate', lead)}
+                                                            className="h-10 w-10 inline-flex items-center justify-center bg-white border border-blue-100 text-blue-700 rounded-xl active:scale-95 transition-all shadow-sm"
+                                                            title="Navigate"
+                                                        >
+                                                            <Navigation size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onAction('start', lead)}
+                                                            className="h-10 w-10 inline-flex items-center justify-center bg-blue-600 text-white rounded-xl active:scale-95 transition-all shadow-sm"
+                                                            title="Start Job"
+                                                        >
+                                                            <Play size={16} />
+                                                        </button>
+                                                    </>
                                                 )}
                                                 {isInProgress && (
-                                                    <button
-                                                        onClick={() => onAction('complete', lead)}
-                                                        className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-emerald-100"
-                                                    >
-                                                        <Check size={18} strokeWidth={3} /> Complete Work
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            onClick={() => onAction('toggleTracking', lead)}
+                                                            className="h-10 w-10 inline-flex items-center justify-center bg-white border border-amber-100 text-amber-700 rounded-xl active:scale-95 transition-all shadow-sm"
+                                                            title={lead.isTrackingActive ? 'Stop Tracking' : 'Go Live Tracking'}
+                                                        >
+                                                            {lead.isTrackingActive ? <Square size={14} /> : <Play size={14} />}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onAction('complete', lead)}
+                                                            className="h-10 w-10 inline-flex items-center justify-center bg-emerald-600 text-white rounded-xl active:scale-95 transition-all shadow-sm"
+                                                            title="Complete Job"
+                                                        >
+                                                            <Check size={16} strokeWidth={3} />
+                                                        </button>
+                                                    </>
                                                 )}
                                             </div>
                                         )}

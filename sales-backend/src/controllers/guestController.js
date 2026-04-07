@@ -172,35 +172,48 @@ const createRequest = async (req, res) => {
         const lngNum = longitude != null && longitude !== '' ? parseFloat(longitude) : null;
 
         // 2. Create Lead as Guest
-        const lead = await prisma.lead.create({
-            data: {
-                leadNo: leadNo,
-                isGuest: true,
-                guestName: name,
-                guestPhone: phone,
-                guestEmail: email || '',
-                sessionToken: sessionToken,
-                categoryId: categoryId,
-                location: location || 'Not Specified',
-                latitude: latNum != null && !Number.isNaN(latNum) ? latNum : null,
-                longitude: lngNum != null && !Number.isNaN(lngNum) ? lngNum : null,
-                description: description || '',
-                status: 'OPEN',
-                preferredWorkerId: resolvedPreferredId
-            },
-            include: { category: true, preferredWorker: { select: { name: true, id: true } } }
-        });
+        const leadData = {
+            leadNo: leadNo,
+            isGuest: true,
+            guestName: name,
+            guestPhone: phone,
+            guestEmail: email || '',
+            sessionToken: sessionToken,
+            categoryId: categoryId,
+            location: location || 'Not Specified',
+            latitude: latNum != null && !Number.isNaN(latNum) ? latNum : null,
+            longitude: lngNum != null && !Number.isNaN(lngNum) ? lngNum : null,
+            description: description || '',
+            status: 'OPEN'
+        };
+
+        // Runtime Prisma client may not expose all Lead relations (e.g. preferredWorker/category).
+        // Create using scalar fields only for maximum compatibility across generated clients.
+        const lead = await prisma.lead.create({ data: leadData });
+
+        const category = categoryId
+            ? await prisma.category.findUnique({
+                where: { id: categoryId },
+                select: { name: true }
+            })
+            : null;
+        const preferredWorker = resolvedPreferredId
+            ? await prisma.user.findUnique({
+                where: { id: resolvedPreferredId },
+                select: { id: true, name: true }
+            })
+            : null;
 
         // 3. Create Notification for Admin
         const pref =
-            lead.preferredWorker != null
-                ? ` Suggested professional: ${lead.preferredWorker.name}.`
+            preferredWorker != null
+                ? ` Suggested professional: ${preferredWorker.name}.`
                 : '';
         await prisma.notification.create({
             data: {
                 userId: null,
                 title: 'New Guest Request',
-                message: `Guest ${name} requested ${lead.category?.name || 'Service'} (#${leadNo}).${pref}`,
+                message: `Guest ${name} requested ${category?.name || 'Service'} (#${leadNo}).${pref}`,
                 type: 'LEAD'
             }
         });
@@ -211,7 +224,7 @@ const createRequest = async (req, res) => {
             sessionToken: sessionToken,
             trackingId: lead.id,
             displayId: leadNo,
-            preferredWorkerId: lead.preferredWorkerId
+            preferredWorkerId: preferredWorker?.id || null
         });
     } catch (error) {
         console.error('Guest Request Error:', error);
@@ -228,14 +241,14 @@ const trackRequest = async (req, res) => {
         // Try to find lead by token
         let lead = await prisma.lead.findUnique({
             where: { sessionToken: token },
-            include: { category: true, job: { include: { worker: { select: { name: true, phone: true, rating: true } } } } }
+            include: { category: true, job: { include: { worker: { select: { name: true, phone: true, rating: true, lat: true, lng: true } } } } }
         });
 
         // If lead not found (might be deleted or archived), try finding job directly by token
         if (!lead) {
             const job = await prisma.job.findFirst({
                 where: { sessionToken: token },
-                include: { worker: { select: { name: true, phone: true, rating: true } } }
+                include: { worker: { select: { name: true, phone: true, rating: true, lat: true, lng: true } } }
             });
 
             if (!job) {
@@ -253,8 +266,12 @@ const trackRequest = async (req, res) => {
                     worker: job.worker ? {
                         name: job.worker.name,
                         phone: job.worker.phone,
-                        rating: job.worker.rating
+                        rating: job.worker.rating,
+                        liveLat: job.worker.lat,
+                        liveLng: job.worker.lng
                     } : null,
+                    customerLat: job.latitude ?? null,
+                    customerLng: job.longitude ?? null,
                     jobId: job.id,
                     isReviewed: !!(await prisma.reviews.findUnique({ where: { job_id: job.id } })),
                     chatId: (await prisma.chats.findUnique({ where: { job_id: job.id } }))?.id
@@ -272,8 +289,12 @@ const trackRequest = async (req, res) => {
                 worker: lead.job?.worker ? {
                     name: lead.job.worker.name,
                     phone: lead.job.worker.phone,
-                    rating: lead.job.worker.rating
+                    rating: lead.job.worker.rating,
+                    liveLat: lead.job.worker.lat,
+                    liveLng: lead.job.worker.lng
                 } : null,
+                customerLat: lead.latitude ?? lead.job?.latitude ?? null,
+                customerLng: lead.longitude ?? lead.job?.longitude ?? null,
                 jobId: lead.job?.id,
                 isReviewed: lead.job ? !!(await prisma.reviews.findUnique({ where: { job_id: lead.job.id } })) : false,
                 chatId: lead.job ? (await prisma.chats.findUnique({ where: { job_id: lead.job.id } }))?.id : null

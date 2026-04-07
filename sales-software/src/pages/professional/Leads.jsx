@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMarketplace } from '../../context/MarketplaceContext';
 import LeadTable from '../../components/professional/LeadTable';
 import LeadDetailModal from '../../components/professional/LeadDetailModal';
 import { Search, Filter, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
+import { getSocketOrigin } from '../../services/apiClient';
 
 const Leads = () => {
     const { leads, assignments, currentUser, respondToLead, showToast, startJob, completeJob } = useMarketplace();
@@ -14,6 +16,106 @@ const Leads = () => {
     // Modal state
     const [selectedLead, setSelectedLead] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [activeTrackingJobId, setActiveTrackingJobId] = useState(null);
+    const trackerRef = useRef({
+        socket: null,
+        watchId: null,
+        lastEmitAt: 0,
+        activeJobId: null,
+        arrivedNotifiedForJob: null
+    });
+
+    const getLeadDestination = (lead) => {
+        const lat = Number(lead?.latitude);
+        const lng = Number(lead?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+    };
+
+    const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const toRad = (x) => (x * Math.PI) / 180;
+        const R = 6371;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    useEffect(() => {
+        const token = localStorage.getItem('userToken');
+        if (!token || !currentUser?.id) return;
+        const socket = io(getSocketOrigin(), {
+            auth: { token },
+            transports: ['websocket', 'polling']
+        });
+        trackerRef.current.socket = socket;
+        return () => {
+            if (trackerRef.current.watchId != null) {
+                navigator.geolocation.clearWatch(trackerRef.current.watchId);
+                trackerRef.current.watchId = null;
+            }
+            trackerRef.current.socket?.disconnect();
+            trackerRef.current.socket = null;
+        };
+    }, [currentUser?.id]);
+
+    const stopLiveTracking = () => {
+        if (trackerRef.current.watchId != null) {
+            navigator.geolocation.clearWatch(trackerRef.current.watchId);
+            trackerRef.current.watchId = null;
+        }
+        trackerRef.current.activeJobId = null;
+        trackerRef.current.arrivedNotifiedForJob = null;
+        setActiveTrackingJobId(null);
+        showToast('Live tracking stopped', 'info');
+    };
+
+    const startLiveTracking = (jobId, lead) => {
+        if (!navigator.geolocation) {
+            showToast('Geolocation not supported on this browser', 'error');
+            return;
+        }
+        const destination = getLeadDestination(lead);
+        trackerRef.current.activeJobId = jobId;
+        trackerRef.current.arrivedNotifiedForJob = null;
+        setActiveTrackingJobId(jobId);
+        if (trackerRef.current.watchId != null) {
+            navigator.geolocation.clearWatch(trackerRef.current.watchId);
+            trackerRef.current.watchId = null;
+        }
+        trackerRef.current.watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const now = Date.now();
+                if (now - trackerRef.current.lastEmitAt < 4000) return;
+                trackerRef.current.lastEmitAt = now;
+                trackerRef.current.socket?.emit('location_update', { lat, lng, jobId });
+                if (destination) {
+                    const distanceKm = haversineKm(lat, lng, destination.lat, destination.lng);
+                    if (distanceKm <= 0.1 && trackerRef.current.arrivedNotifiedForJob !== jobId) {
+                        trackerRef.current.arrivedNotifiedForJob = jobId;
+                        trackerRef.current.socket?.emit('professional_arrived', { jobId });
+                    }
+                }
+            },
+            () => showToast('Unable to read live location', 'error'),
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 3000 }
+        );
+    };
+
+    const openNavigation = (lead) => {
+        const destination = getLeadDestination(lead);
+        if (!destination) {
+            showToast('Customer location coordinates not available', 'info');
+            return;
+        }
+        window.open(
+            `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`,
+            '_blank',
+            'noopener,noreferrer'
+        );
+    };
 
     // ── Real leads from context ───────────────────────────────
     const proAssignments = assignments.filter(a => a.professionalId === currentUser.id);
@@ -36,7 +138,8 @@ const Leads = () => {
             return { 
                 ...lead, 
                 assignmentStatus: assignment?.status || 'Sent', 
-                assignmentId: assignment?.id
+                assignmentId: assignment?.id,
+                isTrackingActive: !!assignment?.id && assignment.id === activeTrackingJobId
             };
         });
 
@@ -75,6 +178,8 @@ const Leads = () => {
             const assignmentId = lead.assignmentId || proAssignments.find(a => a.leadId === lead.id)?.id;
             if (assignmentId) {
                 startJob(assignmentId);
+                startLiveTracking(assignmentId, lead);
+                openNavigation(lead);
                 if (selectedLead?.id === lead.id) {
                     setSelectedLead(prev => ({ ...prev, assignmentStatus: 'In Progress' }));
                 }
@@ -84,10 +189,33 @@ const Leads = () => {
             return;
         }
 
+        if (type === 'navigate') {
+            openNavigation(lead);
+            return;
+        }
+
+        if (type === 'stopTracking') {
+            stopLiveTracking();
+            return;
+        }
+
+        if (type === 'toggleTracking') {
+            const assignmentId = lead.assignmentId || proAssignments.find(a => a.leadId === lead.id)?.id;
+            if (!assignmentId) return;
+            if (lead.isTrackingActive) {
+                stopLiveTracking();
+            } else {
+                startLiveTracking(assignmentId, lead);
+                showToast('Live tracking started', 'success');
+            }
+            return;
+        }
+
         if (type === 'complete') {
             const assignmentId = lead.assignmentId || proAssignments.find(a => a.leadId === lead.id)?.id;
             if (assignmentId) {
                 completeJob(assignmentId);
+                stopLiveTracking();
                 if (selectedLead?.id === lead.id) {
                     setSelectedLead(prev => ({ ...prev, assignmentStatus: 'Completed' }));
                 }

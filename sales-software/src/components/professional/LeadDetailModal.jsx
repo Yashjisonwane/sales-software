@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, MapPin, Calendar, Clock, User, Phone, Mail, FileText, Check, MessageSquare } from 'lucide-react';
+import { X, MapPin, Calendar, Clock, User, Phone, Mail, FileText, Check, MessageSquare, Navigation, Play, Square } from 'lucide-react';
 
 const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
     if (!isOpen || !lead) return null;
@@ -146,22 +146,23 @@ const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
                         Close
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
                         {/* New Status Actions */}
                         {['open', 'sent', 'viewed', 'new'].includes(status) && (
                             <>
                                 <button
                                     onClick={() => { onAction('reject', lead); onClose(); }}
-                                    className="px-4 py-3 bg-gray-50 text-rose-600 border border-rose-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-50 transition-all active:scale-95"
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-gray-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-50 transition-all active:scale-95"
+                                    title="Reject"
                                 >
-                                    Reject
+                                    <X size={16} />
                                 </button>
                                 <button
                                     onClick={() => { onAction('accept', lead); onClose(); }}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95 flex items-center justify-center gap-2"
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm active:scale-95"
+                                    title="Accept"
                                 >
-                                    <Check size={14} strokeWidth={3} />
-                                    Accept
+                                    <Check size={16} strokeWidth={3} />
                                 </button>
                             </>
                         )}
@@ -169,27 +170,42 @@ const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
                         {/* Accepted Status Actions */}
                         {status === 'accepted' && (
                             <>
-                                <div className="flex gap-1.5 mr-2">
+                                <div className="flex gap-1.5 mr-1">
                                     <a
                                         href={`tel:${lead.customerPhone || lead.phone}`}
-                                        className="h-11 w-11 flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl active:scale-90 transition-all shadow-sm"
+                                        className="h-10 w-10 flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl active:scale-90 transition-all shadow-sm"
                                         title="Call"
                                     >
-                                        <Phone size={18} />
+                                        <Phone size={16} />
                                     </a>
                                     <button
                                         onClick={() => { onAction('contact', lead); onClose(); }}
-                                        className="h-11 w-11 flex items-center justify-center bg-blue-50 text-blue-700 border border-blue-100 rounded-xl active:scale-90 transition-all shadow-sm"
+                                        className="h-10 w-10 flex items-center justify-center bg-blue-50 text-blue-700 border border-blue-100 rounded-xl active:scale-90 transition-all shadow-sm"
                                         title="Message"
                                     >
-                                        <MessageSquare size={18} />
+                                        <MessageSquare size={16} />
                                     </button>
                                 </div>
                                 <button
-                                    onClick={() => { onAction('start', lead); onClose(); }}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 active:scale-95"
+                                    onClick={() => onAction('navigate', lead)}
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-white text-blue-700 border border-blue-100 rounded-xl hover:bg-blue-50 transition-all active:scale-95"
+                                    title="Navigate"
                                 >
-                                    Start Job
+                                    <Navigation size={15} />
+                                </button>
+                                <button
+                                    onClick={() => onAction('toggleTracking', lead)}
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-white text-amber-700 border border-amber-100 rounded-xl hover:bg-amber-50 transition-all active:scale-95"
+                                    title={lead?.isTrackingActive ? 'Stop Tracking' : 'Go Live Tracking'}
+                                >
+                                    {lead?.isTrackingActive ? <Square size={13} /> : <Play size={13} />}
+                                </button>
+                                <button
+                                    onClick={() => { onAction('start', lead); onClose(); }}
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-sm active:scale-95"
+                                    title="Start Job"
+                                >
+                                    <Play size={15} />
                                 </button>
                             </>
                         )}
@@ -197,28 +213,42 @@ const LeadDetailModal = ({ isOpen, onClose, lead, onAction }) => {
                         {/* In Progress Status Actions */}
                         {['in progress', 'active', 'in_progress'].includes(status) && (
                             <>
-                                <div className="flex gap-1.5 mr-2">
+                                <div className="flex gap-1.5 mr-1">
                                     <a
                                         href={`tel:${lead.customerPhone || lead.phone}`}
-                                        className="h-11 w-11 flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl active:scale-90 transition-all shadow-sm"
+                                        className="h-10 w-10 flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl active:scale-90 transition-all shadow-sm"
                                         title="Call"
                                     >
-                                        <Phone size={18} />
+                                        <Phone size={16} />
                                     </a>
                                     <button
                                         onClick={() => { onAction('contact', lead); onClose(); }}
-                                        className="h-11 w-11 flex items-center justify-center bg-blue-50 text-blue-700 border border-blue-100 rounded-xl active:scale-90 transition-all shadow-sm"
+                                        className="h-10 w-10 flex items-center justify-center bg-blue-50 text-blue-700 border border-blue-100 rounded-xl active:scale-90 transition-all shadow-sm"
                                         title="Message"
                                     >
-                                        <MessageSquare size={18} />
+                                        <MessageSquare size={16} />
                                     </button>
                                 </div>
                                 <button
+                                    onClick={() => onAction('navigate', lead)}
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-white text-blue-700 border border-blue-100 rounded-xl hover:bg-blue-50 transition-all active:scale-95"
+                                    title="Navigate"
+                                >
+                                    <Navigation size={15} />
+                                </button>
+                                <button
+                                    onClick={() => onAction('stopTracking', lead)}
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-white text-amber-700 border border-amber-100 rounded-xl hover:bg-amber-50 transition-all active:scale-95"
+                                    title="Stop Tracking"
+                                >
+                                    <Square size={13} />
+                                </button>
+                                <button
                                     onClick={() => { onAction('complete', lead); onClose(); }}
-                                    className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 active:scale-95 flex items-center justify-center gap-2"
+                                    className="h-10 w-10 inline-flex items-center justify-center bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-sm active:scale-95"
+                                    title="Complete Job"
                                 >
                                     <Check size={16} strokeWidth={3} />
-                                    Complete Work
                                 </button>
                             </>
                         )}
