@@ -1,5 +1,9 @@
 const prisma = require('../config/db');
+<<<<<<< HEAD
 const { haversineKm } = require('../utils/geo');
+=======
+const { v4: uuidv4 } = require('uuid');
+>>>>>>> da7126fea389b4b0cf15184dd30779983973d231
 
 const generateShortId = (prefix) => {
     return `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -160,83 +164,127 @@ const getLeads = async (req, res) => {
 };
 
 // @route   PATCH /api/v1/leads/:id/assign
-// @desc    Worker accepts/Admin assigns a lead
+// @desc    Worker accepts/Admin assigns a lead (atomic: job + chat + lead status)
 const assignLead = async (req, res) => {
     try {
         const leadId = req.params.id;
+<<<<<<< HEAD
         const body = req.body && typeof req.body === 'object' ? req.body : {};
         const { workerId: bodyWorkerId } = body;
         const workerId = bodyWorkerId || req.user.id; 
+=======
+        const { workerId: bodyWorkerId } = req.body;
+        const workerId = bodyWorkerId || req.user.id;
+>>>>>>> da7126fea389b4b0cf15184dd30779983973d231
 
-        const lead = await prisma.lead.findUnique({
-            where: { id: leadId },
-            include: { category: true }
-        });
-
-        if (!lead) {
-            return res.status(404).json({ success: false, message: 'Lead not found' });
+        if (!workerId) {
+            return res.status(400).json({ success: false, message: 'workerId is required' });
         }
 
-        if (lead.status !== 'OPEN') {
-            return res.status(400).json({ success: false, message: `Lead is already ${lead.status.toLowerCase()}` });
-        }
+        const result = await prisma.$transaction(async (tx) => {
+            const lead = await tx.lead.findUnique({
+                where: { id: leadId },
+                include: { category: true, job: true }
+            });
 
-        // 1. Update Lead Status
-        await prisma.lead.update({
-            where: { id: leadId },
-            data: { status: 'ASSIGNED' }
-        });
-
-        // 2. Create Job
-        const jobNo = generateShortId('J');
-        const newJob = await prisma.job.create({
-            data: {
-                jobNo: jobNo,
-                leadId: lead.id,
-                customerId: lead.customerId,
-                guestName: lead.guestName,
-                guestPhone: lead.guestPhone,
-                sessionToken: lead.sessionToken,
-                isGuest: lead.isGuest || false,
-                workerId: workerId,
-                categoryName: lead.category.name,
-                location: lead.location,
-                latitude: lead.latitude,
-                longitude: lead.longitude,
-                description: lead.description,
-                preferredDate: lead.preferredDate,
-                status: 'SCHEDULED',
-                scheduledDate: new Date(),
-                scheduledTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            if (!lead) {
+                const err = new Error('Lead not found');
+                err.statusCode = 404;
+                throw err;
             }
-        });
 
-        // 3. Create Chat for this Job (Properly mapping to the 'chats' model)
-        const { v4: uuidv4 } = require('uuid');
-        await prisma.chats.create({
-            data: {
-                id: uuidv4(),
-                job_id: newJob.id,
-                last_message: 'Conversation started',
-                updated_at: new Date()
+            // Already have a job: idempotent success (fixes "error then shows assigned" retries)
+            if (lead.job) {
+                if (lead.status === 'OPEN') {
+                    await tx.lead.update({
+                        where: { id: leadId },
+                        data: { status: 'ASSIGNED' }
+                    });
+                }
+
+                const isAdmin = req.user.role === 'ADMIN';
+                if (isAdmin && bodyWorkerId && bodyWorkerId !== lead.job.workerId) {
+                    const updatedJob = await tx.job.update({
+                        where: { id: lead.job.id },
+                        data: { workerId: bodyWorkerId }
+                    });
+                    await tx.notification.create({
+                        data: {
+                            userId: bodyWorkerId,
+                            title: 'New Job Assigned',
+                            message: `You have been assigned to Job #${lead.job.jobNo} (${lead.category.name}) at ${lead.location}.`,
+                            type: 'ASSIGNMENT'
+                        }
+                    });
+                    return { job: updatedJob, message: 'Lead reassigned!' };
+                }
+
+                return { job: lead.job, message: 'Lead already assigned.' };
             }
-        });
 
-        // 4. Create Notification for Professional
-        await prisma.notification.create({
-            data: {
-                userId: workerId,
-                title: "New Job Assigned",
-                message: `You have been assigned to Job #${jobNo} (${lead.category.name}) at ${lead.location}.`,
-                type: 'ASSIGNMENT'
+            // No job yet — only OPEN or recovery (ASSIGNED in DB but job missing after a failed assign)
+            if (lead.status !== 'OPEN' && lead.status !== 'ASSIGNED') {
+                const err = new Error(`Lead is already ${lead.status.toLowerCase()}`);
+                err.statusCode = 400;
+                throw err;
             }
+
+            const jobNo = generateShortId('J');
+            const newJob = await tx.job.create({
+                data: {
+                    jobNo: jobNo,
+                    leadId: lead.id,
+                    customerId: lead.customerId,
+                    guestName: lead.guestName,
+                    guestPhone: lead.guestPhone,
+                    sessionToken: lead.sessionToken,
+                    isGuest: lead.isGuest || false,
+                    workerId: workerId,
+                    categoryName: lead.category.name,
+                    location: lead.location,
+                    latitude: lead.latitude,
+                    longitude: lead.longitude,
+                    description: lead.description,
+                    preferredDate: lead.preferredDate,
+                    status: 'SCHEDULED',
+                    scheduledDate: new Date(),
+                    scheduledTime: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+                }
+            });
+
+            await tx.chats.create({
+                data: {
+                    id: uuidv4(),
+                    job_id: newJob.id,
+                    last_message: 'Conversation started',
+                    updated_at: new Date()
+                }
+            });
+
+            if (lead.status === 'OPEN') {
+                await tx.lead.update({
+                    where: { id: leadId },
+                    data: { status: 'ASSIGNED' }
+                });
+            }
+
+            await tx.notification.create({
+                data: {
+                    userId: workerId,
+                    title: 'New Job Assigned',
+                    message: `You have been assigned to Job #${jobNo} (${lead.category.name}) at ${lead.location}.`,
+                    type: 'ASSIGNMENT'
+                }
+            });
+
+            return { job: newJob, message: 'Lead assigned!' };
         });
 
-        res.status(200).json({ success: true, message: 'Lead assigned!', data: newJob });
-
+        res.status(200).json({ success: true, message: result.message, data: result.job });
     } catch (error) {
-        console.error("Assign Lead Error:", error);
-        res.status(500).json({ success: false, message: error.message || "Server Error" });
+        console.error('Assign Lead Error:', error);
+        const code = error.statusCode || 500;
+        res.status(code).json({ success: false, message: error.message || 'Server Error' });
     }
 };
 
@@ -315,15 +363,79 @@ const assignLeadNearest = async (req, res) => {
 const updateLead = async (req, res) => {
     try {
         const { id } = req.params;
-        const data = req.body;
-        const lead = await prisma.lead.update({
+        const {
+            customerName, customerEmail, customerPhone,
+            guestName, guestPhone, guestEmail,
+            location, description, status, servicePlan, preferredDate,
+            categoryId, serviceCategory
+        } = req.body;
+
+        console.log(`[API] Updating Lead ${id}:`, { customerName, serviceCategory, status });
+
+        // Resolve Category ID - Prioritize serviceCategory name from the form if provided
+        let finalCategoryId = null;
+        
+        if (serviceCategory && serviceCategory.length > 0) {
+            const catNameTrimmed = serviceCategory.trim().toLowerCase();
+            const cat = await prisma.category.findFirst({
+                where: { name: { contains: catNameTrimmed } }
+            });
+            if (cat) {
+                finalCategoryId = cat.id;
+            }
+        }
+
+        // Fallback to categoryId if no name provided or no match found
+        if (!finalCategoryId) finalCategoryId = categoryId;
+
+        // 1. Get current lead to find customer
+        const currentLead = await prisma.lead.findUnique({
             where: { id },
-            data,
+            include: { customer: true }
+        });
+
+        if (!currentLead) {
+            return res.status(404).json({ success: false, message: 'Lead not found' });
+        }
+
+        // 2. Update Customer details if provided and lead is NOT a guest lead
+        if (currentLead.customerId) {
+            await prisma.user.update({
+                where: { id: currentLead.customerId },
+                data: {
+                    name: customerName || undefined,
+                    email: customerEmail || undefined,
+                    phone: customerPhone || undefined
+                }
+            });
+        }
+
+        // 3. Prepare Lead Update data (Filter only valid Lead fields)
+        const dataToUpdate = {};
+        if (location !== undefined) dataToUpdate.location = location;
+        if (description !== undefined) dataToUpdate.description = description;
+        if (status !== undefined) dataToUpdate.status = status.toUpperCase();
+        if (servicePlan !== undefined) dataToUpdate.servicePlan = servicePlan;
+        if (preferredDate !== undefined) dataToUpdate.preferredDate = preferredDate;
+        
+        // Only update category if we resolved a valid one
+        if (finalCategoryId) dataToUpdate.categoryId = finalCategoryId;
+        
+        // Guest fields
+        if (guestName !== undefined) dataToUpdate.guestName = guestName;
+        if (guestPhone !== undefined) dataToUpdate.guestPhone = guestPhone;
+        if (guestEmail !== undefined) dataToUpdate.guestEmail = guestEmail;
+
+        const updatedLead = await prisma.lead.update({
+            where: { id },
+            data: dataToUpdate,
             include: { customer: true, category: true }
         });
-        res.status(200).json({ success: true, data: lead });
+
+        res.status(200).json({ success: true, message: "Lead updated successfully", data: updatedLead });
     } catch (err) {
-        res.status(500).json({ success: false, message: 'Lead update failed' });
+        console.error("❌ [API] updateLead Error:", err);
+        res.status(500).json({ success: false, message: 'Lead update failed: ' + err.message, error: err.stack });
     }
 };
 

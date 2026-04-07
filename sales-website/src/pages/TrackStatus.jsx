@@ -75,11 +75,16 @@ const TrackStatus = () => {
 
             socketRef.current.on('connect', () => {
                 socketRef.current.emit("join_chat", data.jobId);
+                socketRef.current.emit("join_room", data.jobId);
             });
 
-            socketRef.current.on("new_message", (msg) => {
-                setMessages(prev => [...prev, msg]);
-            });
+            const appendMsg = (msg) => {
+                if (!msg?.id) return;
+                setMessages((prev) => (prev.some((p) => p.id === msg.id) ? prev : [...prev, msg]));
+            };
+
+            socketRef.current.on("new_message", appendMsg);
+            socketRef.current.on("receive_message", appendMsg);
 
             // Fetch history - Backend updated to allow sessionToken bypass
             axios.get(`${API_BASE_URL}/chats/${data.chatId}/messages`, {
@@ -103,6 +108,7 @@ const TrackStatus = () => {
         if (!newMessage.trim() || !socketRef.current) return;
         
         socketRef.current.emit("send_message", {
+            requestId: data.jobId,
             jobId: data.jobId,
             chatId: data.chatId,
             text: newMessage
@@ -340,7 +346,7 @@ const TrackStatus = () => {
                                 </div>
                             ) : (
                                 messages.map((m, i) => (
-                                    <div key={i} className={`flex ${m.isGuest ? 'justify-end' : 'justify-start'}`}>
+                                    <div key={m.id || `m-${i}`} className={`flex ${m.isGuest ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[80%] px-5 py-3.5 rounded-[1.5rem] shadow-sm text-sm font-medium ${
                                             m.isGuest 
                                                 ? 'bg-[#7C3AED] text-white rounded-tr-none' 

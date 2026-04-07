@@ -26,7 +26,7 @@ function App() {
             <Route path="/contact" element={<Contact />} />
             <Route path="/job-details" element={<JobDetails />} />
             <Route path="/find-services" element={<FindServices />} />
-            {/* <Route path="/become-professional" element={<BecomeProfessional />} /> */}
+            <Route path="/become-professional" element={<BecomeProfessional />} />
             <Route path="/about-us" element={<AboutUs />} />
             <Route path="/track/:token" element={<TrackStatus />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

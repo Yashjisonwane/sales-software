@@ -145,7 +145,7 @@ const AdminSubscriptions = () => {
                         <table className="w-full text-left">
                             <tbody className="divide-y divide-amber-100/50">
                                 {pendingRequests.map((req) => (
-                                    <tr key={req.id} className="group hover:bg-white/50 transition-colors">
+                                    <tr key={req.id} className="hover:bg-white/50 transition-colors">
                                         <td className="px-8 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-amber-600 text-white flex items-center justify-center font-bold text-[10px]">
@@ -169,7 +169,7 @@ const AdminSubscriptions = () => {
                                             {new Date(req.createdAt).toLocaleDateString()}
                                         </td>
                                         <td className="px-8 py-4 text-right">
-                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                            <div className="flex justify-end gap-2">
                                                 <button 
                                                     onClick={() => mp.approveUpgradeRequest(req.id)}
                                                     className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md transition-all active:scale-95"

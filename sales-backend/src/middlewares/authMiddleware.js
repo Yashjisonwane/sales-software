@@ -22,7 +22,16 @@ const protect = async (req, res, next) => {
             // Get user from db to ensure they still exist and have correct role
             req.user = await prisma.user.findUnique({
                 where: { id: decoded.id },
-                include: { plan: true }
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    phone: true,
+                    role: true,
+                    isAvailable: true,
+                    planId: true,
+                    plan: true
+                }
             });
 
             if (!req.user) {
@@ -54,7 +63,16 @@ const optionalProtect = async (req, res, next) => {
                 
                 req.user = await prisma.user.findUnique({
                     where: { id: decoded.id },
-                    include: { plan: true }
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        phone: true,
+                        role: true,
+                        isAvailable: true,
+                        planId: true,
+                        plan: true
+                    }
                 });
             }
         } catch (error) {

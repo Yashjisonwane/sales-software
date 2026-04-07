@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import io from 'socket.io-client';
 import { useMarketplace } from '../../context/MarketplaceContext';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import { Trash2, Save, User, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { getSocketOrigin } from '../../services/apiClient';
 
 const Settings = () => {
-    const { currentUser, toggleTrackingSetting, updateProfessionalStatus, updateProfile, showToast } = useMarketplace();
+    const { currentUser, toggleTrackingSetting, updateProfessionalStatus, updateProfessionalLocation, updateProfile, showToast } = useMarketplace();
     const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [watchError, setWatchError] = useState('');
 
     const [formData, setFormData] = useState({
         name: '',
@@ -25,6 +28,51 @@ const Settings = () => {
             }));
         }
     }, [currentUser]);
+
+    useEffect(() => {
+        if (!currentUser || currentUser.role !== 'WORKER') return undefined;
+        if (!currentUser.trackingEnabled) return undefined;
+        if (!navigator.geolocation) {
+            setWatchError('Geolocation is not supported on this browser.');
+            return undefined;
+        }
+
+        let socket;
+        const token = localStorage.getItem('userToken');
+        if (token) {
+            socket = io(getSocketOrigin(), {
+                auth: { token },
+                transports: ['websocket', 'polling']
+            });
+        }
+
+        const watchId = navigator.geolocation.watchPosition(
+            async (position) => {
+                setWatchError('');
+                const payload = {
+                    professionalId: currentUser.id,
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                if (socket) socket.emit('location_update', payload);
+                // Keep API persistence as backup
+                await updateProfessionalLocation(payload.lat, payload.lng);
+            },
+            (error) => {
+                setWatchError(error.message || 'Unable to access GPS location');
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 5000,
+                timeout: 15000
+            }
+        );
+
+        return () => {
+            navigator.geolocation.clearWatch(watchId);
+            if (socket) socket.disconnect();
+        };
+    }, [currentUser?.id, currentUser?.role, currentUser?.trackingEnabled]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -88,6 +136,9 @@ const Settings = () => {
                                 </button>
                             </div>
                         </div>
+                        {watchError && (
+                            <p className="text-[11px] font-bold text-rose-500">{watchError}</p>
+                        )}
                     </section>
 
                     <form onSubmit={handleSave} className="space-y-10">

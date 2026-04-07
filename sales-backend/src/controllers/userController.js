@@ -33,7 +33,7 @@ const getProfessionals = async (req, res) => {
                 earnings: completedCount * 150, // Real calculation based on completions
                 rating: w.rating || 0,
                 lastLocation: w.lat && w.lng ? { lat: w.lat, lng: w.lng } : null,
-                trackingEnabled: !!(w.lat && w.lng)
+                trackingEnabled: !!(w.isTrackingEnabled ?? (w.lat && w.lng))
             };
         }));
 
@@ -48,13 +48,100 @@ const updateLocation = async (req, res) => {
     try {
         const { lat, lng } = req.body;
         const userId = req.user.id;
+        const numLat = Number(lat);
+        const numLng = Number(lng);
+
+        if (Number.isNaN(numLat) || Number.isNaN(numLng)) {
+            return res.status(400).json({ success: false, message: 'lat and lng must be valid numbers' });
+        }
+
         const user = await prisma.user.update({
             where: { id: userId },
-            data: { lat, lng }
+            data: {
+                lat: numLat,
+                lng: numLng,
+                isTrackingEnabled: true
+            }
         });
-        res.status(200).json({ success: true, data: { lat: user.lat, lng: user.lng } });
+
+        // Realtime broadcast for admin live map
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            io.to('admin_live_map').emit('update_on_map', {
+                professionalId: user.id,
+                lat: user.lat,
+                lng: user.lng,
+                updatedAt: user.updatedAt,
+                trackingEnabled: !!user.isTrackingEnabled
+            });
+        } catch (socketErr) {
+            console.warn('Socket location emit skipped:', socketErr.message);
+        }
+
+        res.status(200).json({ success: true, data: { lat: user.lat, lng: user.lng, updatedAt: user.updatedAt } });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Location update failed' });
+    }
+};
+
+const getProfessionalsLocations = async (req, res) => {
+    try {
+        const workers = await prisma.user.findMany({
+            where: { role: 'WORKER' },
+            include: {
+                categories: { include: { category: true } },
+                jobs: {
+                    where: { status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] } },
+                    orderBy: { updatedAt: 'desc' },
+                    take: 1,
+                    include: {
+                        lead: {
+                            select: {
+                                latitude: true,
+                                longitude: true,
+                                location: true,
+                                guestName: true
+                            }
+                        },
+                        customer: { select: { name: true } }
+                    }
+                }
+            },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        const data = workers.map((w) => {
+            const activeJob = w.jobs?.[0] || null;
+            const customerLat = activeJob?.lead?.latitude ?? activeJob?.latitude ?? null;
+            const customerLng = activeJob?.lead?.longitude ?? activeJob?.longitude ?? null;
+            return {
+                id: w.id,
+                name: w.name,
+                category: w.categories?.[0]?.category?.name || 'General',
+                isAvailable: w.isAvailable,
+                onlineStatus: w.isAvailable ? 'Online' : 'Offline',
+                trackingEnabled: !!(w.isTrackingEnabled ?? false),
+                lat: w.lat,
+                lng: w.lng,
+                updatedAt: w.updatedAt,
+                currentJob: activeJob
+                    ? {
+                        id: activeJob.id,
+                        jobNo: activeJob.jobNo,
+                        location: activeJob.location || activeJob.lead?.location || null,
+                        customerName: activeJob.customer?.name || activeJob.guestName || activeJob.lead?.guestName || 'Customer',
+                        customerLat,
+                        customerLng
+                    }
+                    : null
+            };
+        });
+
+        res.status(200).json({ success: true, count: data.length, data });
+    } catch (error) {
+        console.error('Fetch professional locations error:', error);
+        res.status(500).json({ success: false, message: 'Failed to fetch professional locations' });
     }
 };
 
@@ -103,7 +190,7 @@ const createProfessional = async (req, res) => {
         });
 
         // 2. Map Category (find or create)
-        let cat = await prisma.category.findUnique({ where: { name: category } });
+        let cat = await prisma.category.findFirst({ where: { name: category } });
         if (!cat) {
             cat = await prisma.category.create({ data: { name: category } });
         }
@@ -146,7 +233,7 @@ const createProfessional = async (req, res) => {
 const updateProfessional = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, phone, category, status } = req.body;
+        const { name, email, phone, category, status, password } = req.body;
 
         console.log(`[ADMIN] Updating Professional: ${id}`, req.body);
 
@@ -190,6 +277,7 @@ const updateProfessional = async (req, res) => {
             if (city !== undefined) dataToUpdate.city = city;
             if (state !== undefined) dataToUpdate.state = state;
             if (pincode !== undefined) dataToUpdate.pincode = pincode;
+            // Performance Rating update (if editing a professional)
             if (req.body.rating !== undefined) dataToUpdate.rating = parseFloat(req.body.rating || 0);
 
             // Commission: admin only
@@ -198,20 +286,26 @@ const updateProfessional = async (req, res) => {
                 if (workerCommission !== undefined) dataToUpdate.workerCommission = parseInt(workerCommission);
             }
 
+            // ─── NEW: Support for Password Update ───
+            if (password && password.length > 0) {
+                const salt = await bcrypt.genSalt(10);
+                const hashedPassword = await bcrypt.hash(password, salt);
+                dataToUpdate.password = hashedPassword;
+            }
+
             // Perform the update
             const updatedUser = await tx.user.update({
                 where: { id },
                 data: dataToUpdate
             });
 
-            // Handle Category linking
+            // Handle Category linking manually (upsert requires unique field)
             if (category) {
-                const cat = await tx.category.upsert({
-                    where: { name: category },
-                    update: {},
-                    create: { name: category }
-                });
-
+                let cat = await tx.category.findFirst({ where: { name: category } });
+                if (!cat) {
+                    cat = await tx.category.create({ data: { name: category } });
+                }
+                
                 // Clear and Re-link (MySQL schema has a unique constraint on userId, categoryId)
                 await tx.workerCategory.deleteMany({ where: { userId: id } });
                 await tx.workerCategory.create({
@@ -284,7 +378,11 @@ const updateProfile = async (req, res) => {
             name, email, phone, address, city, state, pincode,
             isAvailable, password, businessName, bio,
             availability, experience, serviceRadius, location,
+<<<<<<< HEAD
             payoutSettings
+=======
+            trackingEnabled, isTrackingEnabled
+>>>>>>> da7126fea389b4b0cf15184dd30779983973d231
         } = req.body;
 
         const dataToUpdate = {
@@ -293,7 +391,10 @@ const updateProfile = async (req, res) => {
             state: state || (location ? location.split(',')[1]?.trim() : undefined),
             pincode, isAvailable, businessName, bio,
             availability, experience,
-            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined
+            serviceRadius: serviceRadius ? parseInt(serviceRadius) : undefined,
+            isTrackingEnabled: typeof isTrackingEnabled === 'boolean'
+                ? isTrackingEnabled
+                : (typeof trackingEnabled === 'boolean' ? trackingEnabled : undefined)
         };
 
         if (password && password.trim() !== '') {
@@ -483,6 +584,7 @@ const getDashboardStats = async (req, res) => {
 module.exports = {
     getProfessionals,
     updateLocation,
+    getProfessionalsLocations,
     toggleAvailability,
     createProfessional,
     updateProfessional,

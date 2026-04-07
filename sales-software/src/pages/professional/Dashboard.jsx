@@ -172,7 +172,7 @@ const Dashboard = () => {
                     <h2 className="text-lg font-bold text-gray-900 px-1">Job Locations</h2>
                 </div>
                 <div className="w-full rounded-2xl sm:rounded-[2.5rem] overflow-hidden shadow-sm border border-gray-100">
-                    <LeadMap leads={mapLeads} onAction={handleAction} />
+                    <LeadMap leads={mapLeads} onAction={handleAction} currentUser={currentUser} />
                 </div>
             </div>
 

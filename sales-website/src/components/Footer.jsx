@@ -52,6 +52,12 @@ const Footer = () => {
                       {item}
                     </a>
                   ))}
+                  <Link to="/become-professional" style={{ fontSize: 14, color: '#7C3AED', fontWeight: 700, textDecoration: 'none', transition: 'opacity 0.2s' }}
+                    onMouseEnter={e => e.target.style.opacity = '0.7'}
+                    onMouseLeave={e => e.target.style.opacity = '1'}
+                  >
+                    Join as Professional
+                  </Link>
                 </div>
               </div>
 

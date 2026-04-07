@@ -1,18 +1,234 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import io from 'socket.io-client';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { useMarketplace } from '../../context/MarketplaceContext';
-import { Search, Activity, Clock, User, Filter, MoreVertical, Navigation } from 'lucide-react';
+import { Search, Activity, Clock, Navigation, MoreVertical, Route } from 'lucide-react';
+import { getSocketOrigin } from '../../services/apiClient';
 
 const LiveTracking = () => {
-    const { professionals, locationLogs } = useMarketplace();
+    const {
+        currentUser,
+        professionalLocations,
+        refreshProfessionalLocations,
+        patchProfessionalLocationRealtime
+    } = useMarketplace();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPro, setSelectedPro] = useState(null);
+    const [mapError, setMapError] = useState('');
+    const [tokenInput, setTokenInput] = useState('');
+    const [routeInfo, setRouteInfo] = useState(null);
+    const [activeMapToken, setActiveMapToken] = useState(() => {
+        const fromEnv = import.meta.env.VITE_MAPBOX_TOKEN;
+        const fromLocal = localStorage.getItem('VITE_MAPBOX_TOKEN');
+        return fromEnv || fromLocal || '';
+    });
+    const mapContainerRef = useRef(null);
+    const mapRef = useRef(null);
+    const proMarkersRef = useRef({});
+    const customerMarkerRef = useRef(null);
+    const routeFetchTimerRef = useRef(null);
 
-    const trackedPros = professionals.filter(p => p.trackingEnabled);
-    
-    const filteredPros = trackedPros.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    const trackedPros = useMemo(
+        () => (professionalLocations || []).filter((p) => p.trackingEnabled && p.lat && p.lng),
+        [professionalLocations]
     );
+
+    const filteredPros = trackedPros.filter(p =>
+        (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    useEffect(() => {
+        if (!selectedPro?.id) return;
+        const fresh = trackedPros.find((p) => p.id === selectedPro.id);
+        if (fresh) setSelectedPro(fresh);
+    }, [trackedPros, selectedPro?.id]);
+
+    useEffect(() => {
+        if (!currentUser || currentUser.role !== 'ADMIN') return;
+        refreshProfessionalLocations();
+    }, [currentUser?.id, currentUser?.role, refreshProfessionalLocations]);
+
+    useEffect(() => {
+        if (!currentUser || currentUser.role !== 'ADMIN') return undefined;
+        const token = localStorage.getItem('userToken');
+        if (!token) return undefined;
+
+        const socket = io(getSocketOrigin(), {
+            auth: { token },
+            transports: ['websocket', 'polling']
+        });
+        socket.on('update_on_map', patchProfessionalLocationRealtime);
+        return () => {
+            socket.off('update_on_map', patchProfessionalLocationRealtime);
+            socket.disconnect();
+        };
+    }, [currentUser?.id, currentUser?.role, patchProfessionalLocationRealtime]);
+
+    useEffect(() => {
+        if (!mapContainerRef.current || mapRef.current) return;
+        const token = activeMapToken;
+        if (!token) {
+            setMapError('VITE_MAPBOX_TOKEN missing. Please add it in your environment to enable map.');
+            return;
+        }
+
+        mapboxgl.accessToken = token;
+        const map = new mapboxgl.Map({
+            container: mapContainerRef.current,
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [77.1025, 28.7041],
+            zoom: 4.5
+        });
+        map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        mapRef.current = map;
+
+        return () => {
+            map.remove();
+            mapRef.current = null;
+        };
+    }, [activeMapToken]);
+
+    const applyToken = () => {
+        const t = tokenInput.trim();
+        if (!t) return;
+        localStorage.setItem('VITE_MAPBOX_TOKEN', t);
+        setActiveMapToken(t);
+        setMapError('');
+    };
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map) return;
+
+        // Remove stale markers
+        Object.keys(proMarkersRef.current).forEach((id) => {
+            if (!trackedPros.some((p) => p.id === id)) {
+                proMarkersRef.current[id].remove();
+                delete proMarkersRef.current[id];
+            }
+        });
+
+        trackedPros.forEach((pro) => {
+            const lngLat = [pro.lng, pro.lat];
+            const marker = proMarkersRef.current[pro.id];
+            if (marker) {
+                marker.setLngLat(lngLat);
+            } else {
+                const el = document.createElement('div');
+                el.className = 'h-4 w-4 rounded-full border-2 border-white bg-blue-600 shadow';
+                const mk = new mapboxgl.Marker({ element: el })
+                    .setLngLat(lngLat)
+                    .setPopup(
+                        new mapboxgl.Popup({ offset: 12 }).setHTML(
+                            `<div style="font-size:12px"><b>${pro.name}</b><br/>${pro.category || 'General'}</div>`
+                        )
+                    )
+                    .addTo(map);
+                el.addEventListener('click', () => setSelectedPro(pro));
+                proMarkersRef.current[pro.id] = mk;
+            }
+        });
+    }, [trackedPros]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !selectedPro?.currentJob) {
+            if (customerMarkerRef.current) {
+                customerMarkerRef.current.remove();
+                customerMarkerRef.current = null;
+            }
+            if (map?.getLayer('pro-route-line')) map.removeLayer('pro-route-line');
+            if (map?.getSource('pro-route-line')) map.removeSource('pro-route-line');
+            setRouteInfo(null);
+            return;
+        }
+
+        const cLat = selectedPro.currentJob.customerLat;
+        const cLng = selectedPro.currentJob.customerLng;
+        if (typeof cLat !== 'number' || typeof cLng !== 'number') return;
+
+        if (customerMarkerRef.current) customerMarkerRef.current.remove();
+        const el = document.createElement('div');
+        el.className = 'h-4 w-4 rounded-full border-2 border-white bg-emerald-500 shadow';
+        customerMarkerRef.current = new mapboxgl.Marker({ element: el })
+            .setLngLat([cLng, cLat])
+            .setPopup(
+                new mapboxgl.Popup({ offset: 12 }).setHTML(
+                    `<div style="font-size:12px"><b>Customer</b><br/>${selectedPro.currentJob.customerName || ''}</div>`
+                )
+            )
+            .addTo(map);
+    }, [selectedPro?.id, selectedPro?.currentJob]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !activeMapToken) return;
+        if (!selectedPro?.currentJob) return;
+        if (typeof selectedPro.lat !== 'number' || typeof selectedPro.lng !== 'number') return;
+
+        const cLat = selectedPro.currentJob.customerLat;
+        const cLng = selectedPro.currentJob.customerLng;
+        if (typeof cLat !== 'number' || typeof cLng !== 'number') return;
+
+        const drawRoute = async () => {
+            try {
+                const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${selectedPro.lng},${selectedPro.lat};${cLng},${cLat}?geometries=geojson&overview=full&access_token=${activeMapToken}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                const route = data?.routes?.[0];
+                if (!route?.geometry) return;
+
+                const geojson = {
+                    type: 'Feature',
+                    geometry: route.geometry
+                };
+
+                if (map.getSource('pro-route-line')) {
+                    map.getSource('pro-route-line').setData(geojson);
+                } else {
+                    map.addSource('pro-route-line', { type: 'geojson', data: geojson });
+                    map.addLayer({
+                        id: 'pro-route-line',
+                        type: 'line',
+                        source: 'pro-route-line',
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: {
+                            'line-color': '#2563eb',
+                            'line-width': 4,
+                            'line-opacity': 0.85
+                        }
+                    });
+                }
+
+                const mins = Math.max(1, Math.round((route.duration || 0) / 60));
+                const kms = ((route.distance || 0) / 1000).toFixed(1);
+                setRouteInfo({ etaMins: mins, distanceKm: kms });
+            } catch (err) {
+                console.warn('Route fetch failed:', err.message);
+            }
+        };
+
+        drawRoute();
+        if (routeFetchTimerRef.current) clearInterval(routeFetchTimerRef.current);
+        routeFetchTimerRef.current = setInterval(drawRoute, 15000);
+
+        return () => {
+            if (routeFetchTimerRef.current) {
+                clearInterval(routeFetchTimerRef.current);
+                routeFetchTimerRef.current = null;
+            }
+        };
+    }, [selectedPro?.id, selectedPro?.lat, selectedPro?.lng, selectedPro?.currentJob, activeMapToken]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || trackedPros.length === 0) return;
+        const bounds = new mapboxgl.LngLatBounds();
+        trackedPros.forEach((p) => bounds.extend([p.lng, p.lat]));
+        map.fitBounds(bounds, { padding: 80, maxZoom: 14, duration: 800 });
+    }, [trackedPros.length]);
 
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col md:flex-row gap-6">
@@ -75,7 +291,7 @@ const LiveTracking = () => {
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <Navigation size={10} />
-                                    <span>{pro.lastLocation ? `${pro.lastLocation.lat.toFixed(3)}, ${pro.lastLocation.lng.toFixed(3)}` : 'Wait...'}</span>
+                                    <span>{typeof pro.lat === 'number' ? `${pro.lat.toFixed(3)}, ${pro.lng.toFixed(3)}` : 'Wait...'}</span>
                                 </div>
                             </div>
                         </button>
@@ -95,26 +311,39 @@ const LiveTracking = () => {
                 </div>
             </div>
 
-            {/* Right Side: Map Interace */}
+            {/* Right Side: Map Interface */}
             <div className="flex-1 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden relative group">
-                {/* Google Map Iframe */}
-                <iframe 
-                    src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d29447.82891851613!2d75.86119679999999!3d22.69184!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin!4v1775022608974!5m2!1sen!2sin" 
-                    width="100%" 
-                    height="100%" 
-                    style={{ border: 0 }} 
-                    allowFullScreen="" 
-                    loading="lazy" 
-                    referrerPolicy="no-referrer-when-downgrade"
-                    className="absolute inset-0 z-0"
-                ></iframe>
+                <div ref={mapContainerRef} className="absolute inset-0 z-0" />
+                {mapError && (
+                    <div className="absolute inset-0 z-20 bg-white/90 flex items-center justify-center p-6 text-center">
+                        <div className="max-w-md w-full space-y-3">
+                            <p className="text-sm font-bold text-rose-600">{mapError}</p>
+                            <p className="text-xs text-gray-500 font-medium">
+                                Mapbox token paste karo (starts with <span className="font-black">pk.</span>)
+                            </p>
+                            <input
+                                type="text"
+                                value={tokenInput}
+                                onChange={(e) => setTokenInput(e.target.value)}
+                                placeholder="Paste Mapbox public token here..."
+                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            />
+                            <button
+                                onClick={applyToken}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700"
+                            >
+                                Apply Token
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* UI Overlays */}
                 <div className="absolute top-6 left-6 flex gap-2">
                     <div className="px-4 py-2 bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white flex items-center gap-3">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                         <span className="text-xs font-black uppercase tracking-widest text-gray-700">
-                            {selectedPro?.city || trackedPros[0]?.city || 'Indore'} Live Cluster
+                            {selectedPro?.city || 'Live Tracking Cluster'}
                         </span>
                     </div>
                 </div>
@@ -153,18 +382,30 @@ const LiveTracking = () => {
                                 <div className="flex items-center gap-2">
                                     <Clock className="text-blue-500" size={14} />
                                     <span className="text-sm font-black text-gray-800">
-                                        {selectedPro.lastUpdate ? new Date(selectedPro.lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
+                                        {selectedPro.updatedAt ? new Date(selectedPro.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never'}
                                     </span>
                                 </div>
                             </div>
                         </div>
+                        {routeInfo && (
+                            <div className="mb-6 bg-blue-50 rounded-2xl border border-blue-100 p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Route size={14} className="text-blue-600" />
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-600">Live Route</span>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-black text-gray-900">{routeInfo.distanceKm} km</p>
+                                    <p className="text-[10px] font-bold text-gray-500">ETA ~ {routeInfo.etaMins} min</p>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex gap-3">
                             <button className="flex-1 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl hover:translate-y-[-2px] active:translate-y-0 transition-all">
                                 View Full Profile
                             </button>
-                            <button 
-                                onClick={() => window.location.href=`/admin/location-history?id=${selectedPro.id}`}
+                            <button
+                                onClick={() => window.location.href = `/admin/location-history?id=${selectedPro.id}`}
                                 className="px-6 py-4 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 hover:bg-blue-100 transition-colors"
                             >
                                 <Clock size={20} />
@@ -173,15 +414,16 @@ const LiveTracking = () => {
                     </div>
                 )}
 
-                {/* Map Controls */}
-                <div className="absolute top-6 right-6 flex flex-col gap-2">
-                    <button className="w-12 h-12 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors">
-                        <Filter size={18} />
-                    </button>
-                    <button className="w-12 h-12 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center text-blue-600 hover:bg-gray-50 transition-colors">
-                        <Navigation size={18} />
-                    </button>
-                </div>
+                {selectedPro?.currentJob && (
+                    <div className="absolute top-6 right-6 bg-white/95 backdrop-blur px-4 py-3 rounded-2xl shadow-lg border border-gray-100 max-w-xs z-20">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-1">Assigned Customer</p>
+                        <p className="text-xs font-bold text-gray-900">{selectedPro.currentJob.customerName}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">{selectedPro.currentJob.location || 'Location unavailable'}</p>
+                        {routeInfo && (
+                            <p className="text-[10px] font-bold text-blue-600 mt-1">ETA {routeInfo.etaMins} min · {routeInfo.distanceKm} km</p>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );
