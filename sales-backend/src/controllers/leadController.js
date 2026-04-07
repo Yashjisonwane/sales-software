@@ -471,7 +471,6 @@ const patchLeadLocation = async (req, res) => {
                 include: {
                     customer: { select: { name: true, phone: true, email: true } },
                     category: { select: { name: true } },
-                    preferredWorker: { select: { id: true, name: true, phone: true, rating: true } },
                     job: { select: { id: true, workerId: true, status: true, jobNo: true } },
                 },
             });
@@ -492,9 +491,17 @@ const patchLeadLocation = async (req, res) => {
             customerName: updated.customer?.name || updated.guestName || 'Valued Customer',
             customerEmail: updated.customer?.email || updated.guestEmail || '—',
             customerPhone: updated.customer?.phone || updated.guestPhone || '—',
+            preferredWorkerName: null,
             categoryName: updated.category?.name || 'Uncategorized',
             displayId: updated.leadNo,
         };
+        if (updated.preferredWorkerId) {
+            const pref = await prisma.user.findUnique({
+                where: { id: updated.preferredWorkerId },
+                select: { name: true },
+            });
+            out.preferredWorkerName = pref?.name || null;
+        }
         res.status(200).json({ success: true, data: out });
     } catch (err) {
         console.error('patchLeadLocation error:', err);
