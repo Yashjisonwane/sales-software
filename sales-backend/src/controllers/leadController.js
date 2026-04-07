@@ -132,13 +132,21 @@ const getLeads = async (req, res) => {
             include: {
                 customer: { select: { name: true, phone: true, email: true } },
                 category: { select: { name: true } },
-                preferredWorker: { select: { id: true, name: true, phone: true, rating: true } },
                 job: {
                     select: { id: true, workerId: true, status: true, jobNo: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
+
+        const preferredIds = [...new Set(leads.map((l) => l.preferredWorkerId).filter(Boolean))];
+        const preferredWorkers = preferredIds.length
+            ? await prisma.user.findMany({
+                  where: { id: { in: preferredIds } },
+                  select: { id: true, name: true, phone: true, rating: true },
+              })
+            : [];
+        const preferredWorkerMap = new Map(preferredWorkers.map((w) => [w.id, w]));
 
         const formattedLeads = leads.map(l => ({
             ...l,
@@ -148,7 +156,7 @@ const getLeads = async (req, res) => {
             guestEmail: l.guestEmail,
             guestPhone: l.guestPhone,
             preferredWorkerId: l.preferredWorkerId,
-            preferredWorkerName: l.preferredWorker?.name || null,
+            preferredWorkerName: preferredWorkerMap.get(l.preferredWorkerId)?.name || null,
             categoryName: l.category?.name || 'Uncategorized',
             displayId: l.leadNo
         }));
@@ -856,7 +864,6 @@ const getLeadById = async (req, res) => {
             include: {
                 customer: { select: { name: true, phone: true, email: true } },
                 category: { select: { name: true } },
-                preferredWorker: { select: { id: true, name: true, phone: true, rating: true } },
                 job: { select: { id: true, workerId: true, status: true, jobNo: true } },
             },
         });
@@ -868,9 +875,17 @@ const getLeadById = async (req, res) => {
             customerName: lead.customer?.name || lead.guestName || 'Valued Customer',
             customerEmail: lead.customer?.email || lead.guestEmail || '—',
             customerPhone: lead.customer?.phone || lead.guestPhone || '—',
+            preferredWorkerName: null,
             categoryName: lead.category?.name || 'Uncategorized',
             displayId: lead.leadNo,
         };
+        if (lead.preferredWorkerId) {
+            const pref = await prisma.user.findUnique({
+                where: { id: lead.preferredWorkerId },
+                select: { name: true },
+            });
+            data.preferredWorkerName = pref?.name || null;
+        }
         res.status(200).json({ success: true, data });
     } catch (error) {
         console.error('getLeadById error:', error);
