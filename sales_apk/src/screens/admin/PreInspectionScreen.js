@@ -18,7 +18,7 @@ import { submitInspection } from '../../api/apiService';
 
 const PreInspectionScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { job } = route.params || {};
+  const { job, role = 'admin' } = route.params || {};
   
   // Selection states
   const [issueType, setIssueType] = useState('New Installation');
@@ -27,6 +27,10 @@ const PreInspectionScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
 
   const handleInspect = async () => {
+    if (!job?.jobNo) {
+      Alert.alert('Job required', 'Inspection is saved against a job. Assign a worker to the lead first.');
+      return;
+    }
     setLoading(true);
     const triageAnswers = { issueType, urgency, damage };
     const notes = `Triage: ${issueType}, Urgency: ${urgency}, Damage: ${damage}`;
@@ -38,6 +42,7 @@ const PreInspectionScreen = ({ navigation, route }) => {
       // Pass back results to QuoteScope
       navigation.navigate('QuoteScope', { 
         job,
+        role,
         inspectionResults: {
            materials: [
              { name: 'HVAC Unit (3-Ton)', qty: 1 },
@@ -110,10 +115,16 @@ const PreInspectionScreen = ({ navigation, route }) => {
           </View>
 
           <View style={styles.triageBox}>
-            <Text style={styles.triageSectionTitle}>Issue Type</Text>
+            <Text style={styles.triageSectionTitle}>{role === 'worker' ? 'Technical Issue Type' : 'Issue Type'}</Text>
             <CheckItem label="New Installation" selected={issueType === 'New Installation'} onPress={() => setIssueType('New Installation')} />
             <CheckItem label="Repair" selected={issueType === 'Repair'} onPress={() => setIssueType('Repair')} />
             <CheckItem label="Replacement" selected={issueType === 'Replacement'} onPress={() => setIssueType('Replacement')} />
+            {role === 'worker' && (
+              <>
+                <CheckItem label="Diagnostic Only" selected={issueType === 'Diagnostic'} onPress={() => setIssueType('Diagnostic')} />
+                <CheckItem label="Warranty Claim" selected={issueType === 'Warranty'} onPress={() => setIssueType('Warranty')} />
+              </>
+            )}
           </View>
 
           <View style={styles.triageBox}>
@@ -122,28 +133,67 @@ const PreInspectionScreen = ({ navigation, route }) => {
             <CheckItem label="Medium" selected={urgency === 'Medium'} onPress={() => setUrgency('Medium')} color="#EAB308" />
             <CheckItem label="Urgent" selected={urgency === 'Urgent'} onPress={() => setUrgency('Urgent')} color="#EF4444" />
           </View>
+
+          {role === 'worker' && (
+            <View style={styles.triageBox}>
+              <Text style={styles.triageSectionTitle}>Job Difficulty (Technical)</Text>
+              <CheckItem label="Standard" selected={damage === 'Standard'} onPress={() => setDamage('Standard')} />
+              <CheckItem label="Complex (Custom tools needed)" selected={damage === 'Complex'} onPress={() => setDamage('Complex')} />
+              <CheckItem label="Critical (Requires support)" selected={damage === 'Critical'} onPress={() => setDamage('Critical')} />
+            </View>
+          )}
         </View>
+
+        {role === 'worker' && (
+          <View style={styles.card}>
+            <Text style={styles.cardHeaderTitle}>Site Access & Constraints</Text>
+            <View style={styles.accessRow}>
+              <TouchableOpacity style={[styles.accessTab, damage === 'restricted' && styles.accessTabActive]} onPress={() => setDamage('restricted')}>
+                <Ionicons name="lock-closed" size={18} color={damage === 'restricted' ? '#fff' : '#718096'} />
+                <Text style={[styles.accessText, damage === 'restricted' && styles.accessTextActive]}>Restricted</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.accessTab, damage === 'standard' && styles.accessTabActive]} onPress={() => setDamage('standard')}>
+                <Ionicons name="key" size={18} color={damage === 'standard' ? '#fff' : '#718096'} />
+                <Text style={[styles.accessText, damage === 'standard' && styles.accessTextActive]}>Standard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.accessTab, damage === 'easy' && styles.accessTabActive]} onPress={() => setDamage('easy')}>
+                <Ionicons name="checkmark-circle" size={18} color={damage === 'easy' ? '#fff' : '#718096'} />
+                <Text style={[styles.accessText, damage === 'easy' && styles.accessTextActive]}>Easy</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Camera Measuring Section */}
         <View style={styles.card}>
-          <Text style={styles.cardHeaderTitle}>Camera Measuring</Text>
-          <Text style={styles.cardSub}>Detect objects and spaces via camera.</Text>
+          <Text style={styles.cardHeaderTitle}>{role === 'worker' ? 'Technical Measurements' : 'Camera Measuring'}</Text>
+          <Text style={styles.cardSub}>
+            {role === 'worker' 
+              ? "Input precise measurements from the field for accurate material calculation." 
+              : "Detect objects and spaces via camera."}
+          </Text>
           
           <View style={styles.cameraBox}>
             <TouchableOpacity style={styles.openCameraBtn}>
               <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.openCameraBtnText}>Open AR Camera</Text>
+              <Text style={styles.openCameraBtnText}>{role === 'worker' ? 'Launch Scanning Tool' : 'Open AR Camera'}</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.measRow}>
-             <Text style={styles.measLab}>Wall Width</Text>
+             <Text style={styles.measLab}>{role === 'worker' ? 'Exact Wall Width' : 'Wall Width'}</Text>
              <Text style={styles.measVal}>12.4 ft</Text>
           </View>
           <View style={styles.measRow}>
-             <Text style={styles.measLab}>Ceiling Height</Text>
+             <Text style={styles.measLab}>{role === 'worker' ? 'Exact Ceiling Height' : 'Ceiling Height'}</Text>
              <Text style={styles.measVal}>9.1 ft</Text>
           </View>
+          {role === 'worker' && (
+            <View style={styles.measRow}>
+               <Text style={styles.measLab}>Substrate Condition</Text>
+               <Text style={styles.measVal}>Level (Ready)</Text>
+            </View>
+          )}
         </View>
 
         <TouchableOpacity 
@@ -230,6 +280,13 @@ const styles = StyleSheet.create({
 
   continueBtn: { width: '100%', height: 56, backgroundColor: '#0E56D0', borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
   continueBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  // Worker Access Styles
+  accessRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  accessTab: { flex: 1, height: 48, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  accessTabActive: { backgroundColor: '#0E56D0', borderColor: '#0E56D0' },
+  accessText: { fontSize: 13, color: '#718096', fontWeight: '600' },
+  accessTextActive: { color: '#fff' },
 });
 
 export default PreInspectionScreen;

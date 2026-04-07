@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,88 +7,44 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
-  TextInput,
-  Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
+import BusinessModuleBanner from '../../components/business/BusinessModuleBanner';
+import { getAdminMarketingFeed } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
 const CampaignsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('Campaigns');
+  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState([]);
+  const [feedNote, setFeedNote] = useState('');
 
   const tabs = ['Campaigns', 'Templates', 'Follow-Ups'];
 
-  const CampaignCard = ({ title, status, sent, opened, clicked, date }) => (
-    <View style={styles.campaignCard}>
-      <View style={styles.cardHeader}>
-        <View style={styles.titleSection}>
-          <Text style={styles.campaignTitle}>{title}</Text>
-          <Text style={styles.campaignDate}>Sent on {date}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: status === 'Active' ? '#ECFDF5' : '#F1F5F9' }]}>
-          <Text style={[styles.statusText, { color: status === 'Active' ? '#10B981' : '#64748B' }]}>{status}</Text>
-        </View>
-      </View>
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await getAdminMarketingFeed();
+    if (res.success && res.data) {
+      setActivities(res.data.activities || []);
+      setFeedNote(res.data.note || '');
+    } else setActivities([]);
+    setLoading(false);
+  }, []);
 
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statVal}>{sent}</Text>
-          <Text style={styles.statLab}>Sent</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statVal}>{opened}%</Text>
-          <Text style={styles.statLab}>Opened</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statVal}>{clicked}%</Text>
-          <Text style={styles.statLab}>Clicked</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.viewReportBtn}>
-        <Text style={styles.viewReportText}>View Detailed Report</Text>
-        <Ionicons name="arrow-forward" size={16} color="#0062E1" />
-      </TouchableOpacity>
-    </View>
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
   );
 
-  const TemplateItem = ({ title, type, lastUsed }) => (
-    <TouchableOpacity style={styles.templateItem}>
-      <View style={styles.templateIcon}>
-        <Ionicons name="document-text-outline" size={24} color="#6366F1" />
-      </View>
-      <View style={styles.templateInfo}>
-        <Text style={styles.templateTitle}>{title}</Text>
-        <Text style={styles.templateSub}>{type} • Last used {lastUsed}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={COLORS.textTertiary} />
-    </TouchableOpacity>
-  );
-
-  const FollowUpItem = ({ client, service, trigger, days }) => (
-    <View style={styles.followUpCard}>
-      <View style={styles.followUpHeader}>
-        <View style={styles.clientAvatar}>
-           <Text style={styles.avatarText}>{client[0]}</Text>
-        </View>
-        <View style={styles.followUpInfo}>
-          <Text style={styles.clientName}>{client}</Text>
-          <Text style={styles.serviceText}>{service}</Text>
-        </View>
-        <TouchableOpacity style={styles.editFollowUp}>
-          <Ionicons name="settings-outline" size={20} color={COLORS.textTertiary} />
-        </TouchableOpacity>
-      </View>
-      <View style={styles.triggerBox}>
-        <Ionicons name="flash-outline" size={16} color="#F59E0B" />
-        <Text style={styles.triggerText}>Trigger: {trigger} • After {days} days</Text>
-      </View>
-    </View>
-  );
+  const upgradeActivities = activities.filter((a) => a.kind === 'upgrade');
 
   return (
     <View style={styles.container}>
@@ -100,7 +56,7 @@ const CampaignsScreen = ({ navigation }) => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Email & Follow-Ups</Text>
-        <TouchableOpacity style={styles.plusBtn}>
+        <TouchableOpacity style={styles.plusBtn} onPress={() => Alert.alert('Campaigns', 'Email campaigns need an ESP integration. Use Activity tab for live DB events.')}>
           <Ionicons name="add" size={24} color={COLORS.white} />
         </TouchableOpacity>
       </View>
@@ -121,6 +77,10 @@ const CampaignsScreen = ({ navigation }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <BusinessModuleBanner
+          title="Sample campaigns & templates"
+          subtitle="Email stats below are illustrative. They can sync from your marketing or CRM tools when those are connected."
+        />
         {activeTab === 'Campaigns' && (
           <View>
             <Text style={styles.sectionTitle}>Recent Campaigns</Text>
@@ -179,7 +139,10 @@ const CampaignsScreen = ({ navigation }) => {
       </ScrollView>
 
       {/* Floating Action Button */}
-      <TouchableOpacity style={[styles.fab, { bottom: insets.bottom + 20 }]}>
+      <TouchableOpacity
+        style={[styles.fab, { bottom: insets.bottom + 20 }]}
+        onPress={() => Alert.alert('New campaign', 'Connect an email provider on the backend to create campaigns from the app.')}
+      >
         <Ionicons name="mail-outline" size={24} color={COLORS.white} />
         <Text style={styles.fabText}>New Campaign</Text>
       </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,14 @@ import {
   TextInput,
   Dimensions,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES, SHADOWS, FONTS } from '../../constants/theme';
+import BusinessModuleBanner from '../../components/business/BusinessModuleBanner';
+import { getAdminInventorySnapshot } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
@@ -19,14 +23,41 @@ const InventoryScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState('All');
   const filters = ['All', 'In Stock', 'Low Stock', 'Assigned to Jobs'];
+  const [searchText, setSearchText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [snapshotNote, setSnapshotNote] = useState('');
 
-  const inventoryItems = [
-    { id: '1', name: 'Copper Pipe ¾', category: 'Plumbing', remaining: '24 units', status: 'In Stock' },
-    { id: '2', name: 'Cement Bags', category: 'Building', remaining: '08 units', status: 'Low Stock' },
-    { id: '3', name: 'LED Strip Lights', category: 'Electrical', remaining: '24 units', status: 'Out of Stock' },
-    { id: '4', name: 'PVC Pipe – 2 inch', category: 'Plumbing', remaining: '101 units', status: 'In Stock' },
-    { id: '5', name: 'Electrical Wire – 100m', category: 'Electrical', remaining: '12 units', status: 'In Stock' },
-  ];
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await getAdminInventorySnapshot();
+    if (res.success && res.data) {
+      setInventoryItems(res.data.items || []);
+      setSnapshotNote(res.data.note || '');
+    } else setInventoryItems([]);
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const filteredItems = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return inventoryItems.filter((item) => {
+      const matchQ = !q || item.name.toLowerCase().includes(q) || (item.category || '').toLowerCase().includes(q);
+      if (!matchQ) return false;
+      if (activeFilter === 'All') return true;
+      if (activeFilter === 'In Stock') return item.status === 'In Stock';
+      if (activeFilter === 'Low Stock') return item.status === 'Low Stock';
+      if (activeFilter === 'Assigned to Jobs') return (item.quoteRefs || 0) > 0;
+      return true;
+    });
+  }, [inventoryItems, searchText, activeFilter]);
+
+  const lowCount = inventoryItems.filter((i) => i.status === 'Low Stock').length;
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -53,6 +84,10 @@ const InventoryScreen = ({ navigation }) => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <BusinessModuleBanner
+          title="From saved quotes"
+          subtitle={snapshotNote || 'Line items are aggregated from job estimates in your database — not warehouse stock.'}
+        />
 
         {/* Search Bar */}
         <View style={styles.searchContainer}>
@@ -61,6 +96,8 @@ const InventoryScreen = ({ navigation }) => {
             placeholder="Search here"
             placeholderTextColor="#94A3B8"
             style={styles.searchInput}
+            value={searchText}
+            onChangeText={setSearchText}
           />
           <TouchableOpacity>
             <Ionicons name="mic-outline" size={20} color="#64748B" />
@@ -92,45 +129,56 @@ const InventoryScreen = ({ navigation }) => {
               <View style={[styles.statIconBg, { backgroundColor: '#F0F7FF' }]}>
                 <Ionicons name="build-outline" size={20} color="#0062E1" />
               </View>
-              <Text style={styles.statValue}>342</Text>
-              <Text style={styles.statLabel}>Total Parts</Text>
+              <Text style={styles.statValue}>{inventoryItems.length}</Text>
+              <Text style={styles.statLabel}>Line items</Text>
             </View>
 
             <View style={styles.statItem}>
               <View style={[styles.statIconBg, { backgroundColor: '#F0FDF4' }]}>
-                <Ionicons name="logo-usd" size={20} color="#16A34A" />
+                <Ionicons name="document-text-outline" size={20} color="#16A34A" />
               </View>
-              <Text style={styles.statValue}>$42,800</Text>
-              <Text style={styles.statLabel}>Total Value</Text>
+              <Text style={styles.statValue}>
+                {inventoryItems.reduce((s, i) => s + (i.quoteRefs || 0), 0)}
+              </Text>
+              <Text style={styles.statLabel}>Quote refs</Text>
             </View>
 
             <View style={styles.statItem}>
               <View style={[styles.statIconBg, { backgroundColor: '#FFF7ED' }]}>
                 <Ionicons name="warning-outline" size={20} color="#D97706" />
               </View>
-              <Text style={styles.statValue}>18</Text>
-              <Text style={styles.statLabel}>Low Stock</Text>
+              <Text style={styles.statValue}>{lowCount}</Text>
+              <Text style={styles.statLabel}>Low (qty)</Text>
             </View>
           </View>
         </View>
 
         {/* Parts List */}
         <Text style={styles.sectionTitle}>All Parts</Text>
-        {inventoryItems.map(item => {
-          const statusStyle = getStatusStyle(item.status);
-          return (
-            <TouchableOpacity key={item.id} style={styles.partItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.partName}>{item.name}</Text>
-                <Text style={styles.partCategory}>{item.category}</Text>
-                <Text style={styles.partUnits}>{item.remaining} remaining</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status}</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        {loading ? (
+          <ActivityIndicator color="#0062E1" style={{ marginTop: 24 }} />
+        ) : filteredItems.length === 0 ? (
+          <Text style={{ color: COLORS.textTertiary, marginTop: 8 }}>No materials found in estimates yet.</Text>
+        ) : (
+          filteredItems.map((item) => {
+            const statusStyle = getStatusStyle(item.status);
+            return (
+              <TouchableOpacity key={item.id} style={styles.partItem}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.partName}>{item.name}</Text>
+                  <Text style={styles.partCategory}>{item.category}</Text>
+                  <Text style={styles.partUnits}>
+                    {item.remaining}
+                    {item.quoteRefs ? ` · ${item.quoteRefs} quotes` : ''}
+                  </Text>
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+                  <Text style={[styles.statusText, { color: statusStyle.text }]}>{item.status}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>

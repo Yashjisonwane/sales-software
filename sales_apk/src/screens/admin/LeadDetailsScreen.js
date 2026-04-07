@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
+import { getLeadById } from '../../api/apiService';
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import Animated, { 
   useAnimatedStyle, 
@@ -28,8 +29,64 @@ const MetricBox = ({ label, value, color = COLORS.textPrimary }) => (
   </View>
 );
 
-export default function LeadDetailsScreen({ navigation }) {
+function leadApiToView(lead) {
+  if (!lead) return null;
+  const pref = lead.preferredWorker;
+  return {
+    id: lead.job?.id || lead.id,
+    customerName: lead.customerName || lead.clientName || 'Unknown',
+    clientName: lead.customerName || lead.clientName,
+    amount: lead.job ? undefined : null,
+    categoryName: lead.categoryName || 'Service',
+    status: lead.status || 'New',
+    scheduledTime: lead.preferredDate
+      ? new Date(lead.preferredDate).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Not set',
+    location: lead.location || 'No address',
+    address: lead.location,
+    worker: pref
+      ? { name: pref.name, profession: 'Preferred pro' }
+      : null,
+    jobNo: lead.job?.jobNo,
+    leadNo: lead.displayId || lead.leadNo,
+  };
+}
+
+export default function LeadDetailsScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const rawJob = route.params?.job;
+  const leadIdParam = route.params?.leadId;
+
+  const initialView = useMemo(() => {
+    if (!rawJob) return null;
+    const merged = {
+      ...rawJob,
+      customerName: rawJob.customerName || rawJob.clientName || 'Unknown',
+    };
+    return merged;
+  }, [rawJob]);
+
+  const [jobView, setJobView] = useState(initialView);
+
+  useEffect(() => {
+    setJobView(initialView);
+  }, [initialView]);
+
+  useEffect(() => {
+    const id = leadIdParam || (rawJob?.id && !rawJob?.jobNo ? rawJob.id : null);
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      const res = await getLeadById(id);
+      if (cancelled || !res.success || !res.data) return;
+      const v = leadApiToView(res.data);
+      if (v) setJobView((prev) => ({ ...prev, ...v }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leadIdParam, rawJob?.id, rawJob?.leadNo, rawJob?.jobNo]);
+
   const bottomSheetRef = React.useRef(null);
   const snapPoints = React.useMemo(() => ['18%', '40%', '92%'], []);
   const animatedIndex = useSharedValue(0);
@@ -87,28 +144,40 @@ export default function LeadDetailsScreen({ navigation }) {
           <View style={styles.mainCardContent}>
             <View style={styles.mainHeader}>
               <View>
-                <Text style={styles.customerName}>{route.params?.job?.customerName || route.params?.job?.clientName || 'Unknown Job'}</Text>
-                <Text style={styles.jobId}>Job ID #{route.params?.job?.id?.slice(-4).toUpperCase() || '1000'}</Text>
+                <Text style={styles.customerName}>{jobView?.customerName || jobView?.clientName || 'Unknown Job'}</Text>
+                <Text style={styles.jobId}>
+                  {(jobView?.jobNo && `Job #${jobView.jobNo}`) ||
+                    (jobView?.leadNo && `Lead #${jobView.leadNo}`) ||
+                    (jobView?.id && `ID #${String(jobView.id).slice(-4).toUpperCase()}`) ||
+                    'Details'}
+                </Text>
               </View>
-              <Text style={styles.priceText}>${route.params?.job?.amount || '450'}</Text>
+              <Text style={styles.priceText}>
+                {(() => {
+                  const a = jobView?.estimate?.amount ?? jobView?.invoice?.amount ?? jobView?.amount;
+                  return a != null && a !== ''
+                    ? `$${Number(a).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : '—';
+                })()}
+              </Text>
             </View>
 
             <View style={styles.badgeRow}>
               <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}>
-                <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{route.params?.job?.categoryName || 'Service'}</Text>
+                <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{jobView?.categoryName || 'Service'}</Text>
               </View>
               <View style={[styles.badge, { backgroundColor: '#EFF6FF' }]}>
-                <Text style={[styles.badgeText, { color: '#0062E1' }]}>{route.params?.job?.status || 'New'}</Text>
+                <Text style={[styles.badgeText, { color: '#0062E1' }]}>{jobView?.status || 'New'}</Text>
               </View>
             </View>
 
             <View style={styles.infoRow}>
               <Ionicons name="time-outline" size={18} color={COLORS.textTertiary} />
-              <Text style={styles.infoText}>{route.params?.job?.scheduledTime || 'Not set'}</Text>
+              <Text style={styles.infoText}>{jobView?.scheduledTime || 'Not set'}</Text>
             </View>
             <View style={styles.infoRow}>
               <Ionicons name="location-outline" size={18} color={COLORS.textTertiary} />
-              <Text style={styles.infoText}>{route.params?.job?.location || route.params?.job?.address || 'No address'}</Text>
+              <Text style={styles.infoText}>{jobView?.location || jobView?.address || 'No address'}</Text>
             </View>
 
             <Text style={styles.sectionTitle}>Job Photos</Text>
@@ -124,19 +193,19 @@ export default function LeadDetailsScreen({ navigation }) {
             </View>
 
             {/* Assigned Worker Section */}
-            {route.params?.job?.worker && (
+            {jobView?.worker && (
               <>
                 <Text style={styles.sectionTitle}>Assigned Worker</Text>
                 <View style={styles.workerCard}>
                   <View style={styles.workerHeader}>
                     <View style={styles.workerAvatar}>
-                      <Text style={styles.avatarText}>{route.params?.job?.worker?.name?.charAt(0) || 'W'}</Text>
+                      <Text style={styles.avatarText}>{jobView.worker?.name?.charAt(0) || 'W'}</Text>
                     </View>
                     <View style={styles.workerInfo}>
-                      <Text style={styles.workerName}>{route.params?.job?.worker?.name}</Text>
+                      <Text style={styles.workerName}>{jobView.worker?.name}</Text>
                       <View style={styles.badgeRow}>
                         <View style={[styles.badge, { backgroundColor: '#F5F3FF' }]}>
-                          <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{route.params?.job?.worker?.profession || 'Pro'}</Text>
+                          <Text style={[styles.badgeText, { color: '#8B5CF6' }]}>{jobView.worker?.profession || 'Pro'}</Text>
                         </View>
                         <View style={[styles.badge, { backgroundColor: '#ECFDF5' }]}>
                           <Text style={[styles.badgeText, { color: '#10B981' }]}>Active</Text>

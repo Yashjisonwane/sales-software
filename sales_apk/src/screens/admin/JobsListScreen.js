@@ -126,19 +126,19 @@ const JobCard = ({ name, id, tag, time, images, address, jobType, onPress }) => 
         <TouchableOpacity style={styles.actionBtn}>
           <View style={styles.actionIconBg}>
             <Ionicons name="navigate-outline" size={18} color="#0E56D0" />
-            <Text style={[styles.actionBtnText, { color: '#0E56D0' }]}>Directions</Text>
+            <Text style={[styles.actionBtnText, { color: '#0E56D0' }]} numberOfLines={1}>Directions</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn}>
           <View style={styles.actionIconBg}>
             <Ionicons name="call-outline" size={18} color="#0E56D0" />
-            <Text style={[styles.actionBtnText, { color: '#0E56D0' }]}>Call</Text>
+            <Text style={[styles.actionBtnText, { color: '#0E56D0' }]} numberOfLines={1}>Call</Text>
           </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn}>
           <View style={styles.actionIconBg}>
             <Ionicons name="chatbubble-outline" size={18} color="#0E56D0" />
-            <Text style={[styles.actionBtnText, { color: '#0E56D0' }]}>Chat</Text>
+            <Text style={[styles.actionBtnText, { color: '#0E56D0' }]} numberOfLines={1}>Chat</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -470,8 +470,24 @@ const styles = StyleSheet.create({
   jobSubText: { fontSize: 13, color: '#718096', marginBottom: 12 },
   jobType: { fontSize: 14, fontWeight: '700', color: '#0E56D0' },
   jobTime: { fontSize: 12, color: '#718096' },
-  jobActions: { flexDirection: 'row', gap: 8, marginTop: 16, pt: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  actionBtn: { flex: 1 },
-  actionIconBg: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 44, backgroundColor: '#F0F7FF', borderRadius: 12 },
-  actionBtnText: { fontSize: 11, fontWeight: '700' },
+  jobActions: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  actionBtn: { flex: 1, minWidth: 0 },
+  actionIconBg: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    minHeight: 44,
+    paddingHorizontal: 4,
+    backgroundColor: '#F0F7FF',
+    borderRadius: 12,
+  },
+  actionBtnText: { fontSize: 10, fontWeight: '700', flexShrink: 1 },
 });

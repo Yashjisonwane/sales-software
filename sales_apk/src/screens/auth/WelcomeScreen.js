@@ -12,10 +12,10 @@ export default function WelcomeScreen({ navigation }) {
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <View style={styles.content}>
-        <Image 
-          source={require('../../../assets/Logo.png')} 
-          style={styles.logo} 
-          resizeMode="contain" 
+        <Image
+          source={require('../../../assets/Logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
         />
       </View>
 
@@ -32,6 +32,14 @@ export default function WelcomeScreen({ navigation }) {
           onPress={() => navigation.navigate('Login')}
         >
           <Text style={styles.loginText}>Log In</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.guestBtn}
+          onPress={() => navigation.navigate('GuestMapHome')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.guestText}>Continue as Guest</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -81,6 +89,20 @@ const styles = StyleSheet.create({
   },
   loginText: {
     color: '#1A202C',
+    fontSize: 16,
+    fontFamily: FONTS.bold,
+  },
+  guestBtn: {
+    height: 56,
+    borderRadius: 30,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#0E56D0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestText: {
+    color: '#0E56D0',
     fontSize: 16,
     fontFamily: FONTS.bold,
   },

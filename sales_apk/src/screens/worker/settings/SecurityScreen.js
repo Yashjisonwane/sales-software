@@ -7,26 +7,38 @@ import {
   ScrollView,
   StatusBar,
   Switch,
-  Dimensions,
+  Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  getBiometricPrefEnabled,
+  setBiometricPrefEnabled,
+  getBiometricActionLabels,
+  getStoredCredentials,
+} from '../../../api/biometricLogin';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SHADOWS, SIZES } from '../../../constants/theme';
-
-const { width } = Dimensions.get('window');
+import { COLORS, SHADOWS } from '../../../constants/theme';
 
 const SecurityScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [isBiometricEnabled, setBiometricEnabled] = React.useState(true);
-  const [isTwoFactorEnabled, setTwoFactorEnabled] = React.useState(false);
+  const [isBiometricEnabled, setBiometricEnabled] = React.useState(false);
+  const [bioSettingsLabels, setBioSettingsLabels] = React.useState({
+    settingsTitle: 'Fingerprint & Face login',
+    settingsSubtitle: 'Fingerprint or Face ID on the login screen',
+  });
 
-  const SecurityOption = ({ icon, title, sub, onPress, type = 'chevron' }) => (
-    <TouchableOpacity
-      style={styles.optionItem}
-      onPress={onPress}
-      disabled={type === 'switch'}
-      activeOpacity={0.7}
-    >
+  React.useEffect(() => {
+    getBiometricPrefEnabled().then(setBiometricEnabled);
+  }, []);
+
+  React.useEffect(() => {
+    getBiometricActionLabels().then((l) =>
+      setBioSettingsLabels({ settingsTitle: l.settingsTitle, settingsSubtitle: l.settingsSubtitle })
+    );
+  }, []);
+
+  const SecurityOption = ({ icon, title, sub, type = 'switch' }) => (
+    <TouchableOpacity style={styles.optionItem} disabled={type === 'switch'} activeOpacity={0.7}>
       <View style={styles.optionIconContainer}>
         <Ionicons name={icon} size={22} color="#0E56D0" />
       </View>
@@ -34,12 +46,23 @@ const SecurityScreen = ({ navigation }) => {
         <Text style={styles.optionTitle}>{title}</Text>
         <Text style={styles.optionSub}>{sub}</Text>
       </View>
-      {type === 'chevron' ? (
-        <Ionicons name="chevron-forward" size={18} color="#CBD5E0" />
-      ) : type === 'switch' ? (
+      {type === 'switch' ? (
         <Switch
-          value={title === 'Biometric Login' ? isBiometricEnabled : isTwoFactorEnabled}
-          onValueChange={(val) => title === 'Biometric Login' ? setBiometricEnabled(val) : setTwoFactorEnabled(val)}
+          value={isBiometricEnabled}
+          onValueChange={async (val) => {
+            setBiometricEnabled(val);
+            await setBiometricPrefEnabled(val);
+            if (val) {
+              const l = await getBiometricActionLabels();
+              const hasCreds = !!(await getStoredCredentials());
+              Alert.alert(
+                l.settingsTitle,
+                hasCreds
+                  ? `Fingerprint works on the worker login screen. If you sign out, you can sign back in with password or fingerprint.`
+                  : `After your next successful sign-in with email and password, you can use ${l.settingsSubtitle.toLowerCase()}.`
+              );
+            }
+          }}
           trackColor={{ false: '#E2E8F0', true: '#3B82F6' }}
           thumbColor={COLORS.white}
         />
@@ -51,7 +74,6 @@ const SecurityScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
@@ -63,55 +85,27 @@ const SecurityScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.introCard}>
           <View style={styles.introIcon}>
-            <Ionicons name="shield-checkmark" size={40} color="#0E56D0" />
+            <Ionicons name="finger-print-outline" size={40} color="#0E56D0" />
           </View>
-          <Text style={styles.introTitle}>Secure Your Account</Text>
-          <Text style={styles.introSub}>Manage your login methods and protect your personal data.</Text>
+          <Text style={styles.introTitle}>Login methods</Text>
+          <Text style={styles.introSub}>
+            Choose how you unlock the app on this device after you sign out.
+          </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Login Methods</Text>
           <View style={styles.sectionCard}>
             <SecurityOption
-              icon="key-outline"
-              title="Change Password"
-              sub="Last changed 3 months ago"
-              onPress={() => { }}
-            />
-            <View style={styles.divider} />
-            <SecurityOption
               icon="finger-print-outline"
-              title="Biometric Login"
-              sub="FaceID or TouchID"
+              title={bioSettingsLabels.settingsTitle}
+              sub={bioSettingsLabels.settingsSubtitle}
               type="switch"
             />
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Advanced Security</Text>
-          <View style={styles.sectionCard}>
-            <SecurityOption
-              icon="phone-portrait-outline"
-              title="Two-Factor Auth"
-              sub="Secure your account with SMS"
-              type="switch"
-            />
-            <View style={styles.divider} />
-            <SecurityOption
-              icon="log-out-outline"
-              title="Manage Devices"
-              sub="Currently 2 active devices"
-              onPress={() => { }}
-            />
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.deleteBtn}>
-          <Text style={styles.deleteText}>Deactivate Account</Text>
-        </TouchableOpacity>
-
-        <View style={{ height: 40 }} />
+        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   );
@@ -139,7 +133,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
     ...SHADOWS.medium,
   },
   introIcon: {
@@ -154,7 +148,7 @@ const styles = StyleSheet.create({
   introTitle: { fontSize: 20, fontWeight: '800', color: '#1A202C' },
   introSub: { fontSize: 14, color: '#718096', textAlign: 'center', marginTop: 8, lineHeight: 20 },
 
-  section: { marginBottom: 24 },
+  section: { marginBottom: 8 },
   sectionTitle: { fontSize: 16, fontWeight: '800', color: '#1A202C', marginBottom: 12, marginLeft: 4 },
   sectionCard: {
     backgroundColor: '#FFFFFF',
@@ -181,14 +175,6 @@ const styles = StyleSheet.create({
   optionTextContainer: { flex: 1 },
   optionTitle: { fontSize: 15, fontWeight: '700', color: '#1A202C' },
   optionSub: { fontSize: 12, color: '#A0AEC0', marginTop: 2 },
-  divider: { height: 1, backgroundColor: '#F1F5F9', marginLeft: 60 },
-
-  deleteBtn: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  deleteText: { fontSize: 14, fontWeight: '700', color: '#EF4444' },
 });
 
 export default SecurityScreen;

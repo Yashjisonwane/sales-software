@@ -52,7 +52,7 @@ const StepIndicator = ({ currentStep }) => {
     );
 };
 
-export default function CreateQuoteScreen({ navigation }) {
+export default function CreateQuoteScreen({ navigation, route }) {
     const insets = useSafeAreaInsets();
     const [step, setStep] = useState(0);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -62,6 +62,10 @@ export default function CreateQuoteScreen({ navigation }) {
     const job = route.params?.job || {};
 
     const handleSendQuote = async () => {
+        if (!job?.jobNo) {
+            Alert.alert('Job required', 'Assign a worker first so this lead becomes a job, then send the quote.');
+            return;
+        }
         setLoading(true);
         const res = await createEstimate(job.id, amount, description);
         setLoading(false);

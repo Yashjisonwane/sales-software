@@ -187,7 +187,7 @@ export default function MyRequestsScreen({ navigation }) {
                   <View style={styles.cardActions}>
                     <TouchableOpacity
                       style={styles.chatBtn}
-                      onPress={() => navigation.navigate('WorkerChat')}
+                      onPress={() => navigation.navigate('WorkerTabs', { screen: 'Inbox' })}
                     >
                       <Ionicons name="chatbubble" size={14} color={COLORS.primary} />
                       <Text style={styles.chatBtnText}>Chat</Text>

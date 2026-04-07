@@ -8,6 +8,7 @@ import { CommonActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import storage from '../../api/storage';
+import { clearBiometricSessionOnLogout } from '../../api/biometricLogin';
 import { getProfile } from '../../api/apiService';
 
 const MODULES = [
@@ -16,7 +17,7 @@ const MODULES = [
     title: 'Data Analytics Dashboard',
     desc: 'Revenue, close rate, team performance tracking.',
     icon: 'bar-chart-outline',
-    screen: 'Explore'
+    screen: 'DataAnalytics'
   },
   {
     id: 'sub-accounts',
@@ -52,6 +53,20 @@ const MODULES = [
     desc: 'Real-time updates for jobs, approvals, payments, and activity.',
     icon: 'notifications-outline',
     screen: 'AdminNotifications'
+  },
+  {
+    id: 'earnings',
+    title: 'Revenue & payouts',
+    desc: 'Paid invoice totals — same numbers as the web dashboard.',
+    icon: 'cash-outline',
+    screen: 'Earnings'
+  },
+  {
+    id: 'reviews-all',
+    title: 'All customer reviews',
+    desc: 'Every review in the database across workers.',
+    icon: 'star-outline',
+    screen: 'AdminReviews'
   }
 ];
 
@@ -77,6 +92,7 @@ export default function AdminProfileScreen({ navigation }) {
         onPress: async () => {
           await storage.removeItem('userToken');
           await storage.removeItem('userData');
+          await clearBiometricSessionOnLogout();
           navigation.dispatch(CommonActions.reset({ 
             index: 0, 
             routes: [{ name: 'Welcome' }] 

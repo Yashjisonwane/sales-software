@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -11,6 +12,7 @@ import {
   ActivityIndicator,
   Share,
   Linking,
+  ScrollView,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import BottomSheet, { BottomSheetScrollView, BottomSheetFooter } from '@gorhom/bottom-sheet';
@@ -18,9 +20,12 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { SHADOWS, COLORS } from '../../constants/theme';
-import { getJobHistory, uploadJobPhoto } from '../../api/apiService';
+import { getJobById, getJobHistory, uploadJobPhoto } from '../../api/apiService';
+import storage from '../../api/storage';
 
 const { width, height } = Dimensions.get('window');
+const JOB_DETAIL_ACTION_SIZE = 44;
+const JOB_DETAIL_ACTION_GAP = 10;
 
 const JobDetailsScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -29,6 +34,7 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('Updates'); // Set to Updates as frequently requested
   const [history, setHistory] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [viewerRole, setViewerRole] = useState('ADMIN');
 
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['45%', '92%'], []);
@@ -74,14 +80,46 @@ const JobDetailsScreen = ({ navigation, route }) => {
     </html>
   `;
 
+  const isBackendJob = Boolean(job.jobNo);
+
   React.useEffect(() => {
-    fetchHistory();
-  }, [job.id]);
+    (async () => {
+      try {
+        const raw = await storage.getItem('userData');
+        if (raw) {
+          const u = JSON.parse(raw);
+          if (u?.role) setViewerRole(String(u.role).toUpperCase());
+        }
+      } catch (_) {}
+    })();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const rid = route.params?.job?.id;
+      if (!rid) {
+        setHistory([]);
+        return undefined;
+      }
+      let cancelled = false;
+      (async () => {
+        const res = await getJobById(rid);
+        if (!cancelled && res.success && res.data) {
+          setJob((prev) => ({ ...prev, ...res.data, photos: res.data.photos ?? prev.photos }));
+        }
+        const h = await getJobHistory(rid);
+        if (!cancelled && h.success) setHistory(h.data || []);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [route.params?.job?.id])
+  );
 
   const fetchHistory = async () => {
     if (!job.id) return;
     const res = await getJobHistory(job.id);
-    if (res.success) setHistory(res.data);
+    if (res.success) setHistory(res.data || []);
   };
 
   const handleCall = () => {
@@ -102,6 +140,10 @@ const JobDetailsScreen = ({ navigation, route }) => {
   };
 
   const handleAddPhoto = async () => {
+    if (!isBackendJob) {
+      Alert.alert('Assign first', 'Photos can be added after this lead becomes a job (assign a worker).');
+      return;
+    }
     Alert.alert(
       "Add Photo",
       "Choose from gallery or take a new photo with camera.",
@@ -137,10 +179,12 @@ const JobDetailsScreen = ({ navigation, route }) => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setUploading(true);
         const photoUri = result.assets[0].uri;
-        const res = await uploadJobPhoto(job.id, photoUri);
-        
+        const photoType = viewerRole === 'WORKER' ? 'PROGRESS' : 'SITE';
+        const res = await uploadJobPhoto(job.id, photoUri, photoType);
+
         if (res.success) {
-          const newPhotos = [...(job.photos || []), { id: Date.now().toString(), url: photoUri }];
+          const created = res.data;
+          const newPhotos = [...(job.photos || []), ...(created ? [created] : [{ id: Date.now().toString(), url: photoUri }])];
           setJob({ ...job, photos: newPhotos });
           fetchHistory();
           Alert.alert("Success", "Photo added successfully");
@@ -157,24 +201,53 @@ const JobDetailsScreen = ({ navigation, route }) => {
 
   const renderFooter = useCallback(
     (props) => (
-      <BottomSheetFooter {...props} bottomInset={insets.bottom + 10}>
-        <View style={styles.footerContainer}>
-          <TouchableOpacity 
-            style={styles.assignBtn}
-            onPress={() => navigation.navigate('AssignJob', { job })}
-          >
-            <Text style={styles.btnText}>Assign</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.quoteBtn}
-            onPress={() => navigation.navigate('QuoteScope', { job })}
-          >
-            <Text style={styles.btnText}>Create Quote</Text>
-          </TouchableOpacity>
+      <BottomSheetFooter {...props} bottomInset={Math.max(insets.bottom, 12)}>
+        <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          <View style={styles.footerRow}>
+            <TouchableOpacity
+              style={styles.assignBtn}
+              onPress={() => navigation.navigate('AssignJob', { job })}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.btnText} numberOfLines={1}>
+                Assign
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quoteBtn}
+              onPress={() => navigation.navigate('QuoteScope', { job })}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.btnText} numberOfLines={1}>
+                Quote
+              </Text>
+            </TouchableOpacity>
+            {isBackendJob && job.id ? (
+              <TouchableOpacity
+                style={[
+                  styles.invoiceBtn,
+                  viewerRole === 'WORKER' && !job.estimate && styles.invoiceBtnDisabled,
+                ]}
+                disabled={viewerRole === 'WORKER' && !job.estimate}
+                onPress={() => {
+                  if (viewerRole === 'WORKER' && !job.estimate) {
+                    Alert.alert('Pehle quote', 'Worker ke liye pehle quote save karo, phir invoice bana sakte ho.');
+                    return;
+                  }
+                  navigation.navigate('CreateInvoice', { job });
+                }}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnText} numberOfLines={1}>
+                  Invoice
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
       </BottomSheetFooter>
     ),
-    [job, insets.bottom]
+    [job, insets.bottom, navigation]
   );
 
   const tabs = ['Job Details', 'Description', 'Photos', 'Updates'];
@@ -182,6 +255,9 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const renderJobDetails = () => (
     <View style={styles.detailsList}>
       <InfoRow label="Service Type" value={job.categoryName || 'General Service'} />
+      {job.estimate?.amount != null ? (
+        <InfoRow label="Saved quote" value={`$${Number(job.estimate.amount).toFixed(2)}`} />
+      ) : null}
       <InfoRow label="Assigned To" value={job.workerName || 'Not Assigned'} />
       <InfoRow label="Scheduled Date" value={job.scheduledDate ? new Date(job.scheduledDate).toLocaleDateString() : 'TBD'} />
       <InfoRow label="Scheduled Time" value={job.scheduledTime || 'TBD'} />
@@ -287,32 +363,81 @@ const JobDetailsScreen = ({ navigation, route }) => {
           <View style={styles.mainInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.workerName}>{job.customerName || 'Active Job'}</Text>
-              <View style={[styles.newBadge, { backgroundColor: '#F5F3FF' }]}>
-                <Text style={styles.newBadgeText}>New</Text>
+              <View
+                style={[
+                  styles.newBadge,
+                  { backgroundColor: job.status === 'ESTIMATED' ? '#EFF6FF' : '#F5F3FF' },
+                ]}
+              >
+                <Text style={styles.newBadgeText}>{job.status === 'ESTIMATED' ? 'Quoted' : 'New'}</Text>
               </View>
-              <Text style={styles.priceText}>$0 <Text style={styles.budgetText}>Budget</Text></Text>
+              <Text style={styles.priceText}>
+                {job.estimate?.amount != null
+                  ? `$${Number(job.estimate.amount).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  : '$0'}
+                <Text style={styles.budgetText}>{job.estimate?.amount != null ? ' Quote' : ' Budget'}</Text>
+              </Text>
             </View>
+            {job.estimate?.id ? (
+              <TouchableOpacity
+                style={styles.viewQuoteLink}
+                onPress={() =>
+                  navigation.navigate('QuoteDetails', {
+                    quote: job.estimate,
+                    job,
+                    customerName: job.customerName,
+                    categoryName: job.categoryName,
+                    role: 'admin',
+                  })
+                }
+              >
+                <Text style={styles.viewQuoteLinkText}>View quotation breakdown</Text>
+                <Ionicons name="chevron-forward" size={16} color="#0062E1" />
+              </TouchableOpacity>
+            ) : null}
             <Text style={styles.address}>{job.location || 'Location Pending'}</Text>
             <Text style={styles.distTime}>4.5 mi • 12 m</Text>
 
-            <View style={styles.actionHub}>
-              <TouchableOpacity style={styles.directionsBtn} onPress={handleDirections}>
-                <Ionicons name="navigate" size={20} color="#fff" />
-                <Text style={styles.directionsText}>Directions</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.actionHubScroll}
+              contentContainerStyle={styles.actionHubContent}
+              bounces={false}
+            >
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={handleDirections}
+                accessibilityLabel="Directions"
+                accessibilityRole="button"
+              >
+                <Ionicons name="navigate-outline" size={22} color="#0062E1" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.outlineActionBtn} onPress={handleCall}>
-                <Ionicons name="call" size={20} color="#0E56D0" />
-                <Text style={styles.outlineActionText}>Call</Text>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={handleCall}
+                accessibilityLabel="Call"
+                accessibilityRole="button"
+              >
+                <Ionicons name="call-outline" size={22} color="#0062E1" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.outlineActionBtn}>
-                <Ionicons name="bookmark" size={20} color="#0E56D0" />
-                <Text style={styles.outlineActionText}>Save</Text>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={() => Alert.alert('Saved', 'Job bookmarked.')}
+                accessibilityLabel="Save"
+                accessibilityRole="button"
+              >
+                <Ionicons name="bookmark-outline" size={22} color="#0062E1" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.outlineActionBtn} onPress={handleShare}>
-                <Ionicons name="share-social" size={20} color="#0E56D0" />
-                <Text style={styles.outlineActionText}>Share</Text>
+              <TouchableOpacity
+                style={styles.actionIconBtn}
+                onPress={handleShare}
+                accessibilityLabel="Share"
+                accessibilityRole="button"
+              >
+                <Ionicons name="share-social-outline" size={22} color="#0062E1" />
               </TouchableOpacity>
-            </View>
+            </ScrollView>
 
             <View style={styles.recentSection}>
               <View style={styles.recentBadge}><Text style={styles.recentText}>Recent</Text></View>
@@ -365,20 +490,52 @@ const styles = StyleSheet.create({
 
   scrollContent: { padding: 0 },
   mainInfo: { padding: 20 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  workerName: { fontSize: 24, fontWeight: '800', color: '#1A202C', flex: 1, textTransform: 'capitalize' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 8 },
+  workerName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A202C',
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 120,
+    textTransform: 'capitalize',
+  },
   newBadge: { backgroundColor: '#F5F3FF', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginRight: 15 },
   newBadgeText: { color: '#8B5CF6', fontSize: 12, fontWeight: '700' },
   priceText: { fontSize: 20, fontWeight: '800', color: '#1A202C' },
   budgetText: { fontSize: 12, color: '#718096', fontWeight: '400' },
   address: { fontSize: 14, color: '#718096', marginBottom: 4 },
-  distTime: { fontSize: 13, color: '#A0AEC0', marginBottom: 20 },
+  distTime: { fontSize: 13, color: '#A0AEC0', marginBottom: 12 },
+  viewQuoteLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 16,
+  },
+  viewQuoteLinkText: { fontSize: 14, fontWeight: '600', color: '#0062E1' },
 
-  actionHub: { flexDirection: 'row', gap: 8, marginBottom: 24 },
-  directionsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0062E1', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 25, flex: 1.5 },
-  directionsText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  outlineActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 25, flex: 1, justifyContent: 'center' },
-  outlineActionText: { color: '#0E56D0', fontWeight: '700', fontSize: 13 },
+  actionHubScroll: {
+    marginBottom: 20,
+    maxHeight: JOB_DETAIL_ACTION_SIZE + 8,
+  },
+  actionHubContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: JOB_DETAIL_ACTION_GAP,
+    minWidth: width,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  actionIconBtn: {
+    width: JOB_DETAIL_ACTION_SIZE,
+    height: JOB_DETAIL_ACTION_SIZE,
+    borderRadius: JOB_DETAIL_ACTION_SIZE / 2,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
 
   recentSection: { marginBottom: 24 },
   recentBadge: { backgroundColor: '#4A5568', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, marginBottom: 12 },
@@ -420,13 +577,53 @@ const styles = StyleSheet.create({
   emptyHistoryText: { color: '#718096', fontSize: 16, fontWeight: '700', marginTop: 12 },
   emptyHistorySub: { color: '#CBD5E0', fontSize: 13, marginTop: 4, textAlign: 'center', paddingHorizontal: 40 },
 
-  footerContainer: { 
-    flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingVertical: 16,
-    backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F1F5F9',
+  footerContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  assignBtn: { flex: 1, height: 56, backgroundColor: '#00BFA5', borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  quoteBtn: { flex: 1, height: 56, backgroundColor: '#0062E1', borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  assignBtn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
+    maxHeight: 54,
+    backgroundColor: '#00BFA5',
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  quoteBtn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
+    maxHeight: 54,
+    backgroundColor: '#0062E1',
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  invoiceBtn: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 50,
+    maxHeight: 54,
+    backgroundColor: '#7C3AED',
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  invoiceBtnDisabled: { opacity: 0.45 },
+  btnText: { color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
 });
 
 export default JobDetailsScreen;

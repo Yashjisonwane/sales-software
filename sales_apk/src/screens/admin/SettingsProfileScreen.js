@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SHADOWS, SIZES, FONTS } from '../../constants/theme';
-
-const { width } = Dimensions.get('window');
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS, FONTS } from '../../constants/theme';
+import { getProfile } from '../../api/apiService';
 
 const SETTINGS_OPTIONS = [
   {
@@ -55,6 +55,22 @@ const SETTINGS_OPTIONS = [
 
 const SettingsProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await getProfile();
+    if (res.success && res.data) setUser(res.data);
+    else setUser(null);
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   return (
     <View style={styles.container}>
@@ -73,6 +89,17 @@ const SettingsProfileScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
       >
+        {loading ? (
+          <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+            <ActivityIndicator color={COLORS.primary} />
+          </View>
+        ) : user ? (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryName}>{user.name}</Text>
+            <Text style={styles.summaryEmail}>{user.email}</Text>
+            <Text style={styles.summaryRole}>{user.role} · synced from server</Text>
+          </View>
+        ) : null}
         {SETTINGS_OPTIONS.map((item) => (
           <TouchableOpacity 
             key={item.id}
@@ -122,6 +149,17 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 10,
   },
+  summaryCard: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  summaryName: { fontSize: 18, fontFamily: FONTS.bold, color: COLORS.textPrimary },
+  summaryEmail: { fontSize: 14, color: COLORS.textSecondary, marginTop: 4 },
+  summaryRole: { fontSize: 12, color: COLORS.textTertiary, marginTop: 6 },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',

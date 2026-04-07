@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Image,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +16,7 @@ import MenuItem from '../../components/MenuItem';
 import { getProfile } from '../../api/apiService';
 import { useState, useEffect } from 'react';
 import storage from '../../api/storage';
+import { clearBiometricSessionOnLogout } from '../../api/biometricLogin';
 
 
 
@@ -37,6 +37,14 @@ export default function ProfileScreen({ navigation }) {
     fetchUserData();
   }, []);
 
+  const initials =
+    user?.name
+      ?.split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join('') || '?';
+
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -46,6 +54,7 @@ export default function ProfileScreen({ navigation }) {
         onPress: async () => {
           await storage.removeItem('userToken');
           await storage.removeItem('userData');
+          await clearBiometricSessionOnLogout();
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
@@ -71,10 +80,9 @@ export default function ProfileScreen({ navigation }) {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
-          <Image
-            source={{ uri: 'https://i.pravatar.cc/150?u=worker' }}
-            style={styles.avatar}
-          />
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user?.name || 'Loading...'}</Text>
             <Text style={styles.profileEmail}>{user?.email || 'worker@paired.com'}</Text>
@@ -82,6 +90,34 @@ export default function ProfileScreen({ navigation }) {
           <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
             <Ionicons name="create-outline" size={20} color="#0E56D0" />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Work insights</Text>
+          <View style={styles.sectionCard}>
+            <MenuItem
+              icon="bar-chart-outline"
+              label="Performance"
+              sub="Jobs & earnings from your account"
+              color="#0062E1"
+              onPress={() => navigation.navigate('WorkerAnalytics')}
+            />
+            <MenuItem
+              icon="wallet-outline"
+              label="Payouts & profile"
+              sub="Invoices, commission split, documents"
+              color="#10B981"
+              onPress={() => navigation.navigate('WorkerPayouts')}
+            />
+            <MenuItem
+              icon="cube-outline"
+              label="Quoted materials"
+              sub="Line items from your job estimates"
+              color="#8B5CF6"
+              isLast
+              onPress={() => navigation.navigate('WorkerMaterials')}
+            />
+          </View>
         </View>
 
         {/* Account Section */}
@@ -117,6 +153,27 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Professional</Text>
           <View style={styles.sectionCard}>
+            <MenuItem
+              icon="cash-outline"
+              label="Earnings"
+              sub="Payouts, invoices & commission"
+              color="#10B981"
+              onPress={() => navigation.navigate('WorkerPayouts')}
+            />
+            <MenuItem
+              icon="star-outline"
+              label="Reviews"
+              sub="What customers said (web)"
+              color="#F59E0B"
+              onPress={() => navigation.navigate('Reviews')}
+            />
+            <MenuItem
+              icon="notifications-outline"
+              label="Notifications"
+              sub="Jobs, leads, payments"
+              color="#6366F1"
+              onPress={() => navigation.navigate('Notifications')}
+            />
             <MenuItem
               icon="briefcase-outline"
               label="Service Details"
@@ -218,6 +275,14 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   profileInfo: {
     flex: 1,

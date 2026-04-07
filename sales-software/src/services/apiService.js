@@ -88,6 +88,20 @@ export const updateLead = async (id, data) => {
     }
 };
 
+/** Same flow as APK: site pin + address for OPEN leads (ADMIN + WORKER tokens). Linked job row syncs on backend. */
+export const patchLeadLocation = async (leadId, { location, latitude, longitude } = {}) => {
+    try {
+        const response = await apiClient.patch(`${ENDPOINTS.LEADS}/${leadId}/location`, {
+            location,
+            latitude,
+            longitude,
+        });
+        return { success: true, data: response.data.data };
+    } catch (err) {
+        return { success: false, error: err.response?.data?.message || err.message };
+    }
+};
+
 export const deleteLead = async (id) => {
     try {
         const response = await apiClient.delete(`${ENDPOINTS.LEADS}/${id}`);
@@ -166,6 +180,7 @@ export const deleteJob = async (id) => {
     }
 };
 
+/** Backend accepts optional latitude, longitude; linked lead syncs when job has leadId. */
 export const updateJob = async (id, jobData) => {
     try {
         const response = await apiClient.patch(`${ENDPOINTS.JOBS}/${id}`, jobData);
@@ -497,5 +512,34 @@ export const fetchAllReviews = async () => {
         return { success: true, data: response.data };
     } catch (err) {
         return { success: false, error: err.message };
+    }
+};
+
+// ─── ADMIN OPS (same backend as mobile app) ─────────────────
+
+export const fetchAdminTaxPayroll = async () => {
+    try {
+        const response = await apiClient.get('/admin/tax-payroll');
+        return response.data;
+    } catch (err) {
+        return { success: false, message: err.response?.data?.message || err.message };
+    }
+};
+
+export const fetchAdminInventorySnapshot = async () => {
+    try {
+        const response = await apiClient.get('/admin/inventory-snapshot');
+        return response.data;
+    } catch (err) {
+        return { success: false, message: err.response?.data?.message || err.message };
+    }
+};
+
+export const fetchAdminMarketingFeed = async () => {
+    try {
+        const response = await apiClient.get('/admin/marketing-feed');
+        return response.data;
+    } catch (err) {
+        return { success: false, message: err.response?.data?.message || err.message };
     }
 };

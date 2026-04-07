@@ -1,18 +1,156 @@
 const prisma = require('../config/db');
 const { v4: uuidv4 } = require('uuid');
+const { haversineKm } = require('../utils/geo');
 
 const generateShortId = (prefix) => {
     return `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
 };
 
+// @route   GET /api/v1/guest/nearby?latitude=&longitude=&radiusKm=&include=workers,jobs
+// @desc    Browse workers (and optional job pins) near a point — no auth (guest / customer preview)
+const getNearby = async (req, res) => {
+    try {
+        const lat = parseFloat(req.query.latitude);
+        const lon = parseFloat(req.query.longitude);
+        const radiusKm = Math.min(Math.max(parseFloat(req.query.radiusKm) || 25, 1), 200);
+        const includeRaw = req.query.include || 'workers,jobs';
+        const include = String(includeRaw)
+            .split(',')
+            .map((s) => s.trim().toLowerCase())
+            .filter(Boolean);
+
+        if (Number.isNaN(lat) || Number.isNaN(lon)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Query params latitude and longitude are required (decimal degrees).'
+            });
+        }
+
+        const workers = [];
+        if (include.length === 0 || include.includes('workers')) {
+            const workersRaw = await prisma.user.findMany({
+                where: {
+                    role: 'WORKER',
+                    isAvailable: true,
+                    lat: { not: null },
+                    lng: { not: null }
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    businessName: true,
+                    rating: true,
+                    lat: true,
+                    lng: true,
+                    city: true,
+                    serviceRadius: true,
+                    categories: { include: { category: { select: { name: true } } } }
+                }
+            });
+
+            for (const w of workersRaw) {
+                const d = haversineKm(lat, lon, w.lat, w.lng);
+                if (d <= radiusKm) {
+                    workers.push({
+                        id: w.id,
+                        name: w.name,
+                        businessName: w.businessName,
+                        rating: w.rating,
+                        latitude: w.lat,
+                        longitude: w.lng,
+                        city: w.city,
+                        serviceRadiusKm: w.serviceRadius,
+                        distanceKm: Math.round(d * 100) / 100,
+                        categories: w.categories.map((c) => c.category.name)
+                    });
+                }
+            }
+            workers.sort((a, b) => a.distanceKm - b.distanceKm);
+        }
+
+        const jobs = [];
+        if (include.includes('jobs')) {
+            const jobsRaw = await prisma.job.findMany({
+                where: {
+                    latitude: { not: null },
+                    longitude: { not: null }
+                },
+                select: {
+                    id: true,
+                    jobNo: true,
+                    categoryName: true,
+                    status: true,
+                    location: true,
+                    latitude: true,
+                    longitude: true,
+                    worker: { select: { name: true } }
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 150
+            });
+
+            for (const j of jobsRaw) {
+                const d = haversineKm(lat, lon, j.latitude, j.longitude);
+                if (d <= radiusKm) {
+                    jobs.push({
+                        id: j.id,
+                        jobNo: j.jobNo,
+                        category: j.categoryName,
+                        status: j.status,
+                        location: j.location,
+                        latitude: j.latitude,
+                        longitude: j.longitude,
+                        workerName: j.worker?.name || null,
+                        distanceKm: Math.round(d * 100) / 100
+                    });
+                }
+            }
+            jobs.sort((a, b) => a.distanceKm - b.distanceKm);
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                center: { latitude: lat, longitude: lon },
+                radiusKm,
+                workers,
+                jobs
+            }
+        });
+    } catch (error) {
+        console.error('Guest nearby error:', error);
+        res.status(500).json({ success: false, message: error.message || 'Server error' });
+    }
+};
+
 // @route   POST /api/v1/guest/request
-// @desc    Create a service request without login
+// @desc    Create a service request without login (optional preferredWorkerId = nearby pro for admin routing)
 const createRequest = async (req, res) => {
     try {
-        const { name, phone, email, categoryName, location, description, latitude, longitude } = req.body;
+        const {
+            name,
+            phone,
+            email,
+            categoryName,
+            location,
+            description,
+            latitude,
+            longitude,
+            preferredWorkerId
+        } = req.body;
 
         if (!name || !phone) {
             return res.status(400).json({ success: false, message: "Name and Phone are required." });
+        }
+
+        let resolvedPreferredId = null;
+        if (preferredWorkerId) {
+            const pro = await prisma.user.findFirst({
+                where: { id: preferredWorkerId, role: 'WORKER' }
+            });
+            if (pro) {
+                resolvedPreferredId = pro.id;
+            }
         }
 
         const leadNo = generateShortId('L');
@@ -30,6 +168,9 @@ const createRequest = async (req, res) => {
             categoryId = fallback?.id;
         }
 
+        const latNum = latitude != null && latitude !== '' ? parseFloat(latitude) : null;
+        const lngNum = longitude != null && longitude !== '' ? parseFloat(longitude) : null;
+
         // 2. Create Lead as Guest
         const lead = await prisma.lead.create({
             data: {
@@ -41,33 +182,39 @@ const createRequest = async (req, res) => {
                 sessionToken: sessionToken,
                 categoryId: categoryId,
                 location: location || 'Not Specified',
-                latitude: latitude ? parseFloat(latitude) : null,
-                longitude: longitude ? parseFloat(longitude) : null,
+                latitude: latNum != null && !Number.isNaN(latNum) ? latNum : null,
+                longitude: lngNum != null && !Number.isNaN(lngNum) ? lngNum : null,
                 description: description || '',
-                status: 'OPEN'
+                status: 'OPEN',
+                preferredWorkerId: resolvedPreferredId
             },
-            include: { category: true }
+            include: { category: true, preferredWorker: { select: { name: true, id: true } } }
         });
 
         // 3. Create Notification for Admin
+        const pref =
+            lead.preferredWorker != null
+                ? ` Suggested professional: ${lead.preferredWorker.name}.`
+                : '';
         await prisma.notification.create({
             data: {
                 userId: null,
-                title: "New Guest Request",
-                message: `Guest ${name} requested ${lead.category?.name || 'Service'} (#${leadNo}).`,
+                title: 'New Guest Request',
+                message: `Guest ${name} requested ${lead.category?.name || 'Service'} (#${leadNo}).${pref}`,
                 type: 'LEAD'
             }
         });
 
         res.status(201).json({
             success: true,
-            message: "Request submitted successfully!",
+            message: 'Request submitted successfully!',
             sessionToken: sessionToken,
             trackingId: lead.id,
-            displayId: leadNo
+            displayId: leadNo,
+            preferredWorkerId: lead.preferredWorkerId
         });
     } catch (error) {
-        console.error("Guest Request Error:", error);
+        console.error('Guest Request Error:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -205,6 +352,7 @@ const submitReview = async (req, res) => {
 };
 
 module.exports = {
+    getNearby,
     createRequest,
     trackRequest,
     submitReview

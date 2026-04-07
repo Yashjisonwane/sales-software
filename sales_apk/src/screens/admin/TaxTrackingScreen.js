@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,19 +7,64 @@ import {
   ScrollView,
   StatusBar,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SHADOWS, SIZES, FONTS } from '../../constants/theme';
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS, SHADOWS } from '../../constants/theme';
+import BusinessModuleBanner from '../../components/business/BusinessModuleBanner';
+import { getAdminTaxPayroll } from '../../api/apiService';
 
 const { width } = Dimensions.get('window');
 
 const TaxTrackingScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('Workers');
-  const [activeFilter, setActiveFilter] = useState('All');
+  const [workerFilter, setWorkerFilter] = useState('All');
+  const [docFilter, setDocFilter] = useState('All');
   const insets = useSafeAreaInsets();
   const tabs = ['Workers', 'Documents', 'Payments'];
+
+  const [loading, setLoading] = useState(true);
+  const [workers, setWorkers] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [totals, setTotals] = useState({ paid: 0, pending: 0, overdue: 0 });
+  const [docsNote, setDocsNote] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await getAdminTaxPayroll();
+    if (res.success && res.data) {
+      setWorkers(res.data.workers || []);
+      setDocuments(res.data.documents || []);
+      setPayments(res.data.payments || []);
+      setTotals(res.data.totals || { paid: 0, pending: 0, overdue: 0 });
+      setDocsNote(res.data.documentsNote || '');
+    } else {
+      setWorkers([]);
+      setDocuments([]);
+      setPayments([]);
+      Alert.alert('Could not load', res.message || 'Tax & payroll snapshot failed');
+    }
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  const filteredWorkers = workers.filter((w) => {
+    if (workerFilter === 'All') return true;
+    if (workerFilter === 'Active') return w.status === 'Active';
+    if (workerFilter === 'Inactive') return w.status === 'Inactive';
+    if (workerFilter === '1099') return w.classification?.includes('1099') || w.splitNote?.includes('%');
+    if (workerFilter === 'W-2') return w.classification?.includes('W-2');
+    return true;
+  });
 
   const renderWorkers = () => (
     <View style={{ flex: 1 }}>
@@ -27,38 +72,37 @@ const TaxTrackingScreen = ({ navigation }) => {
         {['All', 'W-2', '1099', 'Active', 'Inactive'].map((filter) => (
           <TouchableOpacity
             key={filter}
-            onPress={() => setActiveFilter(filter)}
-            style={[styles.filterChip, activeFilter === filter && styles.activeFilterChip]}
+            onPress={() => setWorkerFilter(filter)}
+            style={[styles.filterChip, workerFilter === filter && styles.activeFilterChip]}
           >
-            <Text style={[styles.filterChipText, activeFilter === filter && styles.activeFilterChipText]}>{filter}</Text>
+            <Text style={[styles.filterChipText, workerFilter === filter && styles.activeFilterChipText]}>{filter}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {[
-          { initials: 'JM', name: 'John Miller', role: 'Technician', type: 'W-2', status: 'Active' },
-          { initials: 'MT', name: 'Mike Thompson', role: 'Contractor', type: '1099', status: 'Inactive' },
-          { initials: 'JM', name: 'John Miller', role: 'Technician', type: 'W-2', status: 'Active' },
-          { initials: 'JM', name: 'John Miller', role: 'Technician', type: 'W-2', status: 'Active' },
-          { initials: 'SL', name: 'John Miller', role: 'Office Admin', type: 'W-2', status: 'Inactive' },
-          { initials: 'AR', name: 'John Miller', role: 'Contractor', type: '1099', status: 'Active' },
-          { initials: 'SL', name: 'John Miller', role: 'Office Admin', type: 'W-2', status: 'Inactive' },
-          { initials: 'SL', name: 'John Miller', role: 'Office Admin', type: 'W-2', status: 'Inactive' },
-        ].map((worker, idx) => (
-          <View key={idx} style={styles.workerItem}>
-            <View style={styles.avatar}>
-               <Text style={styles.avatarText}>{worker.initials}</Text>
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 32 }} color="#0062E1" />
+        ) : filteredWorkers.length === 0 ? (
+          <Text style={{ color: COLORS.textTertiary, marginTop: 16 }}>No workers in database.</Text>
+        ) : (
+          filteredWorkers.map((worker) => (
+            <View key={worker.id} style={styles.workerItem}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{worker.initials}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={styles.workerName}>{worker.name}</Text>
+                <Text style={styles.workerSub} numberOfLines={2}>
+                  {worker.splitNote || worker.classification}
+                </Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: worker.status === 'Active' ? '#ECFDF5' : '#F1F5F9' }]}>
+                <Text style={[styles.statusText, { color: worker.status === 'Active' ? '#10B981' : '#64748B' }]}>{worker.status}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={styles.workerName}>{worker.name}</Text>
-              <Text style={styles.workerSub}>{worker.role} • {worker.type}</Text>
-            </View>
-            <View style={[styles.statusBadge, { backgroundColor: worker.status === 'Active' ? '#ECFDF5' : '#F1F5F9' }]}>
-              <Text style={[styles.statusText, { color: worker.status === 'Active' ? '#10B981' : '#64748B' }]}>{worker.status}</Text>
-            </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -69,39 +113,35 @@ const TaxTrackingScreen = ({ navigation }) => {
         {['All', 'W-2', '1099'].map((filter) => (
           <TouchableOpacity
             key={filter}
-            onPress={() => setActiveFilter(filter)}
-            style={[styles.filterChip, activeFilter === filter && styles.activeFilterChip, { width: (width - 60) / 3 }]}
+            onPress={() => setDocFilter(filter)}
+            style={[styles.filterChip, docFilter === filter && styles.activeFilterChip, { minWidth: (width - 60) / 3 }]}
           >
-            <Text style={[styles.filterChipText, activeFilter === filter && styles.activeFilterChipText]}>{filter}</Text>
+            <Text style={[styles.filterChipText, docFilter === filter && styles.activeFilterChipText]}>{filter}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {[
-          { name: 'John Miller', type: 'W-2 – 2025', date: 'Jan 10, 2026', status: 'Completed' },
-          { name: 'Mike Thompson', type: '1099-NEC – 2025', date: 'Jan 8, 2026', status: 'Pending Signature' },
-          { name: 'Mike Thompson', type: '1099-NEC – 2025', date: 'Jan 8, 2026', status: 'Pending Signature' },
-          { name: 'Mike Thompson', type: '1099-NEC – 2025', date: 'Jan 8, 2026', status: 'Pending Signature' },
-          { name: 'Mike Thompson', type: '1099-NEC – 2025', date: 'Jan 8, 2026', status: 'Pending Signature' },
-        ].map((doc, idx) => (
-          <View key={idx} style={styles.docCard}>
-            <View style={styles.docHeader}>
-              <View>
-                <Text style={styles.docName}>{doc.name}</Text>
-                <Text style={styles.docType}>{doc.type}</Text>
-                <Text style={styles.docDate}>Uploaded: {doc.date}</Text>
-              </View>
-              <View style={[styles.statusBadge, { backgroundColor: doc.status === 'Completed' ? '#ECFDF5' : '#FFF7ED' }]}>
-                <Text style={[styles.statusText, { color: doc.status === 'Completed' ? '#10B981' : '#F59E0B' }]}>{doc.status}</Text>
-              </View>
-            </View>
-            <View style={styles.docActions}>
-              <TouchableOpacity style={styles.downloadBtn}><Text style={styles.downloadBtnText}>Download</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.viewBtn}><Text style={styles.viewBtnText}>View</Text></TouchableOpacity>
-            </View>
+        {docsNote ? (
+          <View style={[styles.docCard, { marginBottom: 16 }]}>
+            <Text style={styles.docName}>Tax documents</Text>
+            <Text style={styles.docType}>{docsNote}</Text>
           </View>
-        ))}
+        ) : null}
+        {documents.length === 0 ? (
+          <Text style={{ color: COLORS.textTertiary }}>No PDFs stored yet.</Text>
+        ) : (
+          documents.map((doc, idx) => (
+            <View key={idx} style={styles.docCard}>
+              <View style={styles.docHeader}>
+                <View>
+                  <Text style={styles.docName}>{doc.name}</Text>
+                  <Text style={styles.docType}>{doc.type}</Text>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -110,44 +150,57 @@ const TaxTrackingScreen = ({ navigation }) => {
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Total Paid</Text>
-          <Text style={styles.statValue}>$24,580</Text>
+          <Text style={styles.statLabel}>Paid (invoices)</Text>
+          <Text style={styles.statValue}>${Number(totals.paid || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
         </View>
         <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Pending</Text>
-          <Text style={styles.statValue}>$3,200</Text>
+          <Text style={styles.statLabel}>Unpaid</Text>
+          <Text style={styles.statValue}>${Number(totals.pending || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
         </View>
         <View style={styles.statBox}>
           <Text style={styles.statLabel}>Overdue</Text>
-          <Text style={[styles.statValue, { color: '#EF4444' }]}>$850</Text>
+          <Text style={[styles.statValue, { color: '#EF4444' }]}>${Number(totals.overdue || 0).toLocaleString()}</Text>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>All Payments</Text>
-
-      {[
-        { name: 'John Miller', job: 'Job #231', date: 'Jan 5, 2026', amount: '$480', status: 'Paid' },
-        { name: 'John Miller', job: 'Job #231', date: 'Jan 5, 2026', amount: '$480', status: 'Overdue' },
-        { name: 'John Miller', job: 'Job #231', date: 'Jan 5, 2026', amount: '$480', status: 'Pending' },
-      ].map((pay, idx) => (
-        <View key={idx} style={styles.paymentCard}>
-          <View style={styles.docHeader}>
-            <View>
-              <Text style={styles.docName}>{pay.name}</Text>
-              <Text style={styles.docType}>{pay.job} • {pay.date}</Text>
-              <Text style={styles.paymentAmount}>{pay.amount}</Text>
-            </View>
-            <View style={[styles.statusBadge, {
-              backgroundColor: pay.status === 'Paid' ? '#ECFDF5' : pay.status === 'Overdue' ? '#FEF2F2' : '#FFF7ED'
-            }]}>
-              <Text style={[styles.statusText, {
-                color: pay.status === 'Paid' ? '#10B981' : pay.status === 'Overdue' ? '#EF4444' : '#F59E0B'
-              }]}>{pay.status}</Text>
+      <Text style={styles.sectionTitle}>Invoice lines</Text>
+      {loading ? (
+        <ActivityIndicator color="#0062E1" />
+      ) : payments.length === 0 ? (
+        <Text style={{ color: COLORS.textTertiary }}>No invoices yet.</Text>
+      ) : (
+        payments.map((pay) => (
+          <View key={pay.id} style={styles.paymentCard}>
+            <View style={styles.docHeader}>
+              <View>
+                <Text style={styles.docName}>{pay.workerName}</Text>
+                <Text style={styles.docType}>
+                  {pay.jobNo} • {pay.customerLabel} • {pay.dateLabel}
+                </Text>
+                <Text style={styles.paymentAmount}>${Number(pay.amount).toLocaleString()}</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusBadge,
+                  {
+                    backgroundColor:
+                      pay.status === 'PAID' ? '#ECFDF5' : pay.status === 'UNPAID' ? '#FFF7ED' : '#F1F5F9',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: pay.status === 'PAID' ? '#10B981' : pay.status === 'UNPAID' ? '#F59E0B' : '#64748B' },
+                  ]}
+                >
+                  {pay.status}
+                </Text>
+              </View>
             </View>
           </View>
-          <TouchableOpacity style={styles.viewJobBtn}><Text style={styles.viewJobText}>View Job</Text></TouchableOpacity>
-        </View>
-      ))}
+        ))
+      )}
     </ScrollView>
   );
 
@@ -159,15 +212,22 @@ const TaxTrackingScreen = ({ navigation }) => {
           <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tax & Payroll</Text>
-        <TouchableOpacity style={styles.exportBtn}>
+        <TouchableOpacity style={styles.exportBtn} onPress={() => Alert.alert('Export', 'Connect accounting export in a future release.')}>
           <Ionicons name="download-outline" size={16} color={COLORS.white} />
           <Text style={styles.exportText}>Export</Text>
         </TouchableOpacity>
       </View>
 
+      <View style={{ paddingHorizontal: 16 }}>
+        <BusinessModuleBanner
+          title="Database-backed snapshot"
+          subtitle="Workers and invoice amounts come from your API. W-2/1099 PDFs are not stored until you add file uploads."
+        />
+      </View>
+
       <View style={styles.tabContainer}>
         <View style={styles.tabWrapper}>
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -201,16 +261,24 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#000' },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
   exportBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#1E293B', paddingHorizontal: 12,
-    paddingVertical: 8, borderRadius: 20, gap: 6
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
   exportText: { color: COLORS.white, fontSize: 12, fontWeight: '600' },
 
   tabContainer: { padding: 16, backgroundColor: COLORS.white },
   tabWrapper: {
-    flexDirection: 'row', backgroundColor: '#F8FAFC',
-    borderRadius: 25, padding: 4, borderWidth: 1, borderColor: '#F1F5F9'
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 25,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   tab: { flex: 1, height: 44, justifyContent: 'center', alignItems: 'center', borderRadius: 22 },
   activeTab: { backgroundColor: '#0062E1', ...SHADOWS.small },
@@ -219,10 +287,15 @@ const styles = StyleSheet.create({
 
   filterScroll: { paddingVertical: 12, backgroundColor: COLORS.white },
   filterChip: {
-    paddingHorizontal: 20, paddingVertical: 8,
-    borderRadius: 20, backgroundColor: COLORS.white,
-    borderWidth: 1, borderColor: '#E2E8F0', marginRight: 10,
-    alignItems: 'center', justifyContent: 'center'
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginRight: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   activeFilterChip: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
   filterChipText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
@@ -231,9 +304,14 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 16, paddingBottom: 100 },
 
   workerItem: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC',
-    padding: 16, borderRadius: 24, marginBottom: 12, 
-    borderWidth: 1, borderColor: '#F1F5F9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    borderRadius: 24,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: COLORS.white, fontSize: 18, fontWeight: '700' },
@@ -242,15 +320,15 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' },
   statusText: { fontSize: 11, fontWeight: '700' },
 
-  docCard: { 
-    backgroundColor: '#F8FAFC', 
-    borderRadius: 24, 
-    padding: 20, 
-    marginBottom: 16, 
-    borderWidth: 1, 
-    borderColor: '#F1F5F9' 
+  docCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  docHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
+  docHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   docName: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
   docType: { fontSize: 14, color: COLORS.textSecondary, marginTop: 6 },
   docDate: { fontSize: 13, color: COLORS.textTertiary, marginTop: 6 },
@@ -262,8 +340,8 @@ const styles = StyleSheet.create({
 
   statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 24 },
   statBox: { flex: 1, backgroundColor: '#F8FAFC', padding: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#F1F5F9' },
-  statLabel: { fontSize: 12, color: COLORS.textTertiary, marginBottom: 4 },
-  statValue: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
+  statLabel: { fontSize: 12, color: COLORS.textTertiary, marginBottom: 4, textAlign: 'center' },
+  statValue: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 16 },
 
   paymentCard: { backgroundColor: '#F8FAFC', borderRadius: 24, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#F1F5F9' },

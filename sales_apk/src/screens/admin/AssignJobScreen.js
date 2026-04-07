@@ -8,10 +8,24 @@ import {
   ScrollView,
   Switch,
 } from 'react-native';
-import { getProfessionals, assignLeadToWorker } from '../../api/apiService';
+import {
+  getProfessionals,
+  assignLeadToWorker,
+  assignLeadNearest,
+  assignJob,
+} from '../../api/apiService';
 import { Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+/** Backend jobs always have jobNo; OPEN leads do not. */
+function resolveAssignmentTarget(item) {
+  if (!item?.id) return null;
+  if (item.jobNo) return { kind: 'job', id: item.id };
+  const st = String(item.status || '').toUpperCase();
+  if (st === 'OPEN') return { kind: 'lead', id: item.id };
+  return { kind: 'job', id: item.id };
+}
 
 const AssignJobScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -32,21 +46,42 @@ const AssignJobScreen = ({ navigation, route }) => {
 
   const handleAssign = async () => {
     if (!job) return;
+    const target = resolveAssignmentTarget(job);
+    if (!target) {
+      Alert.alert('Missing data', 'Could not resolve this item. Open it again from the jobs or leads list.');
+      return;
+    }
+
     if (method === 'manual' && !selectedWorker) {
       Alert.alert('Selection Error', 'Please select a worker first.');
       return;
     }
 
+    if (method === 'auto' && target.kind === 'job') {
+      Alert.alert(
+        'Manual assign',
+        'Automatic nearest assign works for new OPEN leads only. For an existing job, pick a worker manually to reassign.',
+      );
+      return;
+    }
+
     setLoading(true);
-    const workerId = method === 'auto' ? null : (selectedWorker?.id || null);
-    const { assignJob } = require('../../api/apiService');
-    const res = await assignJob(job.id, workerId);
+    let res;
+    if (target.kind === 'lead') {
+      if (method === 'auto') {
+        res = await assignLeadNearest(target.id);
+      } else {
+        res = await assignLeadToWorker(target.id, selectedWorker.id);
+      }
+    } else {
+      res = await assignJob(target.id, selectedWorker.id);
+    }
     setLoading(false);
 
     if (res.success) {
       navigation.navigate('JobSuccess');
     } else {
-      Alert.alert('Assignment Error', res.message);
+      Alert.alert('Assignment Error', res.message || 'Something went wrong');
     }
   };
 

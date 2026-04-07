@@ -14,6 +14,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const guestRoutes = require('./routes/guestRoutes');
+const adminOpsRoutes = require('./routes/adminOpsRoutes');
+const workerOpsRoutes = require('./routes/workerOpsRoutes');
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/chats', chatRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/guest', guestRoutes);
+app.use('/api/v1/admin', adminOpsRoutes);
+app.use('/api/v1/worker', workerOpsRoutes);
 
 // Health Check Route
 app.get('/api/v1/health', (req, res) => {

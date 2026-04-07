@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,41 @@ import {
   ScrollView,
   StatusBar,
   Alert,
-  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS, SIZES, FONTS } from '../../../constants/theme';
-
-const { width } = Dimensions.get('window');
+import { getProfile, updateProfile, refreshLocalUserSnapshot } from '../../../api/apiService';
 
 const PersonalInfoScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState('Zain Worker');
-  const [email, setEmail] = useState('zain.worker@hinesq.com');
-  const [phone, setPhone] = useState('+1 (555) 123-4567');
-  const [dob, setDob] = useState('12/05/1992');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await getProfile();
+    if (res.success && res.data) {
+      const u = res.data;
+      setName(u.name || '');
+      setEmail(u.email || '');
+      setPhone(u.phone || '');
+      setAddress(u.address || '');
+    }
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const InputField = ({ label, value, onChangeText, icon, placeholder, keyboardType = 'default' }) => (
     <View style={styles.inputGroup}>
@@ -40,16 +61,31 @@ const PersonalInfoScreen = ({ navigation }) => {
     </View>
   );
 
-  const handleSave = () => {
-    Alert.alert('Success', 'Profile updated successfully!');
-    navigation.goBack();
+  const handleSave = async () => {
+    if (!name.trim() || !phone.trim()) {
+      Alert.alert('Required', 'Name and phone are required.');
+      return;
+    }
+    setSaving(true);
+    const res = await updateProfile({
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      address: address.trim() || undefined,
+    });
+    setSaving(false);
+    if (res.success) {
+      await refreshLocalUserSnapshot();
+      Alert.alert('Success', 'Profile saved to the server.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    } else {
+      Alert.alert('Error', res.message || 'Update failed');
+    }
   };
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
@@ -58,59 +94,70 @@ const PersonalInfoScreen = ({ navigation }) => {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.card}>
-          <InputField
-            label="Full Name"
-            value={name}
-            onChangeText={setName}
-            icon="person-outline"
-            placeholder="Enter your name"
-          />
-          <InputField
-            label="Email Address"
-            value={email}
-            onChangeText={setEmail}
-            icon="mail-outline"
-            placeholder="Enter your email"
-            keyboardType="email-address"
-          />
-          <InputField
-            label="Phone Number"
-            value={phone}
-            onChangeText={setPhone}
-            icon="call-outline"
-            placeholder="Enter your phone"
-            keyboardType="phone-pad"
-          />
-          <InputField
-            label="Date of Birth"
-            value={dob}
-            onChangeText={setDob}
-            icon="calendar-outline"
-            placeholder="DD/MM/YYYY"
-          />
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.card}>
+            <InputField
+              label="Full Name"
+              value={name}
+              onChangeText={setName}
+              icon="person-outline"
+              placeholder="Enter your name"
+            />
+            <InputField
+              label="Email Address"
+              value={email}
+              onChangeText={setEmail}
+              icon="mail-outline"
+              placeholder="Enter your email"
+              keyboardType="email-address"
+            />
+            <InputField
+              label="Phone Number"
+              value={phone}
+              onChangeText={setPhone}
+              icon="call-outline"
+              placeholder="Enter your phone"
+              keyboardType="phone-pad"
+            />
+            <InputField
+              label="Street / address"
+              value={address}
+              onChangeText={setAddress}
+              icon="home-outline"
+              placeholder="Service or mailing address"
+            />
+          </View>
 
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle-outline" size={20} color="#0E56D0" />
-          <Text style={styles.infoText}>
-            This information is used for identification and payment verification purposes.
-          </Text>
-        </View>
+          <View style={styles.infoBox}>
+            <Ionicons name="information-circle-outline" size={20} color="#0E56D0" />
+            <Text style={styles.infoText}>
+              Data is stored on your company server — same account as admin and web when using one backend.
+            </Text>
+          </View>
 
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>Save Changes</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FAFBFC' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -121,52 +168,55 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-
-  scrollContent: { padding: 20 },
-
+  headerTitle: { fontSize: 18, fontFamily: FONTS.bold, color: COLORS.textPrimary },
+  scrollContent: { padding: SIZES.screenPadding },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 20,
-    ...SHADOWS.medium,
+    borderRadius: 20,
+    padding: 20,
+    ...SHADOWS.small,
   },
-  inputGroup: { marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '700', color: '#1A202C', marginBottom: 8 },
+  inputGroup: { marginBottom: 4 },
+  label: {
+    fontSize: 14,
+    fontFamily: FONTS.semiBold,
+    color: '#4A5568',
+    marginBottom: 8,
+    marginTop: 12,
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    height: 56,
-    paddingHorizontal: 16,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    height: 52,
   },
   inputIcon: { marginRight: 12 },
-  input: { flex: 1, fontSize: 15, color: '#1A202C' },
-
+  input: { flex: 1, fontSize: 16, fontFamily: FONTS.regular, color: '#1A202C' },
   infoBox: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
     padding: 16,
+    backgroundColor: '#EBF8FF',
     borderRadius: 16,
-    alignItems: 'center',
-    marginBottom: 32,
+    marginTop: 20,
+    alignItems: 'flex-start',
+    gap: 10,
   },
-  infoText: { flex: 1, marginLeft: 12, fontSize: 13, color: '#0E56D0', lineHeight: 18 },
-
+  infoText: { flex: 1, fontSize: 13, color: '#4A5568', lineHeight: 20, fontFamily: FONTS.regular },
   saveBtn: {
     backgroundColor: '#0E56D0',
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 24,
     ...SHADOWS.medium,
   },
-  saveBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  saveBtnText: { color: '#FFFFFF', fontSize: 16, fontFamily: FONTS.bold },
 });
 
 export default PersonalInfoScreen;

@@ -27,7 +27,10 @@ const RescheduleScreen = ({ navigation, route }) => {
 
   const handleReschedule = async () => {
     if (!job?.id) return;
-    
+    if (!job.jobNo) {
+      Alert.alert('Not a job yet', 'Reschedule applies to scheduled jobs. Assign a worker to this lead first.');
+      return;
+    }
     setLoading(true);
     const dateStr = `2025-01-${selectedDate < 10 ? '0' + selectedDate : selectedDate}`;
     const res = await rescheduleJob(job.id, dateStr, selectedTime);

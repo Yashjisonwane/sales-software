@@ -4,6 +4,15 @@ import storage from './storage';
 /**
  * SERVICE: Worker Authentication
  */
+function loginErrorMessage(error) {
+    if (error.response?.data?.message) return error.response.data.message;
+    if (error.code === 'ECONNABORTED') return 'Request timed out — is the backend running on port 4000?';
+    if (error.message === 'Network Error' || error.code === 'ERR_NETWORK') {
+        return 'Network error — same Wi‑Fi as PC? Firewall allow port 4000? Check apiConfig.js host.';
+    }
+    return error.message || 'Login failed';
+}
+
 export const loginWorker = async (email, password) => {
     try {
         const response = await apiClient.post('/auth/login', { email, password });
@@ -13,7 +22,7 @@ export const loginWorker = async (email, password) => {
         }
         return response.data;
     } catch (error) {
-        return { success: false, message: error.response?.data?.message || 'Login failed' };
+        return { success: false, message: loginErrorMessage(error) };
     }
 };
 
@@ -35,6 +44,55 @@ export const registerUser = async (userData) => {
         return response.data;
     } catch (err) {
         return { success: false, message: err.response?.data?.message || err.message };
+    }
+};
+
+/**
+ * SERVICE: Guest (no auth) — map browse + service request
+ */
+export const getJobsMap = async () => {
+    try {
+        const response = await apiClient.get('/jobs/map');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message || 'Map data failed' };
+    }
+};
+
+export const getGuestNearby = async (latitude, longitude, radiusKm = 25) => {
+    try {
+        const response = await apiClient.get('/guest/nearby', {
+            params: {
+                latitude,
+                longitude,
+                radiusKm,
+                include: 'workers,jobs'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message || 'Nearby failed' };
+    }
+};
+
+export const submitGuestRequest = async (payload) => {
+    try {
+        const response = await apiClient.post('/guest/request', payload);
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Request failed'
+        };
+    }
+};
+
+export const trackGuestRequest = async (sessionToken) => {
+    try {
+        const response = await apiClient.get(`/guest/track/${sessionToken}`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
     }
 };
 
@@ -61,7 +119,8 @@ export const getCategories = async () => {
 
 export const acceptLead = async (leadId) => {
     try {
-        const response = await apiClient.patch(`/leads/${leadId}/assign`);
+        // Backend reads optional workerId from body; worker self-assign needs a JSON body (can be {}).
+        const response = await apiClient.patch(`/leads/${leadId}/assign`, {});
         return response.data;
     } catch (error) {
         console.error('Accept Lead API Error:', error.response?.data || error.message);
@@ -81,6 +140,19 @@ export const getWorkerJobs = async () => {
         return response.data;
     } catch (error) {
         return { success: false, message: 'Could not fetch jobs' };
+    }
+};
+
+/** Single job — photos are filtered server-side by JWT role (ADMIN / WORKER / GUEST). */
+export const getJobById = async (jobIdOrJobNo) => {
+    try {
+        const response = await apiClient.get(`/jobs/${encodeURIComponent(jobIdOrJobNo)}`);
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Could not fetch job',
+        };
     }
 };
 
@@ -120,6 +192,19 @@ export const assignLeadToWorker = async (leadId, workerId) => {
     }
 };
 
+/** Admin: assign OPEN lead to nearest available worker (or guest preferredWorkerId). */
+export const assignLeadNearest = async (leadId) => {
+    try {
+        const response = await apiClient.patch(`/leads/${leadId}/assign-nearest`);
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Assign nearest failed',
+        };
+    }
+};
+
 export const submitInspection = async (jobId, notes, triageAnswers) => {
     try {
         const response = await apiClient.post(`/jobs/${jobId}/inspection`, { notes, triageAnswers });
@@ -145,16 +230,26 @@ export const createEstimate = async (jobId, amount, details, materials, laborHou
         });
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to create estimate' };
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to create estimate',
+        };
     }
 };
 
-export const createInvoice = async (jobId, amount) => {
+export const createInvoice = async (jobId, amount, extra = {}) => {
     try {
-        const response = await apiClient.post(`/jobs/${jobId}/invoice`, { amount });
+        const body = {
+            amount: typeof amount === 'string' ? parseFloat(amount) : amount,
+            ...extra,
+        };
+        const response = await apiClient.post(`/jobs/${jobId}/invoice`, body);
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to create invoice' };
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to create invoice',
+        };
     }
 };
 
@@ -176,12 +271,18 @@ export const getJobHistory = async (jobId) => {
     }
 };
 
-export const uploadJobPhoto = async (jobId, photoUrl) => {
+export const uploadJobPhoto = async (jobId, photoUrl, type = 'SITE') => {
     try {
-        const response = await apiClient.post(`/jobs/${jobId}/photos`, { url: photoUrl });
+        const response = await apiClient.post(`/jobs/${encodeURIComponent(jobId)}/photos`, {
+            url: photoUrl,
+            type,
+        });
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to upload photo' };
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to upload photo',
+        };
     }
 };
 
@@ -203,6 +304,109 @@ export const getDashboardStats = async () => {
         return response.data;
     } catch (error) {
         return { success: false, message: 'Failed to fetch dashboard stats' };
+    }
+};
+
+/** Admin: subscription plan upgrade queue */
+export const getSubscriptionUpgradeRequests = async () => {
+    try {
+        const response = await apiClient.get('/leads/subscriptions/upgrade-requests');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to load upgrade requests',
+        };
+    }
+};
+
+export const approveSubscriptionUpgrade = async (requestId) => {
+    try {
+        const response = await apiClient.put(
+            `/leads/subscriptions/upgrade-requests/${encodeURIComponent(requestId)}/approve`
+        );
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Approve failed',
+        };
+    }
+};
+
+export const rejectSubscriptionUpgrade = async (requestId) => {
+    try {
+        const response = await apiClient.put(
+            `/leads/subscriptions/upgrade-requests/${encodeURIComponent(requestId)}/reject`
+        );
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Reject failed',
+        };
+    }
+};
+
+/** Admin ops: tax/payroll snapshot, inventory from quotes, marketing activity */
+export const getAdminTaxPayroll = async () => {
+    try {
+        const response = await apiClient.get('/admin/tax-payroll');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to load tax & payroll',
+        };
+    }
+};
+
+export const getAdminInventorySnapshot = async () => {
+    try {
+        const response = await apiClient.get('/admin/inventory-snapshot');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to load inventory',
+        };
+    }
+};
+
+export const getAdminMarketingFeed = async () => {
+    try {
+        const response = await apiClient.get('/admin/marketing-feed');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to load activity',
+        };
+    }
+};
+
+/** Worker: own payouts & materials (scoped by JWT) */
+export const getWorkerPayoutsSnapshot = async () => {
+    try {
+        const response = await apiClient.get('/worker/payouts-snapshot');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to load payouts',
+        };
+    }
+};
+
+export const getWorkerMaterialsSnapshot = async () => {
+    try {
+        const response = await apiClient.get('/worker/materials-snapshot');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to load materials',
+        };
     }
 };
 
@@ -229,7 +433,33 @@ export const updateProfile = async (profileData) => {
         const response = await apiClient.put('/users/profile', profileData);
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to update profile' };
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to update profile',
+        };
+    }
+};
+
+/** After profile updates, keep AsyncStorage userData in sync for navigation/UI. */
+export const refreshLocalUserSnapshot = async () => {
+    try {
+        const res = await getProfile();
+        if (res.success && res.data) {
+            const u = res.data;
+            await storage.setItem(
+                'userData',
+                JSON.stringify({
+                    id: u.id,
+                    name: u.name,
+                    email: u.email,
+                    role: u.role,
+                    phone: u.phone,
+                })
+            );
+        }
+        return res;
+    } catch (error) {
+        return { success: false, message: error.message };
     }
 };
 
@@ -241,7 +471,10 @@ export const updateProfessional = async (workerId, updateData) => {
         const response = await apiClient.put(`/users/workers/${workerId}`, updateData);
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to update professional account' };
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to update professional account',
+        };
     }
 };
 
@@ -266,27 +499,131 @@ export const sendDirectMessage = async (userId, text) => {
     }
 };
 
+/** Job-linked chats (worker sees assigned jobs; admin sees all). */
+export const getJobChats = async () => {
+    try {
+        const response = await apiClient.get('/chats');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message || 'Failed to load chats' };
+    }
+};
+
+export const getJobChatMessages = async (chatId) => {
+    try {
+        const response = await apiClient.get(`/chats/${encodeURIComponent(chatId)}/messages`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message || 'Failed to load messages' };
+    }
+};
+
+export const sendJobChatMessage = async (chatId, text) => {
+    try {
+        const response = await apiClient.post(`/chats/${encodeURIComponent(chatId)}/messages`, { text });
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message || 'Failed to send' };
+    }
+};
+
+export const getNotifications = async () => {
+    try {
+        const response = await apiClient.get('/notifications');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
+    }
+};
+
+export const markNotificationRead = async (id) => {
+    try {
+        const response = await apiClient.patch(`/notifications/${encodeURIComponent(id)}/read`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
+    }
+};
+
+export const clearNotifications = async () => {
+    try {
+        const response = await apiClient.delete('/notifications/clear');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
+    }
+};
+
+export const getWorkerReviews = async () => {
+    try {
+        const response = await apiClient.get('/reviews');
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
+    }
+};
+
+export const getLeadById = async (leadId) => {
+    try {
+        const response = await apiClient.get(`/leads/${encodeURIComponent(leadId)}`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
+    }
+};
+
+export const registerWorkerByInvite = async ({ token, name, phone, password }) => {
+    try {
+        const response = await apiClient.post('/auth/register-invited', { token, name, phone, password });
+        if (response.data.success && response.data.data?.token) {
+            await storage.setItem('userToken', response.data.data.token);
+            await storage.setItem('userData', JSON.stringify(response.data.data.user));
+        }
+        return response.data;
+    } catch (err) {
+        return { success: false, message: err.response?.data?.message || err.message || 'Registration failed' };
+    }
+};
+
 export default {
     loginWorker,
     registerUser,
     getAvailableLeads,
     getCategories,
     acceptLead,
+    assignLeadNearest,
     getWorkerJobs,
+    getJobById,
     submitCompliance,
     createEstimate,
     createInvoice,
     getDashboardStats,
     getProfile,
     updateProfile,
+    refreshLocalUserSnapshot,
     updateProfessional,
     getDirectMessages,
     sendDirectMessage,
+    getJobChats,
+    getJobChatMessages,
+    sendJobChatMessage,
+    getNotifications,
+    markNotificationRead,
+    clearNotifications,
+    getWorkerReviews,
+    getLeadById,
+    registerWorkerByInvite,
     resetPassword,
     uploadJobPhoto,
     assignJob,
     getJobHistory,
     getEstimates,
     getInvoices,
-    submitInspection
+    submitInspection,
+    getAdminTaxPayroll,
+    getAdminInventorySnapshot,
+    getAdminMarketingFeed,
+    getSubscriptionUpgradeRequests,
+    getWorkerPayoutsSnapshot,
+    getWorkerMaterialsSnapshot,
 };

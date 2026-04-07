@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,131 +7,192 @@ import {
     TouchableOpacity,
     StatusBar,
     TextInput,
-    Image,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { SHADOWS } from '../../constants/theme';
+import { getJobChats } from '../../api/apiService';
 
-const MessageItem = ({ initial, name, lastMessage, time, unread, onPress }) => (
-    <TouchableOpacity style={styles.messageItem} onPress={onPress} activeOpacity={0.7}>
-        <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-        </View>
-        <View style={styles.messageContent}>
-            <View style={styles.messageHeader}>
-                <Text style={styles.senderName}>{name}</Text>
-                <Text style={styles.timeText}>{time}</Text>
-            </View>
-            <View style={styles.messageFooter}>
-                <Text style={[styles.lastMessage, unread && styles.unreadText]} numberOfLines={1}>
-                    {lastMessage}
-                </Text>
-                {unread && <View style={styles.unreadDot} />}
-            </View>
-        </View>
-    </TouchableOpacity>
-);
+function formatListTime(iso) {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return '';
+    }
+}
+
+function initials(name) {
+    if (!name || typeof name !== 'string') return '?';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+}
 
 export default function WorkerInboxScreen({ navigation }) {
-    const [activeFilter, setActiveFilter] = useState('All');
-    const filters = ['All', 'Messages', 'Team Chats', 'Updates'];
+    const tabBarHeight = useBottomTabBarHeight();
+    const [search, setSearch] = useState('');
+    const [threads, setThreads] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-    const messages = [
-        { initial: 'JM', name: 'Sarah Johnson', lastMessage: 'Hi, what time will the team arrive today?', time: '09:15 AM' },
-        { initial: 'JM', name: 'Team Alpha', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Sarah Noah', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Mike Thompson', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'John Miller', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-    ];
+    const load = useCallback(async () => {
+        const res = await getJobChats();
+        if (res.success && Array.isArray(res.data)) {
+            setThreads(res.data);
+        } else {
+            setThreads([]);
+        }
+        setLoading(false);
+        setRefreshing(false);
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            setLoading(true);
+            load();
+        }, [load])
+    );
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        load();
+    };
+
+    const q = search.trim().toLowerCase();
+    const filtered = threads.filter((t) => {
+        if (!q) return true;
+        const hay = `${t.customerName || ''} ${t.lastMessage || ''} ${t.service || ''} ${t.leadId || ''}`.toLowerCase();
+        return hay.includes(q);
+    });
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-            <View style={styles.header}>
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color="#94A3B8" />
-                    <TextInput placeholder="Search Team Member" style={styles.searchInput} placeholderTextColor="#94A3B8" />
+            <View style={styles.titleBlock}>
+                <Text style={styles.screenTitle}>Messages</Text>
+                <Text style={styles.screenSub}>
+                    Job chats in one list. Open a thread for full history. Bottom tabs stay visible so you can switch quickly.
+                </Text>
+            </View>
+
+            <View style={styles.searchWrap}>
+                <Ionicons name="search-outline" size={20} color="#94A3B8" />
+                <TextInput
+                    placeholder="Search by customer or job"
+                    style={styles.searchInput}
+                    placeholderTextColor="#94A3B8"
+                    value={search}
+                    onChangeText={setSearch}
+                />
+            </View>
+
+            {loading ? (
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color="#0062E1" />
                 </View>
-            </View>
-
-            <View style={styles.filtersContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContent}>
-                    {filters.map(filter => (
-                        <TouchableOpacity
-                            key={filter}
-                            onPress={() => setActiveFilter(filter)}
-                            style={[styles.filterChip, activeFilter === filter && styles.activeFilterChip]}
-                        >
-                            <Text style={[styles.filterChipText, activeFilter === filter && styles.activeFilterText]}>{filter}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
-            </View>
-
-            <ScrollView style={styles.messagesList} showsVerticalScrollIndicator={false}>
-                <View style={styles.listCard}>
-                    {messages.map((msg, index) => (
-                        <TouchableOpacity 
-                            key={index} 
-                            style={styles.messageItem} 
-                            onPress={() => navigation.navigate('WorkerChat', { name: msg.name })} 
-                            activeOpacity={0.7}
-                        >
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>{msg.initial}</Text>
-                            </View>
-                            <View style={styles.messageTextContent}>
-                                <View style={styles.messageHeaderRow}>
-                                    <Text style={styles.senderName}>{msg.name}</Text>
-                                    <Text style={styles.timeText}>{msg.time}</Text>
+            ) : (
+                <ScrollView
+                    style={styles.messagesList}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+                >
+                    {filtered.length === 0 ? (
+                        <Text style={styles.emptyText}>
+                            No conversations yet. Threads appear when customers message on jobs assigned to you.
+                        </Text>
+                    ) : (
+                        filtered.map((msg, index) => (
+                            <TouchableOpacity
+                                key={msg.id}
+                                style={[styles.row, index > 0 && styles.rowBorder]}
+                                onPress={() =>
+                                    navigation.navigate('JobChat', {
+                                        chatId: msg.id,
+                                        title: msg.customerName || 'Customer',
+                                        subtitle: [msg.service, msg.leadId && msg.leadId !== 'N/A' ? `#${msg.leadId}` : null]
+                                            .filter(Boolean)
+                                            .join(' · '),
+                                    })
+                                }
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.avatar}>
+                                    <Text style={styles.avatarText}>{initials(msg.customerName)}</Text>
                                 </View>
-                                <View style={styles.messageFooterRow}>
-                                    <Text style={styles.lastMessage} numberOfLines={3}>
-                                        {msg.lastMessage}
-                                        {msg.subMessage && (
-                                            <Text style={styles.subMessageText}>{` \n${msg.subMessage}`}</Text>
-                                        )}
+                                <View style={styles.rowBody}>
+                                    <View style={styles.rowTop}>
+                                        <Text style={styles.name} numberOfLines={1}>
+                                            {msg.customerName || 'Customer'}
+                                        </Text>
+                                        <Text style={styles.time}>{formatListTime(msg.time)}</Text>
+                                    </View>
+                                    <Text style={styles.preview} numberOfLines={2}>
+                                        {msg.lastMessage || 'No messages yet'}
                                     </Text>
                                 </View>
-                            </View>
-                            {index < messages.length - 1 && <View style={styles.itemDivider} />}
-                        </TouchableOpacity>
-                    ))}
-                </View>
-                <View style={{ height: 100 }} />
-            </ScrollView>
+                                <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        ))
+                    )}
+                </ScrollView>
+            )}
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    header: { paddingHorizontal: 16, paddingVertical: 16, backgroundColor: '#FFFFFF' },
-    searchContainer: { 
-        height: 50, backgroundColor: '#FFFFFF', borderRadius: 25, 
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, 
-        borderWidth: 1, borderColor: '#E2E8F0' 
+    container: { flex: 1, backgroundColor: '#F8FAFC' },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    titleBlock: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+    screenTitle: { fontSize: 28, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
+    screenSub: { fontSize: 13, color: '#64748B', marginTop: 6, lineHeight: 18 },
+    searchWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 16,
+        marginBottom: 12,
+        height: 46,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
-    searchInput: { flex: 1, marginLeft: 10, fontSize: 16, color: '#1A202C' },
-    filtersContainer: { paddingBottom: 16, backgroundColor: '#FFFFFF' },
-    filtersContent: { paddingHorizontal: 16, gap: 10 },
-    filterChip: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#F1F5F9' },
-    activeFilterChip: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
-    filterChipText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
-    activeFilterText: { color: '#FFFFFF' },
-    messagesList: { flex: 1, paddingHorizontal: 12 },
-    listCard: { backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-    messageItem: { flexDirection: 'row', paddingVertical: 18, alignItems: 'flex-start' },
-    avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
-    avatarText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
-    messageTextContent: { flex: 1, marginLeft: 14 },
-    messageHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-    senderName: { fontSize: 16, fontWeight: '800', color: '#1A202C' },
-    timeText: { fontSize: 11, color: '#94A3B8' },
-    messageFooterRow: { flexDirection: 'row' },
-    lastMessage: { fontSize: 13, color: '#4A5568', lineHeight: 18, flex: 1 },
-    subMessageText: { fontSize: 12, color: '#94A3B8' },
-    itemDivider: { position: 'absolute', bottom: 0, left: 58, right: 0, height: 1, backgroundColor: '#F1F5F9' },
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#0F172A' },
+    messagesList: { flex: 1, paddingHorizontal: 16 },
+    emptyText: { padding: 28, fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 20 },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        borderRadius: 14,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    rowBorder: {},
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#0062E1',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+    rowBody: { flex: 1, marginLeft: 12, marginRight: 8 },
+    rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    name: { fontSize: 16, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 8 },
+    time: { fontSize: 11, color: '#94A3B8' },
+    preview: { fontSize: 13, color: '#64748B', lineHeight: 18 },
 });

@@ -211,7 +211,15 @@ export default function WorkerProfileScreen({ navigation, route }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={styles.filledActionBtnBlue}
-                    onPress={() => navigation.navigate('AdminChat', { name: worker.name, userId: worker.id })}
+                    onPress={() =>
+                        navigation.navigate('AdminTabs', {
+                            screen: 'Inbox',
+                            params: {
+                                screen: 'DirectMessage',
+                                params: { name: worker.name, userId: worker.id },
+                            },
+                        })
+                    }
                 >
                     <Text style={styles.filledActionBtnText}>Message Worker</Text>
                 </TouchableOpacity>

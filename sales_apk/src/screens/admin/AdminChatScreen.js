@@ -5,13 +5,15 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDirectMessages, sendDirectMessage } from '../../api/apiService';
 
 export default function AdminChatScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { name, userId } = route.params;
+  const tabBarHeight = useBottomTabBarHeight();
+  const { name, userId } = route.params || {};
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +32,7 @@ export default function AdminChatScreen({ navigation, route }) {
   }, [userId]);
 
   const handleSend = async () => {
-    if(!inputText.trim()) return;
+    if (!userId || !inputText.trim()) return;
     const textToSend = inputText.trim();
     setInputText('');
 
@@ -78,7 +80,7 @@ export default function AdminChatScreen({ navigation, route }) {
           <Text style={styles.headerName}>{name || 'Worker'}</Text>
           <View style={styles.onlineRow}>
             <View style={styles.onlineDot} />
-            <Text style={styles.onlineText}>Active Session</Text>
+            <Text style={styles.onlineText}>Direct · message history</Text>
           </View>
         </View>
       </View>
@@ -97,10 +99,7 @@ export default function AdminChatScreen({ navigation, route }) {
         />
       )}
 
-      <View style={styles.inputBar}>
-        <TouchableOpacity>
-          <Ionicons name="add-circle" size={26} color="#8B5CF6" />
-        </TouchableOpacity>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}
@@ -164,7 +163,7 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIZES.screenPadding,
-    paddingVertical: 10, paddingBottom: 24, backgroundColor: COLORS.white,
+    paddingVertical: 10, backgroundColor: COLORS.white,
     borderTopWidth: 1, borderTopColor: COLORS.borderLight, gap: 8,
   },
   inputWrapper: {

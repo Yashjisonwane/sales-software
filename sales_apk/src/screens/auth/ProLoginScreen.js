@@ -17,29 +17,46 @@ import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { loginWorker, resetPassword } from '../../api/apiService';
 
+function goHome(navigation, res) {
+  const role = res.data.user.role;
+  if (role === 'ADMIN') navigation.replace('AdminTabs');
+  else if (role === 'WORKER') navigation.replace('WorkerTabs');
+  else navigation.replace('WorkerTabs');
+}
+
 export default function ProLoginScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@gmail.com');
+  const [password, setPassword] = useState('1234');
   const [showPassword, setShowPassword] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [newPasswordReset, setNewPasswordReset] = useState('');
 
+  const handleLogin = async () => {
+    if (!email || !password) return;
+    const res = await loginWorker(email, password);
+    if (res.success) {
+      goHome(navigation, res);
+    } else {
+      alert(res.message || 'Login failed');
+    }
+  };
+
   const handleReset = async () => {
-      if (!forgotEmail || !newPasswordReset) return;
-      setIsResetting(true);
-      const res = await resetPassword(forgotEmail, newPasswordReset);
-      setIsResetting(false);
-      if (res.success) {
-          alert(res.message || 'Password updated successful!');
-          setShowForgotModal(false);
-          setForgotEmail('');
-          setNewPasswordReset('');
-      } else {
-          alert(res.message || 'Reset failed');
-      }
+    if (!forgotEmail || !newPasswordReset) return;
+    setIsResetting(true);
+    const res = await resetPassword(forgotEmail, newPasswordReset);
+    setIsResetting(false);
+    if (res.success) {
+      alert(res.message || 'Password updated successful!');
+      setShowForgotModal(false);
+      setForgotEmail('');
+      setNewPasswordReset('');
+    } else {
+      alert(res.message || 'Reset failed');
+    }
   };
 
   return (
@@ -86,44 +103,22 @@ export default function ProLoginScreen({ navigation }) {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowPassword(!showPassword)}
-              >
+              <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
                 <Ionicons
-                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
                   color="#1A202C"
                 />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-                style={styles.forgotBtn}
-                onPress={() => setShowForgotModal(true)}
-            >
+            <TouchableOpacity style={styles.forgotBtn} onPress={() => setShowForgotModal(true)}>
               <Text style={styles.forgotText}>Forgot password?</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
             style={[styles.loginBtn, email && password ? { opacity: 1 } : { opacity: 0.7 }]}
-            onPress={async () => {
-                if (!email || !password) return;
-                const res = await loginWorker(email, password);
-                if (res.success) {
-                    const role = res.data.user.role;
-                    if (role === 'ADMIN') {
-                        navigation.replace('AdminTabs');
-                    } else if (role === 'WORKER') {
-                        navigation.replace('WorkerTabs');
-                    } else {
-                        // For other roles, fallback to WorkerTabs or show message
-                        navigation.replace('WorkerTabs');
-                    }
-                } else {
-                    alert(res.message || 'Login failed');
-                }
-            }}
+            onPress={handleLogin}
           >
             <Text style={styles.loginBtnText}>Log In</Text>
           </TouchableOpacity>
@@ -158,44 +153,40 @@ export default function ProLoginScreen({ navigation }) {
         </View>
       </ScrollView>
 
-      {/* Forgot Password Modal */}
-      <Modal visible={showForgotModal} animationType="slide" transparent={true}>
+      <Modal visible={showForgotModal} animationType="slide" transparent>
         <View style={styles.modalBg}>
-            <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Reset Password</Text>
-                <Text style={styles.modalSubtitle}>Enter email and new password</Text>
-                
-                <TextInput
-                    style={styles.modalInput}
-                    placeholder="Email"
-                    value={forgotEmail}
-                    onChangeText={setForgotEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                />
-                <TextInput
-                    style={styles.modalInput}
-                    placeholder="New Password"
-                    value={newPasswordReset}
-                    onChangeText={setNewPasswordReset}
-                    secureTextEntry
-                />
-                
-                <TouchableOpacity 
-                    style={[styles.resetBtn, isResetting && { opacity: 0.7 }]} 
-                    onPress={handleReset}
-                    disabled={isResetting}
-                >
-                    <Text style={styles.resetBtnText}>{isResetting ? 'Updating...' : 'Update'}</Text>
-                </TouchableOpacity>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Reset Password</Text>
+            <Text style={styles.modalSubtitle}>Enter email and new password</Text>
 
-                <TouchableOpacity 
-                    style={styles.cancelBtn} 
-                    onPress={() => setShowForgotModal(false)}
-                >
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-            </View>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Email"
+              value={forgotEmail}
+              onChangeText={setForgotEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="New Password"
+              value={newPasswordReset}
+              onChangeText={setNewPasswordReset}
+              secureTextEntry
+            />
+
+            <TouchableOpacity
+              style={[styles.resetBtn, isResetting && { opacity: 0.7 }]}
+              onPress={handleReset}
+              disabled={isResetting}
+            >
+              <Text style={styles.resetBtnText}>{isResetting ? 'Updating...' : 'Update'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowForgotModal(false)}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -265,9 +256,26 @@ const styles = StyleSheet.create({
   modalContent: { width: '85%', backgroundColor: '#FFF', borderRadius: 20, padding: 25, alignItems: 'center' },
   modalTitle: { fontSize: 22, fontFamily: FONTS.bold, color: '#1A202C', marginBottom: 5 },
   modalSubtitle: { fontSize: 14, fontFamily: FONTS.regular, color: '#718096', marginBottom: 20 },
-  modalInput: { width: '100%', height: 50, backgroundColor: '#F7FAFC', borderRadius: 12, paddingHorizontal: 15, marginBottom: 15, borderWidth: 1, borderColor: '#E2E8F0' },
-  resetBtn: { width: '100%', height: 50, backgroundColor: '#0062E1', borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 10 },
+  modalInput: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#F7FAFC',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  resetBtn: {
+    width: '100%',
+    height: 50,
+    backgroundColor: '#0062E1',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+  },
   resetBtnText: { color: '#FFF', fontSize: 16, fontFamily: FONTS.bold },
   cancelBtn: { width: '100%', height: 50, justifyContent: 'center', alignItems: 'center', marginTop: 5 },
-  cancelBtnText: { color: '#718096', fontSize: 14, fontFamily: FONTS.medium },
+  cancelText: { color: '#718096', fontSize: 14, fontFamily: FONTS.medium },
 });

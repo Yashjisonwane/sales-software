@@ -1,142 +1,157 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TextInput,
   TouchableOpacity,
   StatusBar,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { getWorkerReviews } from '../../api/apiService';
+
+function initials(name) {
+  if (!name || typeof name !== 'string') return '?';
+  const p = name.trim().split(/\s+/);
+  if (p.length >= 2) return (p[0][0] + p[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 export default function ReviewsScreen({ navigation }) {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
+  const [list, setList] = useState([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [distribution, setDistribution] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const existingReviews = [
-    {
-      id: '1', name: 'John Wilson', service: 'Plumbing',
-      rating: 5, comment: 'Excellent work! Fixed the leak in 30 minutes. Very professional.',
-      date: 'Mar 5, 2026', avatar: 'JW', color: '#3B82F6',
-    },
-    {
-      id: '2', name: 'Sarah Martinez', service: 'Electrical',
-      rating: 4, comment: 'Good service. Replaced all faulty switches efficiently.',
-      date: 'Mar 1, 2026', avatar: 'SM', color: '#F59E0B',
-    },
-    {
-      id: '3', name: 'Mike Chen', service: 'Cleaning',
-      rating: 5, comment: 'My house has never been this clean! Will definitely book again.',
-      date: 'Feb 25, 2026', avatar: 'MC', color: '#10B981',
-    },
-  ];
+  const load = useCallback(async () => {
+    const res = await getWorkerReviews();
+    if (res.success) {
+      setList(res.data || []);
+      setAverageRating(typeof res.averageRating === 'number' ? res.averageRating : parseFloat(res.averageRating) || 0);
+      setDistribution(Array.isArray(res.distribution) ? res.distribution : []);
+    } else {
+      setList([]);
+    }
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      load();
+    }, [load])
+  );
+
+  const colors = ['#3B82F6', '#EC4899', '#10B981', '#F59E0B', '#6366F1', '#8B5CF6'];
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
 
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reviews</Text>
+        <Text style={styles.headerTitle}>Your reviews</Text>
         <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Write Review Card */}
-        <View style={styles.writeCard}>
-          <Text style={styles.writeTitle}>Rate Your Experience</Text>
-          <Text style={styles.writeSubtitle}>How was your recent service?</Text>
-
-          {/* Stars */}
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                <Ionicons
-                  name={star <= rating ? 'star' : 'star-outline'}
-                  size={36}
-                  color={star <= rating ? '#F59E0B' : COLORS.border}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.ratingLabel}>
-            {rating === 0 ? 'Tap to rate' : rating === 5 ? 'Excellent! ⭐' : rating === 4 ? 'Great!' : rating === 3 ? 'Good' : rating === 2 ? 'Fair' : 'Poor'}
-          </Text>
-
-          {/* Comment */}
-          <View style={styles.commentWrapper}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Write your review here..."
-              placeholderTextColor={COLORS.textTertiary}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              value={comment}
-              onChangeText={setComment}
-            />
-          </View>
-
-          {/* Submit */}
-          <TouchableOpacity activeOpacity={0.85}>
-            <LinearGradient
-              colors={COLORS.gradientPrimary}
-              style={styles.submitBtn}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Ionicons name="send" size={16} color={COLORS.white} />
-              <Text style={styles.submitText}>Submit Review</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
-
-        {/* Past Reviews */}
-        <Text style={styles.sectionTitle}>Your Past Reviews</Text>
-        {existingReviews.map((review) => (
-          <View key={review.id} style={styles.reviewCard}>
-            <View style={styles.reviewTopRow}>
-              <View style={[styles.reviewAvatar, { backgroundColor: review.color }]}>
-                <Text style={styles.reviewAvatarText}>{review.avatar}</Text>
-              </View>
-              <View style={styles.reviewInfo}>
-                <Text style={styles.reviewName}>{review.name}</Text>
-                <Text style={styles.reviewService}>{review.service}</Text>
-              </View>
-              <Text style={styles.reviewDate}>{review.date}</Text>
-            </View>
-            <View style={styles.reviewStars}>
-              {[1, 2, 3, 4, 5].map((s) => (
-                <Ionicons
-                  key={s}
-                  name={s <= review.rating ? 'star' : 'star-outline'}
-                  size={14}
-                  color="#F59E0B"
-                />
-              ))}
-            </View>
-            <Text style={styles.reviewComment}>{review.comment}</Text>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
+        >
+          <View style={styles.infoBanner}>
+            <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
+            <Text style={styles.infoBannerText}>
+              Customers submit reviews on the web after jobs complete. This list is synced from the server.
+            </Text>
           </View>
-        ))}
-      </ScrollView>
+
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryLeft}>
+              <Text style={styles.avgRating}>{averageRating.toFixed(1)}</Text>
+              <View style={styles.starsRow}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Ionicons
+                    key={s}
+                    name={s <= Math.round(averageRating) ? 'star' : 'star-outline'}
+                    size={16}
+                    color="#F59E0B"
+                  />
+                ))}
+              </View>
+              <Text style={styles.totalReviews}>{list.length} reviews</Text>
+            </View>
+            <View style={styles.summaryRight}>
+              {[5, 4, 3, 2, 1].map((star) => {
+                const row = distribution.find((d) => d.stars === star);
+                const pct = row?.percentage ?? 0;
+                const count = list.filter((r) => r.rating === star).length;
+                return (
+                  <View key={star} style={styles.barRow}>
+                    <Text style={styles.barLabel}>{star}</Text>
+                    <Ionicons name="star" size={10} color="#F59E0B" />
+                    <View style={styles.barBg}>
+                      <View style={[styles.barFill, { width: `${pct}%` }]} />
+                    </View>
+                    <Text style={styles.barCount}>{count}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>Customer reviews</Text>
+          {list.length === 0 ? (
+            <Text style={styles.empty}>No reviews yet. Complete jobs so customers can rate you on the web.</Text>
+          ) : (
+            list.map((review, idx) => (
+              <View key={review.id} style={styles.reviewCard}>
+                <View style={styles.reviewTopRow}>
+                  <View style={[styles.reviewAvatar, { backgroundColor: colors[idx % colors.length] }]}>
+                    <Text style={styles.reviewAvatarText}>{initials(review.author)}</Text>
+                  </View>
+                  <View style={styles.reviewInfo}>
+                    <Text style={styles.reviewName}>{review.author}</Text>
+                    <Text style={styles.reviewService}>Job {review.jobNo}</Text>
+                  </View>
+                  <Text style={styles.reviewDate}>{review.date}</Text>
+                </View>
+                <View style={styles.reviewStars}>
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Ionicons
+                      key={s}
+                      name={s <= review.rating ? 'star' : 'star-outline'}
+                      size={14}
+                      color="#F59E0B"
+                    />
+                  ))}
+                </View>
+                <Text style={styles.reviewComment}>{review.comment || '—'}</Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     paddingTop: 50,
     paddingBottom: 14,
@@ -156,131 +171,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 14,
   },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
+  headerTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: COLORS.textPrimary, textAlign: 'center' },
+  scrollContent: { padding: SIZES.screenPadding, paddingBottom: 100 },
+  infoBanner: {
+    flexDirection: 'row',
+    gap: 10,
+    backgroundColor: '#EEF2FF',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
   },
-  scrollContent: {
-    padding: SIZES.screenPadding,
-    paddingBottom: 100,
-  },
-  writeCard: {
+  infoBannerText: { flex: 1, fontSize: 13, color: COLORS.textSecondary, lineHeight: 18 },
+  summaryCard: {
+    flexDirection: 'row',
     backgroundColor: COLORS.white,
     borderRadius: SIZES.radiusXl,
-    padding: 24,
-    marginBottom: 28,
+    padding: 20,
+    marginBottom: 24,
     ...SHADOWS.medium,
   },
-  writeTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  writeSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  ratingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  commentWrapper: {
-    backgroundColor: COLORS.surfaceAlt,
-    borderRadius: SIZES.radiusMd,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    marginBottom: 18,
-  },
-  commentInput: {
-    fontSize: 14,
-    color: COLORS.textPrimary,
-    padding: 14,
-    minHeight: 100,
-  },
-  submitBtn: {
-    height: SIZES.buttonHeight,
-    borderRadius: SIZES.buttonRadius,
-    flexDirection: 'row',
+  summaryLeft: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    marginRight: 24,
+    paddingRight: 24,
+    borderRightWidth: 1,
+    borderRightColor: COLORS.borderLight,
   },
-  submitText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 14,
-  },
+  avgRating: { fontSize: 42, fontWeight: '800', color: COLORS.textPrimary },
+  starsRow: { flexDirection: 'row', gap: 2, marginVertical: 6 },
+  totalReviews: { fontSize: 12, color: COLORS.textTertiary },
+  summaryRight: { flex: 1, justifyContent: 'center', gap: 6 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  barLabel: { fontSize: 12, fontWeight: '600', color: COLORS.textSecondary, width: 12 },
+  barBg: { flex: 1, height: 6, borderRadius: 3, backgroundColor: COLORS.surfaceAlt },
+  barFill: { height: 6, borderRadius: 3, backgroundColor: '#F59E0B' },
+  barCount: { fontSize: 11, color: COLORS.textTertiary, width: 16, textAlign: 'right' },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 14 },
+  empty: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', marginTop: 12 },
   reviewCard: {
     backgroundColor: COLORS.white,
-    borderRadius: SIZES.radiusMd,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     ...SHADOWS.small,
   },
-  reviewTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
+  reviewTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   reviewAvatar: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
-  reviewAvatarText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.white,
-  },
-  reviewInfo: {
-    flex: 1,
-  },
-  reviewName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  reviewService: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  reviewDate: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-  },
-  reviewStars: {
-    flexDirection: 'row',
-    gap: 2,
-    marginBottom: 8,
-  },
-  reviewComment: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-  },
+  reviewAvatarText: { fontSize: 14, fontWeight: '800', color: COLORS.white },
+  reviewInfo: { flex: 1 },
+  reviewName: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
+  reviewService: { fontSize: 12, color: COLORS.textTertiary, marginTop: 2 },
+  reviewDate: { fontSize: 11, color: COLORS.textTertiary },
+  reviewStars: { flexDirection: 'row', gap: 2, marginBottom: 8 },
+  reviewComment: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 20 },
 });

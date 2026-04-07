@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.lightlabcreation.salesapp",
+      "usesCleartextTraffic": true,
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
@@ -50,7 +51,14 @@
     },
     "plugins": [
       "expo-font",
-      "expo-updates"
+      "expo-updates",
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to use Face ID to sign in to your account."
+        }
+      ]
     ]
   }
 }

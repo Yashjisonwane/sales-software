@@ -4,43 +4,52 @@ const prisma = require('../config/db');
 // @desc    Get all reviews for the professional/worker
 const getReviews = async (req, res) => {
     try {
+        const isAdmin = req.user.role === 'ADMIN';
+
         const reviews = await prisma.reviews.findMany({
-            where: {
-                jobs: {
-                    workerId: req.user.id
-                }
-            },
+            where: isAdmin
+                ? {}
+                : {
+                      jobs: {
+                          workerId: req.user.id,
+                      },
+                  },
             include: {
                 jobs: {
                     include: {
                         customer: {
                             select: {
-                                name: true
-                            }
-                        }
-                    }
-                }
+                                name: true,
+                            },
+                        },
+                        worker: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
-                created_at: 'desc'
-            }
+                created_at: 'desc',
+            },
+            take: isAdmin ? 300 : 100,
         });
 
-        // Map for easier UI consumption
-        const formatted = (reviews || []).map(rev => ({
+        const formatted = (reviews || []).map((rev) => ({
             id: rev.id,
             author: rev.jobs?.customer?.name || 'Customer',
+            workerName: rev.jobs?.worker?.name || 'Worker',
             role: 'Customer',
             rating: rev.rating,
             comment: rev.comment,
             date: rev.created_at ? rev.created_at.toLocaleDateString() : 'N/A',
             verified: true,
-            jobNo: rev.jobs?.jobNo || 'N/A'
+            jobNo: rev.jobs?.jobNo || 'N/A',
         }));
 
-        // Group ratings for distribution data
-        const distribution = [5, 4, 3, 2, 1].map(stars => {
-            const count = formatted.filter(r => r.rating === stars).length;
+        const distribution = [5, 4, 3, 2, 1].map((stars) => {
+            const count = formatted.filter((r) => r.rating === stars).length;
             const percentage = formatted.length > 0 ? (count / formatted.length) * 100 : 0;
             return { stars, percentage };
         });
@@ -48,15 +57,15 @@ const getReviews = async (req, res) => {
         const totalRating = formatted.reduce((acc, curr) => acc + curr.rating, 0);
         const averageRating = formatted.length > 0 ? (totalRating / formatted.length).toFixed(1) : '0.0';
 
-        res.status(200).json({ 
-            success: true, 
-            count: formatted.length, 
+        res.status(200).json({
+            success: true,
+            count: formatted.length,
             data: formatted,
             averageRating: parseFloat(averageRating),
-            distribution
+            distribution,
         });
     } catch (error) {
-        console.error("❌ [REVIEWS] Fetch Reviews Error:", error);
+        console.error('❌ [REVIEWS] Fetch Reviews Error:', error);
         res.status(500).json({ success: false, message: 'Server error: ' + error.message });
     }
 };

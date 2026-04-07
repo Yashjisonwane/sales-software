@@ -65,7 +65,7 @@ export default function HomeScreen({ navigation }) {
       }
 
       if (statsRes.success) {
-        setStats(statsRes.data || []);
+        setStats(Array.isArray(statsRes.data) ? statsRes.data : []);
       }
     } catch (error) {
       console.error('Home Fetch Error:', error);

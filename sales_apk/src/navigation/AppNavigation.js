@@ -8,6 +8,7 @@ import { COLORS, SIZES } from '../constants/theme';
 
 // Shared & Auth
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
+import GuestMapHomeScreen from '../screens/guest/GuestMapHomeScreen';
 import SplashScreen from '../screens/auth/SplashScreen';
 import RoleSelectScreen from '../screens/auth/RoleSelectScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -32,6 +33,9 @@ import ProfileScreen from '../screens/worker/ProfileScreen';
 import WorkerProfileSetupScreen from '../screens/worker/WorkerProfileSetupScreen';
 import WorkerPaymentSetupScreen from '../screens/worker/WorkerPaymentSetupScreen';
 import WorkerExploreScreen from '../screens/worker/WorkerExploreScreen';
+import WorkerAnalyticsScreen from '../screens/worker/WorkerAnalyticsScreen';
+import WorkerPayoutsScreen from '../screens/worker/WorkerPayoutsScreen';
+import WorkerMaterialsScreen from '../screens/worker/WorkerMaterialsScreen';
 import WorkerSearchScreen from '../screens/worker/WorkerSearchScreen';
 import WorkerInboxScreen from '../screens/worker/WorkerInboxScreen';
 import PricingScreen from '../screens/worker/PricingScreen';
@@ -51,12 +55,12 @@ import ScheduleScreen from '../screens/admin/ScheduleScreen';
 import CreateQuoteScreen from '../screens/admin/CreateQuoteScreen';
 import WorkerProfileScreen from '../screens/admin/WorkerProfileScreen';
 import InboxScreen from '../screens/admin/InboxScreen';
-import AdminChatScreen from '../screens/admin/ChatScreen';
 import RescheduleScreen from '../screens/admin/RescheduleScreen';
 import CreateInvoiceScreen from '../screens/admin/CreateInvoiceScreen';
 import TeamAccountsScreen from '../screens/admin/TeamAccountsScreen';
 import AddMemberScreen from '../screens/admin/AddMemberScreen';
 import TaxTrackingScreen from '../screens/admin/TaxTrackingScreen';
+import DataAnalyticsScreen from '../screens/admin/DataAnalyticsScreen';
 import InventoryScreen from '../screens/admin/InventoryScreen';
 import CampaignsScreen from '../screens/admin/CampaignsScreen';
 import JobOfferDetailScreen from '../screens/admin/JobOfferDetailScreen';
@@ -71,6 +75,7 @@ import QuotePricingScreen from '../screens/admin/QuotePricingScreen';
 import QuoteReviewScreen from '../screens/admin/QuoteReviewScreen';
 import QuoteSuccessScreen from '../screens/admin/QuoteSuccessScreen';
 import QuoteDetailsScreen from '../screens/admin/QuoteDetailsScreen';
+import InvoiceDetailsScreen from '../screens/admin/InvoiceDetailsScreen';
 import SettingsProfileScreen from '../screens/admin/SettingsProfileScreen';
 import WorkerManagementScreen from '../screens/admin/WorkerManagementScreen';
 
@@ -102,12 +107,36 @@ import AdminSearchScreen from '../screens/admin/AdminSearchScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+const WorkerMessageStack = createStackNavigator();
+const AdminMessageStack = createStackNavigator();
+
+/** Job + customer threads; stays under Messages tab so bottom tabs stay visible. */
+function WorkerMessagesStackNavigator() {
+  return (
+    <WorkerMessageStack.Navigator screenOptions={{ headerShown: false }}>
+      <WorkerMessageStack.Screen name="MessageCenter" component={WorkerInboxScreen} />
+      <WorkerMessageStack.Screen name="JobChat" component={WorkerChatScreen} />
+    </WorkerMessageStack.Navigator>
+  );
+}
+
+/** Job chats + admin↔worker direct messages in one place; tabs stay visible. */
+function AdminMessagesStackNavigator() {
+  return (
+    <AdminMessageStack.Navigator screenOptions={{ headerShown: false }}>
+      <AdminMessageStack.Screen name="MessageCenter" component={InboxScreen} />
+      <AdminMessageStack.Screen name="JobChat" component={WorkerChatScreen} />
+      <AdminMessageStack.Screen name="DirectMessage" component={AdminProChatScreen} />
+    </AdminMessageStack.Navigator>
+  );
+}
 
 function WorkerTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarHideOnKeyboard: false,
         tabBarStyle: styles.tabBar,
         tabBarActiveTintColor: '#0062E1',
         tabBarInactiveTintColor: '#718096',
@@ -136,8 +165,8 @@ function WorkerTabs() {
       />
       <Tab.Screen
         name="Inbox"
-        component={WorkerInboxScreen}
-        options={{ tabBarLabel: 'Inbox' }}
+        component={WorkerMessagesStackNavigator}
+        options={{ tabBarLabel: 'Messages' }}
       />
       <Tab.Screen
         name="Account"
@@ -153,6 +182,7 @@ function AdminTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarHideOnKeyboard: false,
         tabBarStyle: styles.proTabBar,
         tabBarActiveTintColor: '#0062E1',
         tabBarInactiveTintColor: COLORS.textTertiary,
@@ -188,9 +218,9 @@ function AdminTabs() {
       />
       <Tab.Screen
         name="Inbox"
-        component={InboxScreen}
+        component={AdminMessagesStackNavigator}
         options={{ 
-          tabBarLabel: 'Inbox',
+          tabBarLabel: 'Messages',
           tabBarIcon: ({ focused, color }) => (
             <View style={[styles.tabIconContainer, focused && styles.activePillPadded]}>
               <Ionicons name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={22} color={color} />
@@ -220,6 +250,7 @@ export default function AppNavigation() {
       <Stack.Navigator initialRouteName="Welcome" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        <Stack.Screen name="GuestMapHome" component={GuestMapHomeScreen} />
         <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="ProLogin" component={ProLoginScreen} />
@@ -236,20 +267,22 @@ export default function AppNavigation() {
         <Stack.Screen name="WorkerExplore" component={WorkerExploreScreen} />
         <Stack.Screen name="WorkerSearch" component={WorkerSearchScreen} />
         <Stack.Screen name="WorkerTabs" component={WorkerTabs} />
+        <Stack.Screen name="WorkerAnalytics" component={WorkerAnalyticsScreen} />
+        <Stack.Screen name="WorkerPayouts" component={WorkerPayoutsScreen} />
+        <Stack.Screen name="WorkerMaterials" component={WorkerMaterialsScreen} />
         <Stack.Screen name="AdminTabs" component={AdminTabs} />
         <Stack.Screen name="AdminSearch" component={AdminSearchScreen} />
 
         {/* Other screens */}
         <Stack.Screen name="Providers" component={ProvidersScreen} />
         <Stack.Screen name="RequestService" component={RequestServiceScreen} />
-        <Stack.Screen name="WorkerChat" component={WorkerChatScreen} />
         <Stack.Screen name="Notifications" component={NotificationsScreen} />
         <Stack.Screen name="Reviews" component={ReviewsScreen} />
         <Stack.Screen name="LeadMap" component={ExploreScreen} />
         <Stack.Screen name="LeadDetails" component={LeadDetailsScreen} />
-        <Stack.Screen name="AdminProChat" component={AdminProChatScreen} />
         <Stack.Screen name="AdminReviews" component={AdminReviewsScreen} />
         <Stack.Screen name="AdminNotifications" component={AdminNotificationsScreen} />
+        <Stack.Screen name="Earnings" component={EarningsScreen} />
         <Stack.Screen name="AdminSchedule" component={ScheduleScreen} />
         <Stack.Screen name="AdminDashboard" component={DashboardScreen} />
         <Stack.Screen name="JobOfferDetail" component={JobOfferDetailScreen} />
@@ -259,7 +292,6 @@ export default function AppNavigation() {
         <Stack.Screen name="AdminJobs" component={JobsListScreen} />
         <Stack.Screen name="CreateQuote" component={CreateQuoteScreen} />
         <Stack.Screen name="WorkerProfile" component={WorkerProfileScreen} />
-        <Stack.Screen name="AdminChat" component={AdminChatScreen} />
         <Stack.Screen name="Subscription" component={SubscriptionScreen} />
         <Stack.Screen name="MyRequests" component={MyRequestsScreen} />
         <Stack.Screen name="Reschedule" component={RescheduleScreen} />
@@ -267,7 +299,7 @@ export default function AppNavigation() {
         <Stack.Screen name="Pricing" component={PricingScreen} />
 
         {/* Missing Automation Modules */}
-        <Stack.Screen name="Analytics" component={ComingSoonScreen} />
+        <Stack.Screen name="DataAnalytics" component={DataAnalyticsScreen} />
         <Stack.Screen name="TeamAccounts" component={TeamAccountsScreen} />
         <Stack.Screen name="AddMember" component={AddMemberScreen} />
         <Stack.Screen name="TaxTracking" component={TaxTrackingScreen} />
@@ -305,6 +337,7 @@ export default function AppNavigation() {
         <Stack.Screen name="QuoteReview" component={QuoteReviewScreen} />
         <Stack.Screen name="QuoteSuccess" component={QuoteSuccessScreen} />
         <Stack.Screen name="QuoteDetails" component={QuoteDetailsScreen} />
+        <Stack.Screen name="InvoiceDetails" component={InvoiceDetailsScreen} />
         <Stack.Screen name="SettingsProfile" component={SettingsProfileScreen} />
         <Stack.Screen name="WorkerManagement" component={WorkerManagementScreen} />
       </Stack.Navigator>

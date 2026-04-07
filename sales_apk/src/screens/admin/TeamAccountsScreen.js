@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,27 @@ import {
   Dimensions,
   Switch,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
+import BusinessModuleBanner from '../../components/business/BusinessModuleBanner';
+import {
+  getProfessionals,
+  getSubscriptionUpgradeRequests,
+  approveSubscriptionUpgrade,
+  rejectSubscriptionUpgrade,
+} from '../../api/apiService';
+
+function initialsFromName(name) {
+  if (!name || typeof name !== 'string') return '?';
+  const p = name.trim().split(/\s+/).filter(Boolean);
+  if (p.length >= 2) return (p[0][0] + p[1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
 const { width } = Dimensions.get('window');
 
@@ -22,6 +39,9 @@ const TeamAccountsScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('Requests');
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState([]);
+  const [upgradeRequests, setUpgradeRequests] = useState([]);
 
   const tabs = ['Requests', 'Team Members', 'Roles & Permissions'];
   const roles = ['All', 'Admin', 'Manager', 'Technician', 'Sales'];
@@ -41,58 +61,99 @@ const TeamAccountsScreen = ({ navigation }) => {
     }));
   };
 
-  const RequestCard = ({ name, role, team, status, current, increase, requested, date }) => (
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    const [proRes, upRes] = await Promise.all([getProfessionals(), getSubscriptionUpgradeRequests()]);
+    if (proRes.success && Array.isArray(proRes.data)) setMembers(proRes.data);
+    else setMembers([]);
+    if (upRes.success && Array.isArray(upRes.data)) setUpgradeRequests(upRes.data);
+    else setUpgradeRequests([]);
+    setLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const filteredMembers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return members.filter((m) => {
+      const name = (m.name || '').toLowerCase();
+      const cat = (m.category || '').toLowerCase();
+      const matchQ = !q || name.includes(q) || cat.includes(q);
+      if (roleFilter === 'All') return matchQ;
+      if (roleFilter === 'Admin') return matchQ && m.role === 'ADMIN';
+      if (roleFilter === 'Technician') return matchQ && m.role === 'WORKER';
+      if (roleFilter === 'Manager') return matchQ && m.role === 'WORKER';
+      if (roleFilter === 'Sales') return matchQ && m.role === 'WORKER';
+      return matchQ;
+    });
+  }, [members, searchQuery, roleFilter]);
+
+  const onApproveUpgrade = async (id) => {
+    const res = await approveSubscriptionUpgrade(id);
+    if (res.success) {
+      Alert.alert('Approved', res.message || 'Plan updated.');
+      loadData();
+    } else Alert.alert('Error', res.message || 'Could not approve');
+  };
+
+  const onRejectUpgrade = async (id) => {
+    const res = await rejectSubscriptionUpgrade(id);
+    if (res.success) {
+      Alert.alert('Rejected', res.message || 'Request rejected.');
+      loadData();
+    } else Alert.alert('Error', res.message || 'Could not reject');
+  };
+
+  const UpgradeRequestCard = ({ item }) => {
+    const u = item.user || {};
+    const plan = item.plan || {};
+    const status = (item.status || 'PENDING').toUpperCase();
+    const pending = status === 'PENDING';
+    return (
     <View style={styles.requestCard}>
       <View style={styles.cardHeader}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{name.split(' ').map(n => n[0]).join('')}</Text></View>
+        <View style={styles.avatar}><Text style={styles.avatarText}>{initialsFromName(u.name)}</Text></View>
         <View style={styles.memberInfo}>
-          <Text style={styles.memberName}>{name}</Text>
-          <Text style={styles.memberSub}>{role} • {team}</Text>
+          <Text style={styles.memberName}>{u.name || 'User'}</Text>
+          <Text style={styles.memberSub}>Subscription • {plan.name || 'Plan'}</Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: status === 'Approved' ? '#ECFDF5' : '#FFF7ED' }]}>
-          <Text style={[styles.statusBadgeText, { color: status === 'Approved' ? '#10B981' : '#F59E0B' }]}>{status}</Text>
-        </View>
-      </View>
-
-      <View style={styles.statsTable}>
-        <View style={styles.statCol}>
-          <Text style={styles.statVal}>{current}%</Text>
-          <Text style={styles.statLab}>Current</Text>
-        </View>
-        <View style={styles.statCol}>
-          <Text style={[styles.statVal, { color: '#6366F1' }]}>+{increase}%</Text>
-          <Text style={styles.statLab}>Increase</Text>
-        </View>
-        <View style={styles.statCol}>
-          <Text style={styles.statVal}>{requested}%</Text>
-          <Text style={styles.statLab}>Requested</Text>
+        <View style={[styles.statusBadge, { backgroundColor: pending ? '#FFF7ED' : '#ECFDF5' }]}>
+          <Text style={[styles.statusBadgeText, { color: pending ? '#F59E0B' : '#10B981' }]}>{status}</Text>
         </View>
       </View>
 
       <View style={styles.effectiveBox}>
-        <Text style={styles.effectiveText}>Effective From: {date}</Text>
+        <Text style={styles.effectiveText}>
+          Requested {plan.price != null ? `$${Number(plan.price).toFixed(0)}/mo ` : ''}
+          · {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
+        </Text>
       </View>
 
-      {status === 'Pending' ? (
+      {pending ? (
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.rejectBtn}>
+          <TouchableOpacity style={styles.rejectBtn} onPress={() => onRejectUpgrade(item.id)}>
             <Text style={styles.rejectText}>Reject</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.approveBtn}>
+          <TouchableOpacity style={styles.approveBtn} onPress={() => onApproveUpgrade(item.id)}>
             <Text style={styles.approveText}>Approve</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <TouchableOpacity style={styles.viewDetailsBtn}>
-          <Text style={styles.viewDetailsText}>View Details</Text>
+        <TouchableOpacity style={styles.viewDetailsBtn} onPress={() => {}}>
+          <Text style={styles.viewDetailsText}>Closed</Text>
         </TouchableOpacity>
       )}
     </View>
-  );
+    );
+  };
 
-  const MemberItem = ({ name, role, status, lastActive, roleColor }) => (
+  const MemberItem = ({ name, role, status, lastActive, roleColor, initials }) => (
     <View style={styles.memberCard}>
-      <View style={styles.avatarJM}><Text style={styles.avatarText}>JM</Text></View>
+      <View style={styles.avatarJM}><Text style={styles.avatarText}>{initials}</Text></View>
       <View style={{ flex: 1, marginLeft: 16 }}>
         <Text style={styles.memberName}>{name}</Text>
         <View style={styles.badgeRow}>
@@ -151,46 +212,32 @@ const TeamAccountsScreen = ({ navigation }) => {
         </ScrollView>
       </View>
 
+      <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
+        <BusinessModuleBanner
+          title="Live team data"
+          subtitle="Team Members = workers from /users/workers. Requests = subscription upgrade requests from your database."
+        />
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.contentScroll}>
         {activeTab === 'Requests' && (
           <View style={styles.section}>
             <View style={styles.tabIntro}>
-              <Text style={styles.tabIntroTitle}>Percentage Increase Requests</Text>
-              <Text style={styles.tabIntroSub}>Review and respond to team compensation proposals.</Text>
+              <Text style={styles.tabIntroTitle}>Subscription upgrade requests</Text>
+              <Text style={styles.tabIntroSub}>Approve or reject plan changes from professionals.</Text>
             </View>
 
-            <View style={styles.requestsList}>
-              <RequestCard 
-                name="John Carter" 
-                role="Sales Executive" 
-                team="Alpha Team" 
-                status="Pending" 
-                current="10" 
-                increase="5" 
-                requested="15" 
-                date="March 2026" 
-              />
-              <RequestCard 
-                name="Sarah Wilson" 
-                role="Field Manager" 
-                team="Beta Team" 
-                status="Approved" 
-                current="12" 
-                increase="4" 
-                requested="16" 
-                date="April 2026" 
-              />
-              <RequestCard 
-                name="Mike Davis" 
-                role="Technician Lead" 
-                team="Alpha Team" 
-                status="Pending" 
-                current="8" 
-                increase="4" 
-                requested="12" 
-                date="May 2026" 
-              />
-            </View>
+            {loading ? (
+              <ActivityIndicator style={{ marginTop: 24 }} color="#0062E1" />
+            ) : upgradeRequests.length === 0 ? (
+              <Text style={{ color: COLORS.textTertiary, marginTop: 8 }}>No upgrade requests in the database.</Text>
+            ) : (
+              <View style={styles.requestsList}>
+                {upgradeRequests.map((item) => (
+                  <UpgradeRequestCard key={item.id} item={item} />
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -218,13 +265,25 @@ const TeamAccountsScreen = ({ navigation }) => {
               ))}
             </ScrollView>
 
-            <View style={styles.membersList}>
-              <MemberItem name="John Miller" role="Technician" status="Active" lastActive="Today, 10:42 AM" roleColor="#10B981" />
-              <MemberItem name="Sarah Lee" role="Manager" status="Active" lastActive="Today, 10:42 AM" roleColor="#3B82F6" />
-              <MemberItem name="Mike Thompson" role="Technician" status="Inactive" lastActive="Today, 10:42 AM" roleColor="#10B981" />
-              <MemberItem name="Emma Davis" role="Admin" status="Active" lastActive="Today, 10:42 AM" roleColor="#8B5CF6" />
-              <MemberItem name="Sarah Lee" role="Technician" status="Active" lastActive="Today, 10:42 AM" roleColor="#10B981" />
-            </View>
+            {loading ? (
+              <ActivityIndicator style={{ marginTop: 24 }} color="#0062E1" />
+            ) : filteredMembers.length === 0 ? (
+              <Text style={{ color: COLORS.textTertiary, marginTop: 12 }}>No workers found. Add professionals from admin / worker management.</Text>
+            ) : (
+              <View style={styles.membersList}>
+                {filteredMembers.map((m) => (
+                  <MemberItem
+                    key={m.id}
+                    name={m.name || 'Worker'}
+                    role={m.category || 'Professional'}
+                    status={m.isAvailable ? 'Active' : 'Inactive'}
+                    lastActive={m.lastUpdate ? new Date(m.lastUpdate).toLocaleString() : '—'}
+                    roleColor={m.isAvailable ? '#10B981' : '#94A3B8'}
+                    initials={initialsFromName(m.name)}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -232,7 +291,7 @@ const TeamAccountsScreen = ({ navigation }) => {
           <View style={styles.section}>
             <View style={styles.tabIntro}>
               <Text style={styles.tabIntroTitle}>Roles & Permissions</Text>
-              <Text style={styles.tabIntroSub}>Control access levels across your team.</Text>
+              <Text style={styles.tabIntroSub}>UI presets only — backend RBAC is not stored yet. Real roles use ADMIN vs WORKER in the API.</Text>
             </View>
 
             <View style={styles.rolePermissionCard}>

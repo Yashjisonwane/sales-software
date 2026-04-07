@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,128 +7,192 @@ import {
     TouchableOpacity,
     StatusBar,
     TextInput,
-    Image,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SHADOWS } from '../../constants/theme';
+import { COLORS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { useFocusEffect } from '@react-navigation/native';
+import { getJobChats } from '../../api/apiService';
 
-const MessageItem = ({ initial, name, lastMessage, subMessage, time, onPress }) => (
-    <TouchableOpacity style={styles.messageItem} onPress={onPress}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
-        <View style={styles.messageOuterContent}>
-            <View style={styles.messageHeader}>
-                <Text style={styles.senderName}>{name}</Text>
-                <Text style={styles.timeText}>{time}</Text>
-            </View>
-            <View style={styles.messageFooter}>
-                <Text style={styles.lastMessage} numberOfLines={3}>
-                    {lastMessage}
-                    {subMessage && (
-                        <Text style={styles.subMessageText}>{` \n${subMessage}`}</Text>
-                    )}
-                </Text>
-            </View>
-        </View>
-    </TouchableOpacity>
-);
+function formatListTime(iso) {
+    if (!iso) return '';
+    try {
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return '';
+    }
+}
+
+function initials(name) {
+    if (!name || typeof name !== 'string') return '?';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+}
 
 export default function InboxScreen({ navigation }) {
     const insets = useSafeAreaInsets();
-    const [activeFilter, setActiveFilter] = useState('All');
-    const filters = ['All', 'Messages', 'Team Chats', 'Updates'];
+    const tabBarHeight = useBottomTabBarHeight();
+    const [search, setSearch] = useState('');
+    const [threads, setThreads] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
 
-    const messages = [
-        { initial: 'JM', name: 'Sarah Johnson', lastMessage: 'Hi, what time will the team arrive today?', time: '09:15 AM' },
-        { initial: 'JM', name: 'Team Alpha', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Sarah Noah', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Mike Thompson', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'John Miller', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-        { initial: 'JM', name: 'Emma Davis', lastMessage: 'Invoice #INV-1025 is overdue by 3 days.', subMessage: 'Customer payment is still pending. Follow up recommended.', time: '08:13 AM' },
-    ];
+    const load = useCallback(async () => {
+        const res = await getJobChats();
+        if (res.success && Array.isArray(res.data)) {
+            setThreads(res.data);
+        } else {
+            setThreads([]);
+        }
+        setLoading(false);
+        setRefreshing(false);
+    }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            setLoading(true);
+            load();
+        }, [load])
+    );
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        load();
+    };
+
+    const q = search.trim().toLowerCase();
+    const filtered = threads.filter((t) => {
+        if (!q) return true;
+        const hay = `${t.customerName || ''} ${t.lastMessage || ''} ${t.service || ''} ${t.leadId || ''}`.toLowerCase();
+        return hay.includes(q);
+    });
 
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+            <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
-            <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-                <View style={styles.searchContainer}>
-                    <Ionicons name="search" size={20} color={COLORS.textTertiary} />
-                    <TextInput placeholder="Search..." style={styles.searchInput} />
-                </View>
-                <TouchableOpacity style={styles.teamBtn}>
-                    <Ionicons name="people" size={20} color={COLORS.white} />
-                    <Text style={styles.teamBtnText}>Team</Text>
-                </TouchableOpacity>
+            <View style={[styles.titleBlock, { paddingTop: insets.top + 8 }]}>
+                <Text style={styles.screenTitle}>Messages</Text>
+                <Text style={styles.screenSub}>
+                    Job threads with customers and workers. Search to find a conversation; bottom tabs stay put for easy navigation.
+                </Text>
             </View>
 
-            <View style={styles.filtersContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-                    {filters.map(filter => (
-                        <TouchableOpacity
-                            key={filter}
-                            onPress={() => setActiveFilter(filter)}
-                            style={[styles.filterChip, activeFilter === filter && styles.activeFilterChip]}
-                        >
-                            <Text style={[styles.filterChipText, activeFilter === filter && styles.activeFilterText]}>{filter}</Text>
-                        </TouchableOpacity>
-                    ))}
+            <View style={styles.searchWrap}>
+                <Ionicons name="search-outline" size={20} color="#94A3B8" />
+                <TextInput
+                    placeholder="Search by customer or job"
+                    style={styles.searchInput}
+                    placeholderTextColor="#94A3B8"
+                    value={search}
+                    onChangeText={setSearch}
+                />
+            </View>
+
+            {loading ? (
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
+                </View>
+            ) : (
+                <ScrollView
+                    style={styles.messagesList}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+                    contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+                >
+                    {filtered.length === 0 ? (
+                        <Text style={styles.emptyText}>No job chats yet. Conversations show up when messaging is active on jobs.</Text>
+                    ) : (
+                        filtered.map((msg, index) => (
+                            <TouchableOpacity
+                                key={msg.id}
+                                style={[styles.row, index > 0 && styles.rowBorder]}
+                                onPress={() =>
+                                    navigation.navigate('JobChat', {
+                                        chatId: msg.id,
+                                        title: msg.customerName || 'Customer',
+                                        subtitle: [msg.service, msg.leadId && msg.leadId !== 'N/A' ? `#${msg.leadId}` : null]
+                                            .filter(Boolean)
+                                            .join(' · '),
+                                    })
+                                }
+                                activeOpacity={0.7}
+                            >
+                                <View style={styles.avatar}>
+                                    <Text style={styles.avatarText}>{initials(msg.customerName)}</Text>
+                                </View>
+                                <View style={styles.rowBody}>
+                                    <View style={styles.rowTop}>
+                                        <Text style={styles.name} numberOfLines={1}>
+                                            {msg.customerName || 'Customer'}
+                                        </Text>
+                                        <Text style={styles.time}>{formatListTime(msg.time)}</Text>
+                                    </View>
+                                    <Text style={styles.preview} numberOfLines={2}>
+                                        {msg.lastMessage || 'No messages yet'}
+                                    </Text>
+                                </View>
+                                <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+                            </TouchableOpacity>
+                        ))
+                    )}
                 </ScrollView>
-            </View>
-
-            <ScrollView style={styles.messagesList} showsVerticalScrollIndicator={false}>
-                <View style={styles.listCard}>
-                    {messages.map((msg, index) => (
-                        <React.Fragment key={index}>
-                            <MessageItem
-                                {...msg}
-                                onPress={() => navigation.navigate('AdminChat', { name: msg.name })}
-                            />
-                            {index < messages.length - 1 && <View style={styles.divider} />}
-                        </React.Fragment>
-                    ))}
-                </View>
-                <View style={{ height: 100 }} />
-            </ScrollView>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8FAFC' },
-    header: {
-        paddingBottom: 16, paddingHorizontal: 16,
-        backgroundColor: COLORS.white, flexDirection: 'row', gap: 12, alignItems: 'center',
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    titleBlock: { paddingHorizontal: 20, paddingBottom: 12 },
+    screenTitle: { fontSize: 28, fontWeight: '800', color: '#0F172A', letterSpacing: -0.5 },
+    screenSub: { fontSize: 13, color: '#64748B', marginTop: 6, lineHeight: 18 },
+    searchWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 16,
+        marginBottom: 12,
+        height: 46,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
     },
-    searchContainer: {
-        flex: 1, height: 50, backgroundColor: COLORS.white, borderRadius: 25,
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-        borderWidth: 1, borderColor: '#E2E8F0', ...SHADOWS.small,
-    },
-    searchInput: { flex: 1, marginLeft: 8, fontSize: 16, color: COLORS.textPrimary },
-    teamBtn: {
-        height: 50, backgroundColor: '#1E293B', borderRadius: 25,
-        flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8,
-    },
-    teamBtnText: { color: COLORS.white, fontWeight: '600' },
-
-    filtersContainer: { paddingVertical: 16, backgroundColor: COLORS.white },
-    filterChip: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: COLORS.white, borderWidth: 1, borderColor: '#F1F5F9' },
-    activeFilterChip: { backgroundColor: '#1E293B', borderColor: '#1E293B' },
-    filterChipText: { fontSize: 14, fontWeight: '600', color: COLORS.textSecondary },
-    activeFilterText: { color: COLORS.white },
-
+    searchInput: { flex: 1, marginLeft: 10, fontSize: 15, color: '#0F172A' },
     messagesList: { flex: 1, paddingHorizontal: 16 },
-    listCard: { backgroundColor: COLORS.white, borderRadius: 16, paddingHorizontal: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-    messageItem: { flexDirection: 'row', paddingVertical: 18, gap: 14, alignItems: 'flex-start' },
-    avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
-    avatarText: { color: COLORS.white, fontSize: 16, fontWeight: '800' },
-    messageOuterContent: { flex: 1 },
-    messageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-    senderName: { fontSize: 16, fontWeight: '800', color: '#1A202C' },
-    timeText: { fontSize: 11, color: '#94A3B8' },
-    messageFooter: { flexDirection: 'row' },
-    lastMessage: { fontSize: 13, color: '#4A5568', lineHeight: 18 },
-    subMessageText: { color: '#94A3B8', fontSize: 12 },
-    divider: { height: 1, backgroundColor: '#F1F5F9' },
+    emptyText: { padding: 28, fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 20 },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 14,
+        borderRadius: 14,
+        marginBottom: 8,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+    },
+    rowBorder: {},
+    avatar: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#0062E1',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+    rowBody: { flex: 1, marginLeft: 12, marginRight: 8 },
+    rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+    name: { fontSize: 16, fontWeight: '700', color: '#0F172A', flex: 1, marginRight: 8 },
+    time: { fontSize: 11, color: '#94A3B8' },
+    preview: { fontSize: 13, color: '#64748B', lineHeight: 18 },
 });

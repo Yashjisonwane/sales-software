@@ -7,16 +7,14 @@ import {
   ScrollView,
   StatusBar,
   Switch,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, SHADOWS, FONTS } from '../../../constants/theme';
+import { COLORS, SHADOWS } from '../../../constants/theme';
 
 const AppPreferencesScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [darkMode, setDarkMode] = useState(false);
-  const [biometrics, setBiometrics] = useState(true);
   const [language, setLanguage] = useState('English');
 
   const PreferenceItem = ({ icon, title, value, type, onValueChange }) => (
@@ -46,8 +44,7 @@ const AppPreferencesScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-      
-      {/* Header */}
+
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={COLORS.textPrimary} />
@@ -59,41 +56,20 @@ const AppPreferencesScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.sectionTitle}>General</Text>
         <View style={styles.card}>
-          <PreferenceItem 
-            icon="language-outline" 
-            title="Language" 
-            value={language} 
-            type="select" 
-          />
+          <PreferenceItem icon="language-outline" title="Language" value={language} type="select" />
           <View style={styles.divider} />
-          <PreferenceItem 
-            icon="moon-outline" 
-            title="Dark Mode" 
-            value={darkMode} 
-            type="switch" 
+          <PreferenceItem
+            icon="moon-outline"
+            title="Dark Mode"
+            value={darkMode}
+            type="switch"
             onValueChange={setDarkMode}
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>Security</Text>
-        <View style={styles.card}>
-          <PreferenceItem 
-            icon="finger-print-outline" 
-            title="Biometric Login" 
-            value={biometrics} 
-            type="switch" 
-            onValueChange={setBiometrics}
           />
         </View>
 
         <Text style={styles.sectionTitle}>Appearance</Text>
         <View style={styles.card}>
-          <PreferenceItem 
-            icon="text-outline" 
-            title="Font Size" 
-            value="Default" 
-            type="select" 
-          />
+          <PreferenceItem icon="text-outline" title="Font Size" value="Default" type="select" />
         </View>
       </ScrollView>
     </View>
@@ -113,11 +89,31 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   scrollContent: { padding: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textTertiary, textTransform: 'uppercase', marginBottom: 12, marginLeft: 4 },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.textTertiary,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+    marginLeft: 4,
+  },
   card: { backgroundColor: '#F8FAFC', borderRadius: 20, padding: 8, marginBottom: 24, ...SHADOWS.small },
-  itemContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12 },
+  itemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+  },
   itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconContainer: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center', ...SHADOWS.small },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.small,
+  },
   itemTitle: { fontSize: 15, fontWeight: '600', color: COLORS.textPrimary },
   valueContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   itemValue: { fontSize: 14, color: COLORS.textTertiary, fontWeight: '500' },
