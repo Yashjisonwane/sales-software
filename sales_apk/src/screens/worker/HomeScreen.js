@@ -25,7 +25,7 @@ const { width } = Dimensions.get('window');
 const CATEGORY_STYLE_MAP = {
   'Plumbing': { icon: 'water', color: '#3B82F6', bg: '#EFF6FF' },
   'Electrical': { icon: 'flash', color: '#F59E0B', bg: '#FFFBEB' },
-  'Cleaning': { icon: 'sparkles', color: '#10B981', bg: '#ECFDF5' },
+  'Cleaning': { icon: 'star', color: '#10B981', bg: '#ECFDF5' },
   'HVAC': { icon: 'snow', color: '#06B6D4', bg: '#ECFEFF' },
   'Painting': { icon: 'color-palette', color: '#EC4899', bg: '#FDF2F8' },
   'Roofing': { icon: 'home', color: '#8B5CF6', bg: '#F5F3FF' },

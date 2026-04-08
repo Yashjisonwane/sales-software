@@ -13,6 +13,37 @@ function loginErrorMessage(error) {
     return error.message || 'Login failed';
 }
 
+const normalizeUser = (u = {}) => ({
+    ...u,
+    id: u?.id ?? null,
+    name: u?.name ?? 'User',
+    role: u?.role ?? 'WORKER',
+    lat: u?.lat ?? u?.latitude ?? null,
+    lng: u?.lng ?? u?.longitude ?? null,
+});
+
+const normalizeLead = (lead = {}) => ({
+    ...lead,
+    id: lead?.id ?? lead?.leadId ?? null,
+    customerName: lead?.customerName ?? lead?.customer?.name ?? lead?.guestName ?? 'Customer',
+    customerPhone: lead?.customerPhone ?? lead?.customer?.phone ?? lead?.guestPhone ?? null,
+    categoryName: lead?.categoryName ?? lead?.category?.name ?? 'Service',
+    customerLat: lead?.customerLat ?? lead?.latitude ?? null,
+    customerLng: lead?.customerLng ?? lead?.longitude ?? null,
+});
+
+const normalizeJob = (job = {}) => ({
+    ...job,
+    id: job?.id ?? null,
+    leadId: job?.leadId ?? job?.lead?.id ?? null,
+    customerName: job?.customerName ?? job?.customer?.name ?? job?.lead?.customer?.name ?? 'Customer',
+    categoryName: job?.categoryName ?? job?.lead?.category?.name ?? 'Service',
+    customerLat: job?.customerLat ?? job?.latitude ?? job?.lead?.latitude ?? null,
+    customerLng: job?.customerLng ?? job?.longitude ?? job?.lead?.longitude ?? null,
+    chatId: job?.chatId ?? job?.chats?.id ?? null,
+    invoice: job?.invoice ?? job?.invoices ?? null,
+});
+
 export const loginWorker = async (email, password) => {
     try {
         const response = await apiClient.post('/auth/login', { email, password });
@@ -96,13 +127,26 @@ export const trackGuestRequest = async (sessionToken) => {
     }
 };
 
+export const getGuestLiveTracking = async (sessionToken) => {
+    try {
+        const response = await apiClient.get(`/guest/live/${encodeURIComponent(sessionToken)}`);
+        return response.data;
+    } catch (error) {
+        return { success: false, message: error.response?.data?.message || error.message };
+    }
+};
+
 /**
  * SERVICE: Leads Management
  */
 export const getAvailableLeads = async () => {
     try {
         const response = await apiClient.get('/leads');
-        return response.data;
+        const payload = response.data || {};
+        return {
+            ...payload,
+            data: Array.isArray(payload.data) ? payload.data.map(normalizeLead) : [],
+        };
     } catch (error) {
         return { success: false, message: 'Could not fetch leads' };
     }
@@ -137,7 +181,11 @@ export const acceptLead = async (leadId) => {
 export const getWorkerJobs = async () => {
     try {
         const response = await apiClient.get('/jobs');
-        return response.data;
+        const payload = response.data || {};
+        return {
+            ...payload,
+            data: Array.isArray(payload.data) ? payload.data.map(normalizeJob) : [],
+        };
     } catch (error) {
         return { success: false, message: 'Could not fetch jobs' };
     }
@@ -147,7 +195,11 @@ export const getWorkerJobs = async () => {
 export const getJobById = async (jobIdOrJobNo) => {
     try {
         const response = await apiClient.get(`/jobs/${encodeURIComponent(jobIdOrJobNo)}`);
-        return response.data;
+        const payload = response.data || {};
+        return {
+            ...payload,
+            data: payload.data ? normalizeJob(payload.data) : null,
+        };
     } catch (error) {
         return {
             success: false,
@@ -159,7 +211,11 @@ export const getJobById = async (jobIdOrJobNo) => {
 export const getAllJobs = async () => {
     try {
         const response = await apiClient.get('/jobs');
-        return response.data;
+        const payload = response.data || {};
+        return {
+            ...payload,
+            data: Array.isArray(payload.data) ? payload.data.map(normalizeJob) : [],
+        };
     } catch (error) {
         return { success: false, message: 'Could not fetch all jobs' };
     }
@@ -210,7 +266,10 @@ export const submitInspection = async (jobId, notes, triageAnswers) => {
         const response = await apiClient.post(`/jobs/${jobId}/inspection`, { notes, triageAnswers });
         return response.data;
     } catch (error) {
-        return { success: false, message: 'Failed to submit inspection' };
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to submit inspection',
+        };
     }
 };
 
@@ -249,6 +308,20 @@ export const createInvoice = async (jobId, amount, extra = {}) => {
         return {
             success: false,
             message: error.response?.data?.message || error.message || 'Failed to create invoice',
+        };
+    }
+};
+
+export const updateInvoiceStatus = async (invoiceId, status) => {
+    try {
+        const response = await apiClient.patch(`/jobs/invoices/${encodeURIComponent(invoiceId)}/status`, {
+            status,
+        });
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Failed to update invoice status',
         };
     }
 };
@@ -413,7 +486,11 @@ export const getWorkerMaterialsSnapshot = async () => {
 export const getProfile = async () => {
     try {
         const response = await apiClient.get('/users/profile');
-        return response.data;
+        const payload = response.data || {};
+        return {
+            ...payload,
+            data: payload.data ? normalizeUser(payload.data) : null,
+        };
     } catch (error) {
         return { success: false, message: 'Failed to fetch profile' };
     }
@@ -425,6 +502,18 @@ export const getProfessionals = async () => {
         return response.data;
     } catch (error) {
         return { success: false, message: 'Could not fetch professionals' };
+    }
+};
+
+export const getProfessionalsLocations = async () => {
+    try {
+        const response = await apiClient.get('/users/professionals-locations');
+        return response.data;
+    } catch (error) {
+        return {
+            success: false,
+            message: error.response?.data?.message || error.message || 'Could not fetch professionals locations',
+        };
     }
 };
 
@@ -597,6 +686,7 @@ export default {
     submitCompliance,
     createEstimate,
     createInvoice,
+    updateInvoiceStatus,
     getDashboardStats,
     getProfile,
     updateProfile,
@@ -614,6 +704,7 @@ export default {
     getLeadById,
     registerWorkerByInvite,
     resetPassword,
+    getGuestLiveTracking,
     uploadJobPhoto,
     assignJob,
     getJobHistory,

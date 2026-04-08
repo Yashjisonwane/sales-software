@@ -16,7 +16,9 @@ import {
   FlatList as RNFlatList,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as Location from 'expo-location';
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ScrollView as GestureHandlerScrollView, FlatList as GestureHandlerFlatList } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -95,7 +97,7 @@ const getCategoryImages = (category) => {
   ];
 };
 
-import { getDashboardStats, getAvailableLeads, getAllJobs, getEstimates, getInvoices, getProfessionals } from '../../api/apiService';
+import { getDashboardStats, getAvailableLeads, getAllJobs, getEstimates, getInvoices, getProfessionals, getProfessionalsLocations, getProfile } from '../../api/apiService';
 import { pickLatLng, buildLeafletPinsMapHtml } from '../../utils/leafletMapHtml';
 
 const mapStyle = [
@@ -222,6 +224,13 @@ const StatCard = ({ icon, label, value, change, color, onPress }) => {
     </TouchableOpacity>
   );
 };
+
+const DEFAULT_OVERVIEW_STATS = [
+  { name: 'TOTAL LEADS', value: 0, trend: '+0%' },
+  { name: 'TOTAL PROFESSIONALS', value: 0, trend: '+0%' },
+  { name: 'LEADS TODAY', value: 0, trend: '+0%' },
+  { name: 'CONVERSION RATE', value: '0%' , trend: '+0%' },
+];
 
 const ProgressBar = ({ label, value, progress, color, labelColor }) => (
   <View style={styles.progressContainer}>
@@ -506,35 +515,101 @@ export default function ExploreScreen({ navigation, route }) {
   const [leads, setLeads] = useState([]);
   const [allJobs, setAllJobs] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [workerLocations, setWorkerLocations] = useState([]);
+  const [adminLocation, setAdminLocation] = useState(null);
   const [quotes, setQuotes] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [jobStatusFilter, setJobStatusFilter] = useState('All');
+  const [mapLegendFilter, setMapLegendFilter] = useState('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const overviewStats = useMemo(() => {
+    const fromApi = Array.isArray(stats?.mainStats) && stats.mainStats.length > 0 ? stats.mainStats : DEFAULT_OVERVIEW_STATS;
+    const fallbackByName = Object.fromEntries(fromApi.map((s) => [String(s.name || '').toUpperCase(), s]));
+    return DEFAULT_OVERVIEW_STATS.map((d) => {
+      const src = fallbackByName[d.name] || d;
+      return {
+        name: d.name,
+        value: src.value ?? d.value,
+        trend: src.trend ?? d.trend,
+      };
+    });
+  }, [stats]);
 
   const leafletPins = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const match = (t) => !q || String(t || '').toLowerCase().includes(q);
+    const resolveCoords = (x) =>
+      pickLatLng({
+        latitude: x?.customerLat ?? x?.latitude ?? x?.customer?.latitude ?? x?.job?.customerLat,
+        longitude: x?.customerLng ?? x?.longitude ?? x?.customer?.longitude ?? x?.job?.customerLng,
+        lat: x?.lat ?? x?.customer?.lat ?? x?.job?.lat,
+        lng: x?.lng ?? x?.customer?.lng ?? x?.job?.lng,
+        lon: x?.lon ?? x?.customer?.lon ?? x?.job?.lon,
+      }) || pickLatLng(x?.customer) || pickLatLng(x?.job) || pickLatLng(x);
+    const normalizeMapStatus = (status) => {
+      const s = String(status || '').toUpperCase();
+      if (s === 'OPEN') return 'LEAD_JOBS';
+      if (['DELAYED', 'CANCELLED', 'REJECTED'].includes(s)) return 'DELAYED';
+      return 'SUBCONTRACT';
+    };
+    const passMapFilter = (status) => mapLegendFilter === 'ALL' || normalizeMapStatus(status) === mapLegendFilter;
     const out = [];
     leads
       .filter((l) => String(l.status || '').toUpperCase() === 'OPEN')
+      .filter((l) => passMapFilter(l.status))
       .filter((l) => match(l.customerName || l.clientName) || match(l.location || l.address))
       .forEach((l) => {
-        const c = pickLatLng(l);
+        const c = resolveCoords(l);
         if (!c) return;
         out.push({ ...c, color: '#8B5CF6', id: l.id, recordType: 'lead' });
       });
     allJobs
+      .filter((j) => passMapFilter(j.status))
       .filter((j) => match(j.customerName) || match(j.location))
       .forEach((j) => {
-        const c = pickLatLng(j);
+        const c = resolveCoords(j);
         if (!c) return;
         const color = j.status === 'IN_PROGRESS' ? '#0E56D0' : '#004D40';
         out.push({ ...c, color, id: j.id, recordType: 'job' });
       });
+    workerLocations
+      .filter((w) => match(w.name) || match(w.currentJob?.customerName) || match(w.currentJob?.location))
+      .forEach((w) => {
+        const workerPoint = pickLatLng({ lat: w.lat, lng: w.lng });
+        if (workerPoint) {
+          out.push({
+            ...workerPoint,
+            color: '#0EA5E9',
+            id: `worker-${w.id}`,
+            recordType: 'worker',
+          });
+        }
+        const customerPoint = pickLatLng({
+          lat: w.currentJob?.customerLat,
+          lng: w.currentJob?.customerLng,
+        });
+        if (customerPoint) {
+          out.push({
+            ...customerPoint,
+            color: '#16A34A',
+            id: `worker-customer-${w.id}-${w.currentJob?.id || 'job'}`,
+            recordType: 'worker-customer',
+          });
+        }
+      });
+    if (adminLocation && typeof adminLocation.lat === 'number' && typeof adminLocation.lng === 'number') {
+      out.push({
+        latitude: adminLocation.lat,
+        longitude: adminLocation.lng,
+        color: '#0EA5E9',
+        id: `admin-${adminLocation.id || 'self'}`,
+        recordType: 'self',
+      });
+    }
     return out;
-  }, [leads, allJobs, searchQuery]);
+  }, [leads, allJobs, searchQuery, workerLocations, mapLegendFilter, adminLocation]);
 
   const leafletMapHtml = useMemo(() => buildLeafletPinsMapHtml(leafletPins), [leafletPins]);
   const leafletMapKey = useMemo(
@@ -551,26 +626,47 @@ export default function ExploreScreen({ navigation, route }) {
         if (recordType === 'lead') {
           const lead = leads.find((l) => String(l.id) === String(id));
           if (lead) navigation.navigate('JobDetails', { job: lead });
+        } else if (recordType === 'worker') {
+          const wid = String(id).replace('worker-', '');
+          const worker = workerLocations.find((w) => String(w.id) === wid);
+          if (worker) {
+            Alert.alert(
+              'Worker Location',
+              `${worker.name || 'Worker'}\n${worker.currentJob?.customerName ? `Current customer: ${worker.currentJob.customerName}` : 'No active job'}`
+            );
+          }
+        } else if (recordType === 'worker-customer') {
+          const pinId = String(id || '');
+          const worker = workerLocations.find((w) => pinId.startsWith(`worker-customer-${String(w.id)}-`));
+          if (worker?.currentJob) {
+            navigation.navigate('JobDetails', { job: worker.currentJob });
+          } else {
+            Alert.alert('Location Info', 'No active customer job found for this worker.');
+          }
+        } else if (recordType === 'admin') {
+          Alert.alert('Admin Location', 'This is your current admin location on map.');
         } else {
           const job = allJobs.find((j) => String(j.id) === String(id));
           if (job) navigation.navigate('JobDetails', { job });
         }
       } catch (_) {}
     },
-    [leads, allJobs, navigation]
+    [leads, allJobs, navigation, workerLocations]
   );
 
   const fetchData = async () => {
     setIsRefreshing(true);
     console.log('[DASHBOARD] Fetching data...');
     try {
-      const [statsRes, leadsRes, jobsRes, quotesRes, invoicesRes, workersRes] = await Promise.all([
+      const [statsRes, leadsRes, jobsRes, quotesRes, invoicesRes, workersRes, workerLocationsRes, profileRes] = await Promise.all([
         getDashboardStats(),
         getAvailableLeads(),
         getAllJobs(),
         getEstimates(),
         getInvoices(),
-        getProfessionals()
+        getProfessionals(),
+        getProfessionalsLocations(),
+        getProfile()
       ]);
       
       console.log(`[DASHBOARD] Data received: Stats:${statsRes.success}, Leads:${leadsRes.data?.length}, Jobs:${jobsRes.data?.length}, Workers:${workersRes.data?.length}`);
@@ -581,6 +677,15 @@ export default function ExploreScreen({ navigation, route }) {
       if (quotesRes.success) setQuotes(quotesRes.data);
       if (invoicesRes.success) setInvoices(invoicesRes.data);
       if (workersRes.success) setWorkers(workersRes.data);
+      if (workerLocationsRes.success) setWorkerLocations(workerLocationsRes.data || []);
+      if (profileRes.success && profileRes.data) {
+        const self = profileRes.data;
+        if (typeof self.lat === 'number' && typeof self.lng === 'number') {
+          setAdminLocation({ id: self.id, lat: self.lat, lng: self.lng });
+        } else {
+          setAdminLocation(null);
+        }
+      }
     } catch (e) {
       console.log('[DASHBOARD] Error:', e);
     } finally {
@@ -590,13 +695,81 @@ export default function ExploreScreen({ navigation, route }) {
 
   const tabs = ['Overview', 'Jobs', 'Schedule', 'Invoice', 'Quote'];
   const bottomSheetRef = useRef(null);
+  const locationWatcherRef = useRef(null);
   const snapPoints = useMemo(() => ['18%', '45%', '92%'], []);
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const animatedIndex = useSharedValue(0);
 
   React.useEffect(() => {
     fetchData();
   }, []);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const startDeviceLocationTracking = async () => {
+      try {
+        const perm = await Location.requestForegroundPermissionsAsync();
+        if (perm.status !== 'granted') {
+          Alert.alert('Location permission', 'Allow location access to show your blue current location on map.');
+          return;
+        }
+        const current = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (mounted) {
+          setAdminLocation((prev) => ({
+            id: prev?.id || 'self',
+            lat: current.coords.latitude,
+            lng: current.coords.longitude,
+          }));
+        }
+        if (locationWatcherRef.current) {
+          locationWatcherRef.current.remove();
+        }
+        locationWatcherRef.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 6000,
+            distanceInterval: 10,
+          },
+          (loc) => {
+            if (!mounted) return;
+            setAdminLocation((prev) => ({
+              id: prev?.id || 'self',
+              lat: loc.coords.latitude,
+              lng: loc.coords.longitude,
+            }));
+          }
+        );
+      } catch (_) {
+        // keep profile-based location fallback
+      }
+    };
+    startDeviceLocationTracking();
+    return () => {
+      mounted = false;
+      if (locationWatcherRef.current) {
+        locationWatcherRef.current.remove();
+        locationWatcherRef.current = null;
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      fetchData();
+    });
+    return unsub;
+  }, [navigation]);
+
+  React.useEffect(() => {
+    if (activeTab !== 'Invoice') return undefined;
+    const timer = setInterval(() => {
+      fetchData();
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeTab]);
 
   React.useEffect(() => {
     if (route.params?.activeTab) {
@@ -616,11 +789,12 @@ export default function ExploreScreen({ navigation, route }) {
   });
 
   const legendAnimatedStyle = useAnimatedStyle(() => {
+    const lift = tabBarHeight + 14;
     // 0 = 18%, 1 = 40%, 2 = 92% snap points
     const bottom = interpolate(
       animatedIndex.value,
       [0, 1, 2],
-      [height * 0.18 + 5, height * 0.45 + 5, height * 0.92 + 5]
+      [height * 0.18 + lift, height * 0.45 + lift, height * 0.92 + lift]
     );
     const opacity = 1;
     return {
@@ -630,11 +804,12 @@ export default function ExploreScreen({ navigation, route }) {
   });
 
   const buttonsAnimatedStyle = useAnimatedStyle(() => {
+    const lift = tabBarHeight + 14;
     // Buttons stay higher than legend (160 offset for safety)
     const bottom = interpolate(
       animatedIndex.value,
       [0, 1, 2],
-      [height * 0.18 + 100, height * 0.45 + 100, height * 0.92 + 100]
+      [height * 0.18 + lift + 95, height * 0.45 + lift + 95, height * 0.92 + lift + 95]
     );
     const opacity = interpolate(
       animatedIndex.value,
@@ -663,7 +838,7 @@ export default function ExploreScreen({ navigation, route }) {
             javaScriptEnabled
             domStorageEnabled
             scalesPageToFit
-            scrollEnabled={false}
+            scrollEnabled={true}
           />
         ) : (
           <WebView
@@ -672,7 +847,7 @@ export default function ExploreScreen({ navigation, route }) {
             originWhitelist={['*']}
             javaScriptEnabled
             domStorageEnabled
-            scrollEnabled={false}
+            scrollEnabled={true}
           />
         )}
 
@@ -771,11 +946,32 @@ export default function ExploreScreen({ navigation, route }) {
           {/* Legend Chips precisely matching screenshot - now follows the sheet handle */}
           {!selectedJob && (
             <Animated.View style={[styles.legendContainer, legendAnimatedStyle]}>
-              <View style={styles.legendWrapper}>
-                <View style={[styles.legendChip, { backgroundColor: '#8B5CF6' }]}><Text style={styles.legendText}>Lead Jobs</Text></View>
-                <View style={[styles.legendChip, { backgroundColor: '#10B981' }]}><Text style={styles.legendText}>Subcontract</Text></View>
-                <View style={[styles.legendChip, { backgroundColor: '#EF4444' }]}><Text style={styles.legendText}>Delayed</Text></View>
-              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.legendWrapper}>
+                <TouchableOpacity
+                  onPress={() => setMapLegendFilter('LEAD_JOBS')}
+                  style={[styles.legendChip, { backgroundColor: '#8B5CF6', opacity: mapLegendFilter === 'LEAD_JOBS' ? 1 : 0.6 }]}
+                >
+                  <Text style={styles.legendText}>Lead Jobs</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setMapLegendFilter('SUBCONTRACT')}
+                  style={[styles.legendChip, { backgroundColor: '#10B981', opacity: mapLegendFilter === 'SUBCONTRACT' ? 1 : 0.6 }]}
+                >
+                  <Text style={styles.legendText}>Subcontract</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setMapLegendFilter('DELAYED')}
+                  style={[styles.legendChip, { backgroundColor: '#EF4444', opacity: mapLegendFilter === 'DELAYED' ? 1 : 0.6 }]}
+                >
+                  <Text style={styles.legendText}>Delayed</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setMapLegendFilter('ALL')}
+                  style={[styles.legendChip, { backgroundColor: '#334155', opacity: mapLegendFilter === 'ALL' ? 1 : 0.6 }]}
+                >
+                  <Text style={styles.legendText}>All</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </Animated.View>
           )}
         </Animated.View>
@@ -789,6 +985,7 @@ export default function ExploreScreen({ navigation, route }) {
           ref={bottomSheetRef}
           index={1}
           snapPoints={snapPoints}
+          bottomInset={tabBarHeight}
           animatedIndex={animatedIndex}
           enablePanDownToClose={false}
           handleIndicatorStyle={styles.sheetHandle}
@@ -853,25 +1050,25 @@ export default function ExploreScreen({ navigation, route }) {
                   <View style={styles.statsGridRefined}>
                     <StatCard 
                       icon="people-outline" 
-                      label="Active Workers" 
-                      value={stats?.mainStats?.[0]?.value?.toString() || "0"} 
-                      change={stats?.mainStats?.[0]?.trend || "+0%"} 
+                      label={overviewStats[0].name}
+                      value={String(overviewStats[0].value)}
+                      change={overviewStats[0].trend}
                       color="#3B82F6" 
                       onPress={() => navigation.navigate('WorkerManagement')}
                     />
                     <StatCard 
                       icon="briefcase-outline" 
-                      label="Jobs In Progress" 
-                      value={stats?.mainStats?.[1]?.value?.toString() || "0"} 
-                      change={stats?.mainStats?.[1]?.trend || "Lead: 0 | Sub: 0"} 
+                      label={overviewStats[1].name}
+                      value={String(overviewStats[1].value)}
+                      change={overviewStats[1].trend}
                       color="#8B5CF6" 
                       onPress={() => setActiveTab('Jobs')}
                     />
                     <StatCard 
                       icon="checkmark-circle-outline" 
-                      label="Completed Jobs" 
-                      value={stats?.mainStats?.[2]?.value?.toString() || "0"} 
-                      change={stats?.mainStats?.[2]?.trend || "+0%"} 
+                      label={overviewStats[2].name}
+                      value={String(overviewStats[2].value)}
+                      change={overviewStats[2].trend}
                       color="#10B981" 
                       onPress={() => {
                         setActiveTab('Jobs');
@@ -880,9 +1077,9 @@ export default function ExploreScreen({ navigation, route }) {
                     />
                     <StatCard 
                       icon="cash-outline" 
-                      label="Total Revenue" 
-                      value={stats?.mainStats?.[3]?.value?.toString() || "$0"} 
-                      change={stats?.mainStats?.[3]?.trend || "+0%"} 
+                      label={overviewStats[3].name}
+                      value={String(overviewStats[3].value)}
+                      change={overviewStats[3].trend}
                       color="#0062E1" 
                       onPress={() => setActiveTab('Invoice')}
                     />
@@ -1887,12 +2084,12 @@ const styles = StyleSheet.create({
   mapButtonsRight: { position: 'absolute', right: 20, zIndex: 110, gap: 15, alignItems: 'center' },
   navCircleBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6 },
   dirSquareBtn: { width: 56, height: 52, borderRadius: 16, backgroundColor: '#007A8A', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6 },
-  legendContainer: { position: 'absolute', left: 0, right: 0, zIndex: 1000, height: 80, justifyContent: 'center' },
-  legendWrapper: { flexDirection: 'row', justifyContent: 'center', paddingHorizontal: 10, gap: 8, alignItems: 'center' },
+  legendContainer: { position: 'absolute', left: 0, right: 0, zIndex: 1000, height: 72, justifyContent: 'center' },
+  legendWrapper: { paddingHorizontal: 16, gap: 10, alignItems: 'center' },
   legendChip: { 
-    flex: 1, 
-    height: 52, 
-    borderRadius: 26, 
+    minWidth: 112,
+    height: 46, 
+    borderRadius: 23, 
     alignItems: 'center', 
     justifyContent: 'center', 
     elevation: 8, 
@@ -1900,9 +2097,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, 
     shadowOpacity: 0.25, 
     shadowRadius: 5,
-    paddingHorizontal: 2
+    paddingHorizontal: 16
   },
-  legendText: { color: '#FFF', fontSize: 13, fontWeight: '900', fontFamily: FONTS.bold },
+  legendText: { color: '#FFF', fontSize: 12, fontWeight: '800', fontFamily: FONTS.bold },
 
   // Quote Modal Styles
   quoteModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 16 },

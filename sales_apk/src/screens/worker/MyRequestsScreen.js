@@ -45,7 +45,7 @@ const REQUESTS = [
     status: 'Completed',
     date: 'Mar 5, 2026',
     time: '9:00 AM',
-    icon: 'sparkles',
+    icon: 'star',
     color: '#10B981',
     bg: '#ECFDF5',
     address: '789 Pine Rd, NY',

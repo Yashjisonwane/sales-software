@@ -3,7 +3,24 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Clock, MapPin, Navigation } from 'lucide-react';
 
-const OPEN_FREE_MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const MAP_STYLE = {
+    version: 8,
+    sources: {
+        osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
+        }
+    },
+    layers: [
+        {
+            id: 'osm-base',
+            type: 'raster',
+            source: 'osm'
+        }
+    ]
+};
 const DEFAULT_CENTER = [77.4126, 23.2599];
 const MOVE_ANIMATION_MS = 850;
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
@@ -62,7 +79,7 @@ const LeadMap = ({ leads = [], onAction, className = '' }) => {
         if (!mapContainerRef.current || mapRef.current) return;
         const map = new maplibregl.Map({
             container: mapContainerRef.current,
-            style: OPEN_FREE_MAP_STYLE,
+            style: MAP_STYLE,
             center: DEFAULT_CENTER,
             zoom: 5
         });

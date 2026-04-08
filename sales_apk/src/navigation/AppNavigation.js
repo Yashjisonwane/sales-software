@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../constants/theme';
+import { rootNavigationRef, resetToWelcome } from './navigationRef';
+import { setUnauthorizedHandler } from '../api/apiClient';
 
 // Shared & Auth
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
@@ -151,7 +153,6 @@ function WorkerTabs() {
           return (
             <View style={[styles.tabIconContainer, focused && styles.activePillPadded]}>
               <Ionicons name={iconName} size={24} color={color} />
-              {route.name === 'Inbox' && <View style={styles.notifDot} />}
             </View>
           );
         },
@@ -197,7 +198,6 @@ function AdminTabs() {
           return (
             <View style={[styles.tabIconContainer, focused && styles.activePillPadded]}>
               <Ionicons name={iconName} size={22} color={color} />
-              {route.name === 'Inbox' && <View style={styles.notifBadgeTab} />}
             </View>
           );
         },
@@ -245,8 +245,15 @@ function AdminTabs() {
 }
 
 export default function AppNavigation() {
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      resetToWelcome();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={rootNavigationRef}>
       <Stack.Navigator initialRouteName="Welcome" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Welcome" component={WelcomeScreen} />

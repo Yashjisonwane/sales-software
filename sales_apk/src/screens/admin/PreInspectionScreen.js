@@ -24,18 +24,29 @@ const PreInspectionScreen = ({ navigation, route }) => {
   const [issueType, setIssueType] = useState('New Installation');
   const [urgency, setUrgency] = useState('Medium');
   const [damage, setDamage] = useState('None');
+  const [wallWidth, setWallWidth] = useState('12.4');
+  const [ceilingHeight, setCeilingHeight] = useState('9.1');
   const [loading, setLoading] = useState(false);
 
   const handleInspect = async () => {
-    if (!job?.jobNo) {
+    const resolvedJobId = job?.id || route.params?.jobId;
+    if (!resolvedJobId) {
       Alert.alert('Job required', 'Inspection is saved against a job. Assign a worker to the lead first.');
       return;
     }
     setLoading(true);
-    const triageAnswers = { issueType, urgency, damage };
-    const notes = `Triage: ${issueType}, Urgency: ${urgency}, Damage: ${damage}`;
+    const triageAnswers = {
+      issueType,
+      urgency,
+      damage,
+      measurements: {
+        wallWidth,
+        ceilingHeight,
+      },
+    };
+    const notes = `Triage: ${issueType}, Urgency: ${urgency}, Damage: ${damage}, Wall: ${wallWidth}ft, Ceiling: ${ceilingHeight}ft`;
     
-    const res = await submitInspection(job.id, notes, triageAnswers);
+    const res = await submitInspection(resolvedJobId, notes, triageAnswers);
     setLoading(false);
 
     if (res.success) {
@@ -59,7 +70,7 @@ const PreInspectionScreen = ({ navigation, route }) => {
         }
       });
     } else {
-      Alert.alert("Error", res.message || "Failed to save inspection");
+      Alert.alert("Error", res.message || "Failed to submit inspection");
     }
   };
 
@@ -104,14 +115,14 @@ const PreInspectionScreen = ({ navigation, route }) => {
           </View>
         </View>
 
-        {/* AI Job Triage Card */}
+        {/* Job Assessment Card */}
         <View style={styles.purpleCard}>
           <View style={styles.aiHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.aiTitle}>AI Job Triage</Text>
-              <Text style={styles.aiSub}>Analyze job complexity for better estimates.</Text>
+              <Text style={styles.aiTitle}>Job Triage</Text>
+              <Text style={styles.aiSub}>Capture issue details for better estimates.</Text>
             </View>
-            <MaterialCommunityIcons name="sparkles" size={22} color="#A855F7" />
+            <MaterialCommunityIcons name="clipboard-text-outline" size={22} color="#A855F7" />
           </View>
 
           <View style={styles.triageBox}>
@@ -174,19 +185,33 @@ const PreInspectionScreen = ({ navigation, route }) => {
           </Text>
           
           <View style={styles.cameraBox}>
-            <TouchableOpacity style={styles.openCameraBtn}>
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.openCameraBtnText}>{role === 'worker' ? 'Launch Scanning Tool' : 'Open AR Camera'}</Text>
-            </TouchableOpacity>
+            <View style={styles.cameraInfoBox}>
+              <Ionicons name="construct-outline" size={20} color="#93C5FD" />
+              <Text style={styles.cameraInfoText}>
+                {role === 'worker'
+                  ? 'Enter field measurements below.'
+                  : 'Use the values below to prepare the quote.'}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.measRow}>
              <Text style={styles.measLab}>{role === 'worker' ? 'Exact Wall Width' : 'Wall Width'}</Text>
-             <Text style={styles.measVal}>12.4 ft</Text>
+             <TextInput
+               style={styles.measInput}
+               keyboardType="decimal-pad"
+               value={wallWidth}
+               onChangeText={setWallWidth}
+             />
           </View>
           <View style={styles.measRow}>
              <Text style={styles.measLab}>{role === 'worker' ? 'Exact Ceiling Height' : 'Ceiling Height'}</Text>
-             <Text style={styles.measVal}>9.1 ft</Text>
+             <TextInput
+               style={styles.measInput}
+               keyboardType="decimal-pad"
+               value={ceilingHeight}
+               onChangeText={setCeilingHeight}
+             />
           </View>
           {role === 'worker' && (
             <View style={styles.measRow}>
@@ -251,11 +276,33 @@ const styles = StyleSheet.create({
   cameraBox: { height: 180, backgroundColor: '#111827', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
   openCameraBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0E56D0', paddingHorizontal: 20, height: 48, borderRadius: 24, gap: 10 },
   openCameraBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  cameraInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(14, 86, 208, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(147, 197, 253, 0.5)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  cameraInfoText: { color: '#DBEAFE', fontSize: 13, fontWeight: '600' },
 
   measurementTitle: { fontSize: 15, fontWeight: '700', color: '#1A202C', marginBottom: 16 },
   measRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   measLab: { fontSize: 14, color: '#718096' },
   measVal: { fontSize: 14, fontWeight: '700', color: '#1A202C' },
+  measInput: {
+    minWidth: 72,
+    textAlign: 'right',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1A202C',
+    borderBottomWidth: 1,
+    borderBottomColor: '#CBD5E1',
+    paddingVertical: 2,
+  },
 
   addMeasBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 24, gap: 8, backgroundColor: '#fff' },
   addMeasText: { fontSize: 14, fontWeight: '600', color: '#1A202C' },

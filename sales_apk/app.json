@@ -13,7 +13,6 @@
     },
     "android": {
       "package": "com.lightlabcreation.salesapp",
-      "usesCleartextTraffic": true,
       "config": {
         "googleMaps": {
           "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
@@ -38,7 +37,7 @@
     "updates": {
       "url": "https://u.expo.dev/c73f1702-24fc-44f8-aa68-b4a8e7a5d685",
       "enabled": true,
-      "checkOnLaunch": "ALWAYS",
+      "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
     "runtimeVersion": {
@@ -53,6 +52,12 @@
       "expo-font",
       "expo-updates",
       "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location to show your live position on maps."
+        }
+      ],
       [
         "expo-local-authentication",
         {

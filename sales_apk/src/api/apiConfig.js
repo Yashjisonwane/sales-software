@@ -28,13 +28,13 @@ function resolveDevHost() {
   return FALLBACK_LAN_HOST;
 }
 
-/**
- * In __DEV__, prefer auto-detected host so you don't fight wrong IPs.
- * Release builds use FALLBACK_LAN_HOST — replace with your production API or env.
- */
-export const API_BASE_URL = __DEV__
-  ? `http://${resolveDevHost()}:${BACKEND_PORT}/api/v1`
-  : `http://${FALLBACK_LAN_HOST}:${BACKEND_PORT}/api/v1`;
+// Local backend (commented as requested):
+// export const API_BASE_URL = __DEV__
+//   ? `http://${resolveDevHost()}:${BACKEND_PORT}/api/v1`
+//   : `http://${FALLBACK_LAN_HOST}:${BACKEND_PORT}/api/v1`;
+
+// Live Railway backend:
+export const API_BASE_URL = 'https://sales-software-production.up.railway.app/api/v1';
 
 if (__DEV__) {
   // Metro console — verify phone hits the same machine as `npm run dev` backend

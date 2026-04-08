@@ -201,16 +201,28 @@ export default function DashboardScreen({ navigation }) {
           ) : (
             <>
               <View style={styles.statsGrid}>
-                {stats?.mainStats?.map((s, idx) => (
+                {stats?.mainStats?.map((s, idx) => {
+                  const name = String(s.name || '').toUpperCase();
+                  const icon =
+                    name === 'TOTAL LEADS'
+                      ? 'people-outline'
+                      : name === 'TOTAL PROFESSIONALS'
+                        ? 'construct-outline'
+                        : name === 'LEADS TODAY'
+                          ? 'flash-outline'
+                          : name === 'CONVERSION RATE'
+                            ? 'trending-up-outline'
+                            : 'stats-chart-outline';
+                  return (
                   <StatCard
                     key={idx}
-                    icon={s.name === 'Total Revenue' ? 'cash-outline' : s.name.includes('Job') ? 'checkmark-circle-outline' : 'people-outline'}
-                    label={s.name}
+                    icon={icon}
+                    label={name}
                     value={s.value}
                     change={s.trend}
                     color={idx % 2 === 0 ? '#10B981' : '#3B82F6'}
                   />
-                ))}
+                )})}
               </View>
 
               <View style={styles.revenueCard}>

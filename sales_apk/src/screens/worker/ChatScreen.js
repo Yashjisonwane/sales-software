@@ -31,6 +31,7 @@ function formatTime(iso) {
 
 export default function ChatScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const chatId = route.params?.chatId;
   const title = route.params?.title || route.params?.name || 'Chat';
   const subtitle = route.params?.subtitle || route.params?.service || '';
@@ -39,6 +40,7 @@ export default function ChatScreen({ navigation, route }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [myUserId, setMyUserId] = useState(null);
+  const [userReady, setUserReady] = useState(false);
   const flatListRef = useRef();
 
   useEffect(() => {
@@ -50,11 +52,12 @@ export default function ChatScreen({ navigation, route }) {
           setMyUserId(u?.id || null);
         }
       } catch (_) {}
+      setUserReady(true);
     })();
   }, []);
 
   const loadMessages = useCallback(async () => {
-    if (!chatId) {
+    if (!chatId || !userReady) {
       setLoading(false);
       return;
     }
@@ -74,19 +77,34 @@ export default function ChatScreen({ navigation, route }) {
       senderLabel: m.users?.name || (m.isGuest ? 'Customer' : 'Staff'),
     }));
     setRows(list);
-  }, [chatId, myUserId]);
+  }, [chatId, myUserId, userReady]);
 
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
 
+  useEffect(() => {
+    if (!chatId) return undefined;
+    const timer = setInterval(() => {
+      loadMessages();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [chatId, loadMessages]);
+
   const onSend = async () => {
     const t = message.trim();
     if (!t || !chatId) return;
+    const optimisticId = `local-${Date.now()}`;
+    setRows((prev) => [
+      ...prev,
+      { id: optimisticId, text: t, time: formatTime(new Date().toISOString()), isMine: true, isGuest: false, senderLabel: 'You' },
+    ]);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     setSending(true);
     const res = await sendJobChatMessage(chatId, t);
     setSending(false);
     if (!res.success) {
+      setRows((prev) => prev.filter((m) => m.id !== optimisticId));
       Alert.alert('Send failed', res.message || 'Try again');
       return;
     }
@@ -165,10 +183,17 @@ export default function ChatScreen({ navigation, route }) {
           contentContainerStyle={[styles.messagesList, { paddingBottom: 12 + tabBarHeight }]}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            <View style={{ paddingVertical: 24 }}>
+              <Text style={{ color: COLORS.textSecondary, textAlign: 'center', fontSize: 14 }}>
+                No messages yet. Start the conversation below.
+              </Text>
+            </View>
+          }
         />
       )}
 
-      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      <View style={[styles.inputBar, { paddingBottom: tabBarHeight + Math.max(insets.bottom, 10) }]}>
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}

@@ -19,17 +19,20 @@ import {
   savePaymentMethod,
   FUTURE_ROUTES,
 } from '../../../api/futureBusinessApi';
+import { getInvoices } from '../../../api/apiService';
 
 export default function PaymentMethodsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [methods, setMethods] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [stubNote, setStubNote] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetchPaymentMethods();
+    const [res, invRes] = await Promise.all([fetchPaymentMethods(), getInvoices()]);
     setMethods(Array.isArray(res.data) ? res.data : []);
+    setInvoices(Array.isArray(invRes?.data) ? invRes.data : []);
     setStubNote(res.source === 'stub' ? res.message || '' : '');
     setLoading(false);
   }, []);
@@ -127,6 +130,31 @@ export default function PaymentMethodsScreen({ navigation }) {
           ))
         )}
 
+        <View style={styles.historyCard}>
+          <Text style={styles.historyTitle}>Payment status from invoices</Text>
+          {invoices.length === 0 ? (
+            <Text style={styles.historyEmpty}>No invoices found yet. Create invoice from Job flow to track payments.</Text>
+          ) : (
+            invoices.slice(0, 8).map((inv) => {
+              const paid = String(inv.status || '').toUpperCase() === 'PAID';
+              return (
+                <View key={inv.id} style={styles.historyRow}>
+                  <View style={styles.historyLeft}>
+                    <Text style={styles.historyName}>#{String(inv.id).slice(-6).toUpperCase()}</Text>
+                    <Text style={styles.historySub}>{inv.customerName || inv.job?.customer?.name || 'Customer'}</Text>
+                  </View>
+                  <View style={styles.historyRight}>
+                    <Text style={styles.historyAmount}>${Number(inv.amount || 0).toFixed(2)}</Text>
+                    <Text style={[styles.historyBadge, paid ? styles.historyPaid : styles.historyUnpaid]}>
+                      {paid ? 'PAID' : 'UNPAID'}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         <TouchableOpacity style={styles.addBtn} onPress={onAdd} activeOpacity={0.85}>
           <Ionicons name="add-circle" size={24} color={COLORS.primary} />
           <Text style={styles.addBtnText}>Add payment method</Text>
@@ -213,4 +241,30 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addBtnText: { fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
+  historyCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  historyTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 10 },
+  historyEmpty: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 19 },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  historyLeft: { flex: 1, paddingRight: 10 },
+  historyRight: { alignItems: 'flex-end' },
+  historyName: { fontSize: 13, fontWeight: '700', color: COLORS.textPrimary },
+  historySub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  historyAmount: { fontSize: 13, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+  historyBadge: { fontSize: 11, fontWeight: '800' },
+  historyPaid: { color: '#16A34A' },
+  historyUnpaid: { color: '#DC2626' },
 });

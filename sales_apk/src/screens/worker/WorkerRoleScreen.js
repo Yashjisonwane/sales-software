@@ -61,7 +61,7 @@ export default function WorkerRoleScreen({ navigation }) {
             id: 'Cleaner',
             title: 'Cleaner',
             subtitle: 'Home and office cleaning services',
-            icon: 'sparkles-outline',
+            icon: 'star-outline',
             iconType: 'Ionicons'
         },
         {

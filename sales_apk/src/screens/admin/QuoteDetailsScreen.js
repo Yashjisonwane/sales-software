@@ -30,6 +30,7 @@ const QuoteDetailsScreen = ({ navigation, route }) => {
     role,
     quote: quoteParam,
     estimateId,
+    quoteId,
     job: jobParam,
   } = p;
 
@@ -46,11 +47,11 @@ const QuoteDetailsScreen = ({ navigation, route }) => {
   const [est, setEst] = useState(() => (quoteParam != null ? quoteParam : null));
   const [loading, setLoading] = useState(() => {
     if (quoteParam != null) return false;
-    return Boolean(estimateId || quoteParam?.id);
+    return Boolean(estimateId || quoteId || quoteParam?.id);
   });
 
   useEffect(() => {
-    const eid = estimateId || quoteParam?.id;
+    const eid = estimateId || quoteId || quoteParam?.id;
     if (quoteParam != null) {
       setEst(quoteParam);
       setLoading(false);
@@ -73,7 +74,7 @@ const QuoteDetailsScreen = ({ navigation, route }) => {
     return () => {
       cancelled = true;
     };
-  }, [estimateId, quoteParam?.id, quoteParam]);
+  }, [estimateId, quoteId, quoteParam?.id, quoteParam]);
 
   const id =
     paramDisplayId ||

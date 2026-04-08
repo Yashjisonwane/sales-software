@@ -14,15 +14,18 @@ import {
     Keyboard,
     Platform,
     Alert,
+    Linking,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as Location from 'expo-location';
 import BottomSheet, { BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ScrollView as GestureHandlerScrollView } from 'react-native-gesture-handler';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS, SHADOWS, SIZES, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
-import { getAvailableLeads, acceptLead, getWorkerJobs } from '../../api/apiService';
+import { getAvailableLeads, acceptLead, getWorkerJobs, getProfile, getProfessionalsLocations } from '../../api/apiService';
 import { pickLatLng, buildLeafletPinsMapHtml } from '../../utils/leafletMapHtml';
 import { getLeadPricingLines, getJobPricingLines } from '../../utils/workerPricingDisplay';
 
@@ -87,9 +90,12 @@ export default function WorkerExploreScreen({ navigation, route }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [invoicePickerOpen, setInvoicePickerOpen] = useState(false);
+    const [mapStatusFilter, setMapStatusFilter] = useState('ALL');
     const bottomSheetRef = useRef(null);
+    const locationWatcherRef = useRef(null);
     const snapPoints = useMemo(() => ['18%', '40%', '92%'], []);
     const insets = useSafeAreaInsets();
+    const tabBarHeight = useBottomTabBarHeight();
     const animatedIndex = useSharedValue(0);
 
     const mapAnimatedStyle = useAnimatedStyle(() => {
@@ -104,11 +110,12 @@ export default function WorkerExploreScreen({ navigation, route }) {
     });
 
     const legendAnimatedStyle = useAnimatedStyle(() => {
+        const lift = tabBarHeight + 14;
         // animatedIndex represents the snap points: 0=18%, 1=40%, 2=92%
         const bottom = interpolate(
             animatedIndex.value,
             [0, 1, 2],
-            [windowHeight * 0.18 + 10, windowHeight * 0.40 + 10, windowHeight * 0.92 + 10]
+            [windowHeight * 0.18 + lift, windowHeight * 0.40 + lift, windowHeight * 0.92 + lift]
         );
         const opacity = interpolate(
             animatedIndex.value,
@@ -123,11 +130,12 @@ export default function WorkerExploreScreen({ navigation, route }) {
     });
 
     const buttonsAnimatedStyle = useAnimatedStyle(() => {
+        const lift = tabBarHeight + 14;
         // Buttons stay just above legend (65px offset)
         const bottom = interpolate(
             animatedIndex.value,
             [0, 1, 2],
-            [windowHeight * 0.18 + 65, windowHeight * 0.40 + 65, windowHeight * 0.92 + 65]
+            [windowHeight * 0.18 + lift + 55, windowHeight * 0.40 + lift + 55, windowHeight * 0.92 + lift + 55]
         );
         const opacity = interpolate(
             animatedIndex.value,
@@ -149,28 +157,109 @@ export default function WorkerExploreScreen({ navigation, route }) {
 
     const [leads, setLeads] = useState([]);
     const [jobs, setJobs] = useState([]);
+    const [myLocation, setMyLocation] = useState(null);
+    const [teamLocations, setTeamLocations] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchLeads = async () => {
         setIsLoading(true);
-        const res = await getAvailableLeads();
-        if (res.success) {
-            setLeads(res.data || []);
+        try {
+            const res = await getAvailableLeads();
+            if (res.success) {
+                // Keep legacy flow: worker sees leads list as served by backend.
+                setLeads(Array.isArray(res.data) ? res.data : []);
+            } else if (res.message) {
+                Alert.alert('Leads', res.message);
+            }
+        } catch {
+            Alert.alert('Network error', 'Unable to load leads. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
-        setIsLoading(false);
     };
 
     const fetchJobs = async () => {
-        const res = await getWorkerJobs();
-        if (res.success) {
-            setJobs(res.data || []);
+        try {
+            const res = await getWorkerJobs();
+            if (res.success) {
+                setJobs(Array.isArray(res.data) ? res.data : []);
+            }
+        } catch {
+            // Keep silent for background polling to avoid noisy alerts.
+        }
+    };
+
+    const fetchMyLocation = async () => {
+        try {
+            const res = await getProfile();
+            if (res.success && res.data) {
+                const c = pickLatLng(res.data);
+                setMyLocation(c);
+            }
+        } catch {
+            setMyLocation(null);
+        }
+    };
+
+    const startDeviceLocationTracking = useCallback(async () => {
+        try {
+            const perm = await Location.requestForegroundPermissionsAsync();
+            if (perm.status !== 'granted') {
+                Alert.alert('Location permission', 'Please allow location access to show your live blue location on map.');
+                return;
+            }
+            const current = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+            setMyLocation({
+                latitude: current.coords.latitude,
+                longitude: current.coords.longitude,
+            });
+            if (locationWatcherRef.current) {
+                locationWatcherRef.current.remove();
+            }
+            locationWatcherRef.current = await Location.watchPositionAsync(
+                {
+                    accuracy: Location.Accuracy.Balanced,
+                    timeInterval: 6000,
+                    distanceInterval: 10,
+                },
+                (loc) => {
+                    setMyLocation({
+                        latitude: loc.coords.latitude,
+                        longitude: loc.coords.longitude,
+                    });
+                }
+            );
+        } catch {
+            // Keep API/profile fallback location when device location is unavailable.
+        }
+    }, []);
+
+    const fetchTeamLocations = async () => {
+        try {
+            const res = await getProfessionalsLocations();
+            if (res.success) {
+                setTeamLocations(Array.isArray(res.data) ? res.data : []);
+            }
+        } catch {
+            setTeamLocations([]);
         }
     };
 
     useEffect(() => {
         fetchLeads();
         fetchJobs();
-    }, []);
+        fetchMyLocation();
+        fetchTeamLocations();
+        startDeviceLocationTracking();
+        return () => {
+            if (locationWatcherRef.current) {
+                locationWatcherRef.current.remove();
+                locationWatcherRef.current = null;
+            }
+        };
+    }, [startDeviceLocationTracking]);
 
     useEffect(() => {
         if (activeTab === 'Schedule' || activeTab === 'Invoice' || activeTab === 'Quote') {
@@ -178,26 +267,139 @@ export default function WorkerExploreScreen({ navigation, route }) {
         }
     }, [activeTab]);
 
+    useEffect(() => {
+        const unsub = navigation.addListener('focus', () => {
+            fetchJobs();
+        });
+        return unsub;
+    }, [navigation]);
+
+    useEffect(() => {
+        if (activeTab !== 'Invoice' && activeTab !== 'Schedule') return undefined;
+        const timer = setInterval(() => {
+            fetchJobs();
+            fetchTeamLocations();
+        }, 5000);
+        return () => clearInterval(timer);
+    }, [activeTab]);
+
+    const resolveCoords = useCallback(
+        (x) =>
+            pickLatLng({
+                latitude: x?.customerLat ?? x?.latitude ?? x?.customer?.latitude ?? x?.job?.customerLat,
+                longitude: x?.customerLng ?? x?.longitude ?? x?.customer?.longitude ?? x?.job?.customerLng,
+                lat: x?.lat ?? x?.customer?.lat ?? x?.job?.lat,
+                lng: x?.lng ?? x?.customer?.lng ?? x?.job?.lng,
+                lon: x?.lon ?? x?.customer?.lon ?? x?.job?.lon,
+            }) || pickLatLng(x?.customer) || pickLatLng(x?.job) || pickLatLng(x),
+        []
+    );
+
+    const openDirectionsToWork = useCallback(async () => {
+        const assignedLead = leads.find((l) => String(l.status || '').toUpperCase() !== 'OPEN' && resolveCoords(l));
+        const targetJob = jobs.find((j) => resolveCoords(j));
+        const target = targetJob || assignedLead;
+        const coord = target ? resolveCoords(target) : null;
+        if (!coord) {
+            Alert.alert('Location missing', 'No valid customer location found for directions.');
+            return;
+        }
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${coord.latitude},${coord.longitude}`;
+        const can = await Linking.canOpenURL(url);
+        if (can) Linking.openURL(url);
+        else Alert.alert('Unable to open maps', 'Please install Google Maps or enable browser links.');
+    }, [jobs, leads, resolveCoords]);
+    const openDirectionsForEntity = useCallback(async (entity) => {
+        const coord = resolveCoords(entity);
+        let url = '';
+        if (coord) {
+            url = `https://www.google.com/maps/dir/?api=1&destination=${coord.latitude},${coord.longitude}`;
+        } else {
+            const raw = entity?.location || entity?.customerAddress || entity?.lead?.location || '';
+            if (!raw) {
+                Alert.alert('Location missing', 'This job/lead does not have coordinates or address.');
+                return;
+            }
+            url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(raw)}`;
+        }
+        const can = await Linking.canOpenURL(url);
+        if (can) Linking.openURL(url);
+        else Alert.alert('Unable to open maps', 'Please install Google Maps or enable browser links.');
+    }, [resolveCoords]);
+
     const leafletPins = useMemo(() => {
-        const q = searchQuery.trim().toLowerCase();
-        const match = (t) => !q || String(t || '').toLowerCase().includes(q);
+        const normalizeStatus = (status) => {
+            const s = String(status || '').toUpperCase();
+            if (['IN_PROGRESS', 'STARTED', 'ACTIVE'].includes(s)) return 'IN_PROGRESS';
+            if (['SCHEDULED', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'UPCOMING'].includes(s)) return 'UPCOMING';
+            if (['COMPLETED', 'DONE', 'PAID'].includes(s)) return 'COMPLETED';
+            if (['CANCELLED', 'REJECTED', 'DELAYED'].includes(s)) return 'CANCELLED';
+            return 'UPCOMING';
+        };
+        const passMapFilter = (status) => mapStatusFilter === 'ALL' || normalizeStatus(status) === mapStatusFilter;
         const out = [];
+
+        // Show all leads (OPEN + ASSIGNED) on map; color by state.
         leads
-            .filter((l) => match(l.customerName || l.clientName || '') || match(l.location || l.address || ''))
+            .filter((l) => passMapFilter(l.job?.status || l.status))
             .forEach((l) => {
-                const c = pickLatLng(l);
+                const c = resolveCoords(l);
                 if (!c) return;
-                out.push({ ...c, color: '#F59E0B', id: l.id, recordType: 'lead' });
+                const isOpen = String(l.status || '').toUpperCase() === 'OPEN';
+                out.push({
+                    ...c,
+                    color: isOpen ? '#8B5CF6' : '#7C3AED',
+                    id: `lead-${l.id}`,
+                    recordType: isOpen ? 'lead' : 'lead-assigned',
+                });
             });
+
+        // Keep map behavior aligned with web dashboard:
+        // show assigned job locations as the primary source of truth.
         jobs
-            .filter((j) => match(j.customerName || '') || match(j.location || ''))
+            .filter((j) => passMapFilter(j.status))
             .forEach((j) => {
-                const c = pickLatLng(j);
+                const c = resolveCoords(j);
                 if (!c) return;
-                out.push({ ...c, color: '#8B5CF6', id: j.id, recordType: 'job' });
+                const status = String(j.status || '').toLowerCase();
+                const isActive = ['accepted', 'in progress', 'active', 'scheduled'].includes(status);
+                out.push({ ...c, color: isActive ? '#2563EB' : '#94A3B8', id: j.id, recordType: 'job' });
             });
+        if (myLocation) {
+            out.push({
+                latitude: myLocation.latitude,
+                longitude: myLocation.longitude,
+                color: '#0EA5E9',
+                id: 'worker-self',
+                recordType: 'self',
+            });
+        }
+        teamLocations.forEach((p) => {
+            const c = pickLatLng({ lat: p?.lat, lng: p?.lng, latitude: p?.latitude, longitude: p?.longitude });
+            if (!c) return;
+            if (myLocation && Math.abs(c.latitude - myLocation.latitude) < 0.00001 && Math.abs(c.longitude - myLocation.longitude) < 0.00001) {
+                return;
+            }
+            out.push({
+                ...c,
+                color: String(p?.role || '').toUpperCase() === 'ADMIN' ? '#7C3AED' : '#14B8A6',
+                id: `team-${p?.id || Math.random().toString(36).slice(2, 7)}`,
+                recordType: String(p?.role || '').toUpperCase() === 'ADMIN' ? 'admin' : 'worker-peer',
+            });
+        });
         return out;
-    }, [leads, jobs, searchQuery]);
+    }, [jobs, leads, myLocation, mapStatusFilter, resolveCoords, teamLocations]);
+
+    const filteredLeads = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return leads;
+        return leads.filter((lead) => {
+            const name = String(lead.customerName || lead.customer?.name || '').toLowerCase();
+            const loc = String(lead.location || '').toLowerCase();
+            const cat = String(lead.categoryName || lead.category?.name || '').toLowerCase();
+            return name.includes(q) || loc.includes(q) || cat.includes(q);
+        });
+    }, [leads, searchQuery]);
 
     const leafletMapHtml = useMemo(() => buildLeafletPinsMapHtml(leafletPins), [leafletPins]);
     const leafletMapKey = useMemo(
@@ -231,9 +433,40 @@ export default function WorkerExploreScreen({ navigation, route }) {
                 const msg = JSON.parse(event.nativeEvent.data);
                 if (msg.type !== 'pinPress' || !msg.pin?.id) return;
                 const { id, recordType } = msg.pin;
-                if (recordType === 'lead') {
-                    const lead = leads.find((l) => String(l.id) === String(id));
-                    if (lead) navigation.navigate('JobOfferDetail', { lead, state: 'pending' });
+                if (recordType === 'lead' || recordType === 'lead-assigned') {
+                    const rawId = String(id || '');
+                    const leadId = recordType === 'lead-assigned' && rawId.startsWith('lead-')
+                        ? rawId.replace('lead-', '')
+                        : rawId;
+                    const lead = leads.find((l) => String(l.id) === String(leadId));
+                    if (lead) {
+                        const status = String(lead.status || '').toUpperCase();
+                        if (status === 'OPEN') {
+                            navigation.navigate('JobOfferDetail', { lead, state: 'pending' });
+                        } else {
+                            const linkedJob = getLinkedJobForLead(lead);
+                            if (linkedJob) navigation.navigate('JobDetails', { job: linkedJob });
+                            else {
+                                navigation.navigate('JobDetails', {
+                                    job: {
+                                        id: lead.job?.id || lead.jobId || lead.id,
+                                        leadId: lead.id,
+                                        customerName: lead.customerName || lead.customer?.name || 'Customer',
+                                        location: lead.location,
+                                        status: lead.job?.status || lead.status || 'ASSIGNED',
+                                        latitude: lead.customerLat ?? lead.latitude ?? null,
+                                        longitude: lead.customerLng ?? lead.longitude ?? null,
+                                        customerLat: lead.customerLat ?? lead.latitude ?? null,
+                                        customerLng: lead.customerLng ?? lead.longitude ?? null,
+                                    },
+                                });
+                            }
+                        }
+                    }
+                } else if (recordType === 'admin') {
+                    Alert.alert('Admin Location', 'Admin live location pin.');
+                } else if (recordType === 'worker-peer') {
+                    Alert.alert('Worker Location', 'Another worker live location pin.');
                 } else {
                     const job = jobs.find((j) => String(j.id) === String(id));
                     if (job) navigation.navigate('JobDetails', { job });
@@ -246,13 +479,31 @@ export default function WorkerExploreScreen({ navigation, route }) {
     const handleAcceptLead = async (leadId) => {
         const res = await acceptLead(leadId);
         if (res.success) {
-            alert('Lead Accepted! A new job has been created for you.');
+            Alert.alert('Success', 'Lead accepted. A new job has been linked.');
+            setLeads((prev) => prev.filter((lead) => String(lead.id) !== String(leadId)));
             fetchLeads();
             fetchJobs();
         } else {
-            alert(res.message || 'Failed to accept lead');
+            fetchLeads();
+            fetchJobs();
+            Alert.alert('Failed', res.message || 'Failed to accept lead');
         }
     };
+
+    const getLinkedJobForLead = useCallback(
+        (lead) => {
+            if (!lead) return null;
+            const linkedJobId = lead?.job?.id || lead?.jobId || null;
+            if (linkedJobId) {
+                const byId = jobs.find((j) => String(j.id) === String(linkedJobId));
+                if (byId) return byId;
+            }
+            const byLeadId = jobs.find((j) => String(j.leadId) === String(lead.id));
+            if (byLeadId) return byLeadId;
+            return null;
+        },
+        [jobs]
+    );
 
     const renderOverview = () => (
         <View style={styles.tabScrollContent}>
@@ -300,7 +551,22 @@ export default function WorkerExploreScreen({ navigation, route }) {
             <Text style={styles.sectionTitle}>Recent Activities</Text>
             <View style={styles.updatesList}>
                 {leads.slice(0, 2).map((lead, idx) => (
-                    <View key={idx} style={styles.updateItem}>
+                    <TouchableOpacity
+                        key={idx}
+                        style={styles.updateItem}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                            const status = String(lead.status || '').toUpperCase();
+                            if (status === 'OPEN') {
+                                navigation.navigate('JobOfferDetail', { lead, state: 'pending' });
+                                return;
+                            }
+                            const linkedJob = getLinkedJobForLead(lead);
+                            if (linkedJob) {
+                                navigation.navigate('JobDetails', { job: linkedJob });
+                            }
+                        }}
+                    >
                         <View style={[styles.updateIcon, { backgroundColor: '#FEF3C7' }]}>
                             <Ionicons name="flash" size={20} color="#D97706" />
                         </View>
@@ -308,10 +574,15 @@ export default function WorkerExploreScreen({ navigation, route }) {
                             <Text style={styles.updateText}>New Lead: {lead.customer?.name || 'Customer'}</Text>
                             <Text style={styles.updateMeta}>Just now • {lead.location}</Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 ))}
                 {jobs.slice(0, 1).map((job, idx) => (
-                    <View key={idx} style={styles.updateItem}>
+                    <TouchableOpacity
+                        key={idx}
+                        style={styles.updateItem}
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate('JobDetails', { job })}
+                    >
                         <View style={[styles.updateIcon, { backgroundColor: '#DBEAFE' }]}>
                             <Ionicons name="calendar" size={20} color="#2563EB" />
                         </View>
@@ -319,7 +590,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                             <Text style={styles.updateText}>Upcoming Job today</Text>
                             <Text style={styles.updateMeta}>Scheduled for 09:00 AM</Text>
                         </View>
-                    </View>
+                    </TouchableOpacity>
                 ))}
             </View>
         </View>
@@ -388,27 +659,63 @@ export default function WorkerExploreScreen({ navigation, route }) {
         <View style={styles.tabScrollContent}>
             <View style={styles.detailedSearchRow}>
                 <View style={styles.detailedSearchBox}>
-                    <Text style={styles.detailedSearchText}>Available Leads</Text>
+                    <BottomSheetTextInput
+                        placeholder="Search leads, customer, location"
+                        style={styles.detailedSearchInput}
+                        placeholderTextColor="#94A3B8"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        onSubmitEditing={() => Keyboard.dismiss()}
+                    />
                     <Ionicons name="search" size={20} color="#718096" />
                 </View>
             </View>
 
             {isLoading ? (
                 <Text style={{ textAlign: 'center', padding: 20 }}>Loading leads...</Text>
-            ) : leads.length === 0 ? (
+            ) : filteredLeads.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                     <Ionicons name="document-text-outline" size={60} color="#CBD5E0" />
-                    <Text style={{ color: '#718096', marginTop: 10 }}>No leads available right now.</Text>
+                    <Text style={{ color: '#718096', marginTop: 10 }}>No leads match your search.</Text>
                 </View>
             ) : (
                 <View style={{ gap: 20 }}>
-                    {leads.map(lead => {
+                    {filteredLeads.map(lead => {
                         const leadRates = getLeadPricingLines(lead);
                         return (
                         <TouchableOpacity
                             key={lead.id}
                             style={styles.detailedVerticalCard}
-                            onPress={() => navigation.navigate('JobOfferDetail', { lead, state: 'pending' })}
+                            onPress={() => {
+                                const status = String(lead.status || '').toUpperCase();
+                                if (status === 'OPEN') {
+                                    navigation.navigate('JobOfferDetail', { lead, state: 'pending' });
+                                    return;
+                                }
+                                const linkedJob = getLinkedJobForLead(lead);
+                                if (linkedJob) {
+                                    navigation.navigate('JobDetails', { job: linkedJob });
+                                    return;
+                                }
+                                // Hard fallback: keep assigned flow opening JobDetails even when mapping is missing.
+                                navigation.navigate('JobDetails', {
+                                    job: {
+                                        id: lead.job?.id || lead.jobId || lead.id,
+                                        leadId: lead.id,
+                                        jobNo: lead.job?.jobNo || lead.displayId || lead.leadNo || `LEAD-${String(lead.id).slice(-6)}`,
+                                        customerName: lead.customerName || lead.customer?.name || 'Customer',
+                                        customerPhone: lead.customerPhone || lead.customer?.phone || lead.guestPhone || null,
+                                        location: lead.location,
+                                        categoryName: lead.categoryName || lead.category?.name || 'Service',
+                                        status: lead.job?.status || 'ACCEPTED',
+                                        latitude: lead.customerLat ?? lead.latitude ?? null,
+                                        longitude: lead.customerLng ?? lead.longitude ?? null,
+                                        customerLat: lead.customerLat ?? lead.latitude ?? null,
+                                        customerLng: lead.customerLng ?? lead.longitude ?? null,
+                                        photos: lead.coverPhotoUrl ? [{ id: `cover-${lead.id}`, url: lead.coverPhotoUrl }] : [],
+                                    },
+                                });
+                            }}
                             activeOpacity={0.9}
                         >
                             <Image 
@@ -431,13 +738,22 @@ export default function WorkerExploreScreen({ navigation, route }) {
                                         {leadRates.secondary ? (
                                             <Text style={styles.jobPriceSub}>{leadRates.secondary}</Text>
                                         ) : null}
+                                            <TouchableOpacity onPress={() => openDirectionsForEntity(lead)}>
+                                                <Text style={{ color: '#0E56D0', fontWeight: '700', marginTop: 6 }}>Get Directions</Text>
+                                            </TouchableOpacity>
                                     </View>
-                                    <TouchableOpacity 
-                                        style={[styles.actionBtn, { maxWidth: 120 }]}
-                                        onPress={() => handleAcceptLead(lead.id)}
-                                    >
-                                        <Text style={styles.actionText}>Accept Now</Text>
-                                    </TouchableOpacity>
+                                    {String(lead.status || '').toUpperCase() === 'OPEN' ? (
+                                        <TouchableOpacity 
+                                            style={[styles.actionBtn, { maxWidth: 120 }]}
+                                            onPress={() => handleAcceptLead(lead.id)}
+                                        >
+                                            <Text style={styles.actionText}>Accept Now</Text>
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <View style={[styles.actionBtn, { maxWidth: 120, backgroundColor: '#E2E8F0' }]}>
+                                            <Text style={[styles.actionText, { color: '#475569' }]}>Assigned</Text>
+                                        </View>
+                                    )}
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -563,7 +879,18 @@ export default function WorkerExploreScreen({ navigation, route }) {
                         <Text style={[styles.billingValue, { fontWeight: '700' }]}>${job.invoice.amount}</Text>
                     </View>
 
-                    <TouchableOpacity style={styles.viewDetailsLink}>
+                    <TouchableOpacity
+                        style={styles.viewDetailsLink}
+                        onPress={() =>
+                            navigation.navigate('InvoiceDetails', {
+                                invoice: {
+                                    ...job.invoice,
+                                    customerName: job.customerName || job.customer?.name || 'Customer',
+                                    categoryName: job.categoryName || job.category?.name || 'Service',
+                                },
+                            })
+                        }
+                    >
                         <Text style={styles.viewDetailsText}>View Details</Text>
                     </TouchableOpacity>
                 </View>
@@ -623,7 +950,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
 
                     <TouchableOpacity
                         style={styles.viewDetailsLinkLeft}
-                        onPress={() => navigation.navigate('QuoteDetails', { quoteId: job.estimate.id, role: 'worker' })}
+                        onPress={() => navigation.navigate('QuoteDetails', { estimateId: job.estimate.id, role: 'worker', job })}
                     >
                         <Text style={styles.viewDetailsTextPurple}>View Details</Text>
                     </TouchableOpacity>
@@ -705,24 +1032,16 @@ export default function WorkerExploreScreen({ navigation, route }) {
                                         <TouchableOpacity 
                                            style={styles.agendaBtnSecondary}
                                            onPress={() =>
-                                             navigation.navigate('JobOfferDetail', {
-                                               lead: job.lead || {
-                                                 id: job.leadId,
-                                                 customerName: job.customerName,
-                                                 customer: job.customer,
-                                                 location: job.location,
-                                                 categoryName: job.categoryName,
-                                                 category: { name: job.categoryName },
-                                                 guestPhone: job.guestPhone,
-                                                 servicePlan: job.lead?.servicePlan,
-                                               },
-                                               job,
-                                               state: 'accepted',
-                                               jobId: job.id,
-                                             })
+                                             navigation.navigate('JobDetails', { job })
                                            }
                                         >
                                             <Text style={styles.agendaBtnTextSecondary}>View Details</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                           style={[styles.agendaBtnSecondary, { borderColor: '#93C5FD' }]}
+                                           onPress={() => openDirectionsForEntity(job)}
+                                        >
+                                            <Text style={[styles.agendaBtnTextSecondary, { color: '#1D4ED8' }]}>Directions</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity 
                                            style={styles.agendaBtnPrimary}
@@ -758,7 +1077,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                         javaScriptEnabled
                         domStorageEnabled
                         scalesPageToFit
-                        scrollEnabled={false}
+                        scrollEnabled={true}
                     />
                 ) : (
                     <WebView
@@ -767,7 +1086,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                         originWhitelist={['*']}
                         javaScriptEnabled
                         domStorageEnabled
-                        scrollEnabled={false}
+                        scrollEnabled={true}
                     />
                 )}
 
@@ -786,9 +1105,6 @@ export default function WorkerExploreScreen({ navigation, route }) {
                                 onChangeText={setSearchQuery}
                                 onSubmitEditing={() => {
                                     setIsSearchFocused(false);
-                                    if (searchQuery.trim()) {
-                                        setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(searchQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`);
-                                    }
                                 }}
                                 returnKeyType="search"
                             />
@@ -843,10 +1159,10 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     {/* Map Interaction Buttons Right - Premium Admin Style */}
                     {!selectedPin && (
                         <Animated.View style={[styles.mapButtonsRight, buttonsAnimatedStyle]}>
-                            <TouchableOpacity style={styles.navCircleBtn}>
+                            <TouchableOpacity style={styles.navCircleBtn} onPress={() => { setSearchQuery(''); setMapStatusFilter('ALL'); }}>
                                 <Ionicons name="navigate" size={28} color="#0062E1" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.dirSquareBtn}>
+                            <TouchableOpacity style={styles.dirSquareBtn} onPress={openDirectionsToWork}>
                                 <MaterialCommunityIcons name="directions" size={30} color="#FFFFFF" />
                             </TouchableOpacity>
                         </Animated.View>
@@ -855,10 +1171,36 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     {/* Status filter chips on map overlap - now follows the sheet handle */}
                     <Animated.View style={[styles.mapOverlay, legendAnimatedStyle]}>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 10 }}>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#F59E0B' }]}><Text style={styles.legendText}>In Progress</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#8B5CF6' }]}><Text style={styles.legendText}>Upcoming</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#10B981' }]}><Text style={styles.legendText}>Completed</Text></TouchableOpacity>
-                            <TouchableOpacity style={[styles.legendChip, { backgroundColor: '#EF4444' }]}><Text style={styles.legendText}>Cancelled</Text></TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setMapStatusFilter('IN_PROGRESS')}
+                                style={[styles.legendChip, { backgroundColor: '#F59E0B', opacity: mapStatusFilter === 'IN_PROGRESS' ? 1 : 0.55 }]}
+                            >
+                                <Text style={styles.legendText}>In Progress</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setMapStatusFilter('UPCOMING')}
+                                style={[styles.legendChip, { backgroundColor: '#8B5CF6', opacity: mapStatusFilter === 'UPCOMING' ? 1 : 0.55 }]}
+                            >
+                                <Text style={styles.legendText}>Upcoming</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setMapStatusFilter('COMPLETED')}
+                                style={[styles.legendChip, { backgroundColor: '#10B981', opacity: mapStatusFilter === 'COMPLETED' ? 1 : 0.55 }]}
+                            >
+                                <Text style={styles.legendText}>Completed</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setMapStatusFilter('CANCELLED')}
+                                style={[styles.legendChip, { backgroundColor: '#EF4444', opacity: mapStatusFilter === 'CANCELLED' ? 1 : 0.55 }]}
+                            >
+                                <Text style={styles.legendText}>Cancelled</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setMapStatusFilter('ALL')}
+                                style={[styles.legendChip, { backgroundColor: '#334155', opacity: mapStatusFilter === 'ALL' ? 1 : 0.55 }]}
+                            >
+                                <Text style={styles.legendText}>All</Text>
+                            </TouchableOpacity>
                         </ScrollView>
                     </Animated.View>
 
@@ -871,6 +1213,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                 ref={bottomSheetRef}
                 index={1}
                 snapPoints={snapPoints}
+                bottomInset={tabBarHeight}
                 animatedIndex={animatedIndex}
                 handleIndicatorStyle={styles.sheetHandle}
                 backgroundStyle={styles.sheetBackground}
@@ -1181,6 +1524,7 @@ const styles = StyleSheet.create({
     detailedSearchRow: { flexDirection: 'row', gap: 12, marginBottom: 20, alignItems: 'center' },
     detailedSearchBox: { flex: 1, height: 50, backgroundColor: '#fff', borderRadius: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, ...SHADOWS.medium, borderWidth: 1, borderColor: '#F1F5F9' },
     detailedSearchText: { fontSize: 16, fontWeight: '600', color: '#1A202C' },
+    detailedSearchInput: { flex: 1, fontSize: 15, color: '#1A202C', marginRight: 10 },
     weatherWidgetDetailed: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderRadius: 20, flexDirection: 'row', alignItems: 'center', gap: 8, ...SHADOWS.small },
     weatherTempDetailed: { fontSize: 14, fontWeight: '700' },
     weatherLocDetailed: { fontSize: 10, color: '#718096' },

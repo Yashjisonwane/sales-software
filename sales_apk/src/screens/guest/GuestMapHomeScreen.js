@@ -24,7 +24,9 @@ import {
   getGuestNearby,
   getCategories,
   submitGuestRequest,
+  getGuestLiveTracking,
 } from '../../api/apiService';
+import { buildLeafletPinsMapHtml } from '../../utils/leafletMapHtml';
 
 const { height } = Dimensions.get('window');
 
@@ -66,9 +68,6 @@ const CurrentLocationMarker = () => (
 
 export default function GuestMapHomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [mapUrl, setMapUrl] = useState(
-    `https://maps.google.com/maps?q=${DEFAULT_LAT},${DEFAULT_LNG}&z=13&ie=UTF8&iwloc=&output=embed`
-  );
   const [centerLat, setCenterLat] = useState(DEFAULT_LAT);
   const [centerLng, setCenterLng] = useState(DEFAULT_LNG);
   const [mapJobs, setMapJobs] = useState([]);
@@ -79,6 +78,9 @@ export default function GuestMapHomeScreen({ navigation }) {
   const [submitting, setSubmitting] = useState(false);
   const [categories, setCategories] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [trackingToken, setTrackingToken] = useState('');
+  const [liveTrack, setLiveTrack] = useState(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -98,9 +100,6 @@ export default function GuestMapHomeScreen({ navigation }) {
         if (firstWithCoords) {
           setCenterLat(firstWithCoords.latitude);
           setCenterLng(firstWithCoords.longitude);
-          setMapUrl(
-            `https://maps.google.com/maps?q=${firstWithCoords.latitude},${firstWithCoords.longitude}&z=13&ie=UTF8&iwloc=&output=embed`
-          );
         }
       } else {
         setMapJobs([]);
@@ -123,6 +122,51 @@ export default function GuestMapHomeScreen({ navigation }) {
     loadData();
   }, []);
 
+  const fetchLiveTracking = useCallback(async (token, background = false) => {
+    const t = String(token || '').trim();
+    if (!t) return;
+    if (!background) setTrackingLoading(true);
+    const res = await getGuestLiveTracking(t);
+    if (res.success) {
+      setLiveTrack(res.data || null);
+    } else if (!background) {
+      Alert.alert('Tracking', res.message || 'Could not fetch live location.');
+    }
+    if (!background) setTrackingLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    const t = String(trackingToken || '').trim();
+    if (!t) return;
+    fetchLiveTracking(t, true);
+    const id = setInterval(() => fetchLiveTracking(t, true), 8000);
+    return () => clearInterval(id);
+  }, [trackingToken, fetchLiveTracking]);
+
+  const trackingMiniMapHtml = useMemo(() => {
+    if (liveTrack?.professionalLat == null || liveTrack?.professionalLng == null) return null;
+    return buildLeafletPinsMapHtml([
+      ...(liveTrack.customerLat != null && liveTrack.customerLng != null
+        ? [
+            {
+              id: 'my-location',
+              recordType: 'self',
+              latitude: Number(liveTrack.customerLat),
+              longitude: Number(liveTrack.customerLng),
+              color: '#10B981',
+            },
+          ]
+        : []),
+      {
+        id: liveTrack.professionalId || 'pro',
+        recordType: 'professional',
+        latitude: Number(liveTrack.professionalLat),
+        longitude: Number(liveTrack.professionalLng),
+        color: '#0E56D0',
+      },
+    ]);
+  }, [liveTrack]);
+
   const filteredJobs = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return mapJobs;
@@ -133,6 +177,40 @@ export default function GuestMapHomeScreen({ navigation }) {
         (j.category || '').toLowerCase().includes(q)
     );
   }, [mapJobs, searchQuery]);
+
+  const mainMapHtml = useMemo(() => {
+    const pins = (filteredJobs || [])
+      .filter((j) => j.latitude != null && j.longitude != null)
+      .map((j) => ({
+        id: String(j.id),
+        recordType: 'job',
+        latitude: Number(j.latitude),
+        longitude: Number(j.longitude),
+        color: j.status === 'IN_PROGRESS' ? '#0E56D0' : '#10B981',
+      }));
+    if (pins.length === 0) {
+      pins.push({
+        id: 'center',
+        recordType: 'center',
+        latitude: Number(centerLat),
+        longitude: Number(centerLng),
+        color: '#2563EB',
+      });
+    }
+    return buildLeafletPinsMapHtml(pins);
+  }, [filteredJobs, centerLat, centerLng]);
+
+  const handleMainMapMessage = useCallback(
+    (event) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data);
+        if (msg.type !== 'pinPress' || !msg.pin?.id) return;
+        const job = filteredJobs.find((j) => String(j.id) === String(msg.pin.id));
+        if (job) openRequestModal(job);
+      } catch (_) {}
+    },
+    [filteredJobs]
+  );
 
   const openRequestModal = (job) => {
     setSelectedJob(job || null);
@@ -162,6 +240,10 @@ export default function GuestMapHomeScreen({ navigation }) {
     });
     setSubmitting(false);
     if (res.success) {
+      if (res.sessionToken) {
+        setTrackingToken(res.sessionToken);
+        fetchLiveTracking(res.sessionToken, true);
+      }
       Alert.alert(
         'Request sent',
         `Ref: ${res.displayId || '—'}\nAdmin will review your request. You can sign in later to track with your phone.`,
@@ -182,11 +264,11 @@ export default function GuestMapHomeScreen({ navigation }) {
       <StatusBar barStyle="dark-content" backgroundColor="#FFF" />
       <View style={styles.mapWrap}>
         <WebView
-          source={{
-            html: `<iframe src="${mapUrl}" width="100%" height="100%" style="border:0;" allowfullscreen loading="lazy"></iframe>`,
-          }}
+          source={{ html: mainMapHtml }}
           style={styles.map}
-          scrollEnabled={false}
+          onMessage={handleMainMapMessage}
+          scrollEnabled
+          originWhitelist={['*']}
         />
 
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
@@ -214,32 +296,12 @@ export default function GuestMapHomeScreen({ navigation }) {
               value={searchQuery}
               onChangeText={setSearchQuery}
               onSubmitEditing={() => {
-                if (searchQuery.trim()) {
-                  setMapUrl(
-                    `https://maps.google.com/maps?q=${encodeURIComponent(searchQuery.trim())}&z=13&ie=UTF8&iwloc=&output=embed`
-                  );
-                }
+                // Keep OpenFreeMap renderer active; text filter already updates pins in real time.
               }}
               returnKeyType="search"
             />
           </View>
         </View>
-
-        {!loading &&
-          filteredJobs.map((job) => {
-            if (job.latitude == null || job.longitude == null) return null;
-            const pos = pinStyleFromCoords(job.latitude, job.longitude, filteredJobs);
-            return (
-              <TouchableOpacity
-                key={job.id}
-                style={[styles.absPin, pos]}
-                onPress={() => openRequestModal(job)}
-                activeOpacity={0.85}
-              >
-                <LocationPin color={job.status === 'IN_PROGRESS' ? '#0E56D0' : '#10B981'} />
-              </TouchableOpacity>
-            );
-          })}
 
         <View style={[styles.currentLoc, { top: '46%', left: '48%' }]}>
           <CurrentLocationMarker />
@@ -264,6 +326,54 @@ export default function GuestMapHomeScreen({ navigation }) {
         <TouchableOpacity style={styles.secondaryBtn} onPress={() => navigation.navigate('Login')}>
           <Text style={styles.secondaryBtnText}>Have an account? Log in</Text>
         </TouchableOpacity>
+
+        <View style={styles.trackSection}>
+          <Text style={styles.trackTitle}>📍 Track Professional</Text>
+          <View style={styles.trackTokenRow}>
+            <TextInput
+              style={styles.trackTokenInput}
+              value={trackingToken}
+              onChangeText={setTrackingToken}
+              placeholder="Paste session token"
+              placeholderTextColor="#94A3B8"
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.trackBtn}
+              onPress={() => fetchLiveTracking(trackingToken)}
+              disabled={trackingLoading}
+            >
+              {trackingLoading ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.trackBtnText}>Track</Text>}
+            </TouchableOpacity>
+          </View>
+
+          {liveTrack ? (
+            <View style={styles.trackCard}>
+              <Text style={styles.trackMeta}>Professional: {liveTrack.professionalName || 'Assigned soon'}</Text>
+              <Text style={styles.trackMeta}>Job: {liveTrack.jobNo || '—'} | Status: {liveTrack.status || '—'}</Text>
+              <View style={styles.trackLegendRow}>
+                <View style={styles.trackLegendItem}>
+                  <View style={[styles.trackDot, { backgroundColor: '#10B981' }]} />
+                  <Text style={styles.trackLegendText}>Your Location</Text>
+                </View>
+                <View style={styles.trackLegendItem}>
+                  <View style={[styles.trackDot, { backgroundColor: '#0E56D0' }]} />
+                  <Text style={styles.trackLegendText}>Professional Live</Text>
+                </View>
+              </View>
+              {trackingMiniMapHtml ? (
+                <WebView source={{ html: trackingMiniMapHtml }} style={styles.trackMap} scrollEnabled={false} />
+              ) : (
+                <Text style={styles.trackMeta}>Live location not available yet.</Text>
+              )}
+              {liveTrack.professionalUpdatedAt ? (
+                <Text style={styles.trackUpdatedAt}>
+                  Updated: {new Date(liveTrack.professionalUpdatedAt).toLocaleTimeString()}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <Modal visible={requestOpen} animationType="slide" transparent>
@@ -488,6 +598,45 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#FFF', fontSize: 16, fontFamily: FONTS.bold },
   secondaryBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 10 },
   secondaryBtnText: { fontSize: 14, fontFamily: FONTS.bold, color: '#0E56D0' },
+  trackSection: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 12 },
+  trackTitle: { fontSize: 14, fontFamily: FONTS.bold, color: '#1E293B', marginBottom: 8 },
+  trackTokenRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  trackTokenInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 40,
+    fontSize: 13,
+    color: '#0F172A',
+    fontFamily: FONTS.regular,
+    backgroundColor: '#F8FAFC',
+  },
+  trackBtn: {
+    height: 40,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0E56D0',
+  },
+  trackBtnText: { color: '#FFF', fontSize: 13, fontFamily: FONTS.bold },
+  trackCard: {
+    marginTop: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
+    backgroundColor: '#F8FAFF',
+    padding: 10,
+  },
+  trackMeta: { fontSize: 12, color: '#334155', fontFamily: FONTS.regular, marginBottom: 8 },
+  trackLegendRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  trackLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  trackDot: { width: 10, height: 10, borderRadius: 5 },
+  trackLegendText: { fontSize: 11, color: '#475569', fontFamily: FONTS.bold },
+  trackMap: { height: 150, borderRadius: 10, overflow: 'hidden', backgroundColor: '#E2E8F0' },
+  trackUpdatedAt: { marginTop: 8, fontSize: 11, color: '#64748B', fontFamily: FONTS.regular },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',

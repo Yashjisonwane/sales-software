@@ -11,6 +11,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SHADOWS, FONTS } from '../../constants/theme';
+import { Alert } from 'react-native';
+import { updateInvoiceStatus } from '../../api/apiService';
 
 function statusLabel(raw) {
   const s = (raw || '').toUpperCase();
@@ -36,6 +38,7 @@ export default function InvoiceDetailsScreen({ navigation, route }) {
 
   const displayId = `#INV-${String(inv.id).slice(-4).toUpperCase()}`;
   const label = statusLabel(inv.status);
+  const isPaid = String(inv.status || '').toUpperCase() === 'PAID';
   const amountStr =
     inv.amount != null ? Number(inv.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
   const totalStr =
@@ -109,9 +112,27 @@ export default function InvoiceDetailsScreen({ navigation, route }) {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
-        <TouchableOpacity style={styles.convertBtn} onPress={() => navigation.navigate('AdminTabs')}>
-          <Text style={styles.convertBtnText}>Back to Explore</Text>
-        </TouchableOpacity>
+        {!isPaid ? (
+          <TouchableOpacity
+            style={styles.convertBtn}
+            onPress={async () => {
+              const res = await updateInvoiceStatus(inv.id, 'PAID');
+              if (res.success) {
+                Alert.alert('Success', 'Invoice marked as paid.', [
+                  { text: 'OK', onPress: () => navigation.goBack() },
+                ]);
+              } else {
+                Alert.alert('Error', res.message || 'Could not update invoice status');
+              }
+            }}
+          >
+            <Text style={styles.convertBtnText}>Mark as Paid</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.convertBtn} onPress={() => navigation.navigate('AdminTabs')}>
+            <Text style={styles.convertBtnText}>Back to Explore</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

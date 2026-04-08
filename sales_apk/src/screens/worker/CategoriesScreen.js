@@ -17,7 +17,7 @@ const { width } = Dimensions.get('window');
 const CATEGORIES = [
   { id: '1', name: 'Plumbing', icon: 'water', color: '#3B82F6', bg: '#EFF6FF', count: '45 pros' },
   { id: '2', name: 'Electrical', icon: 'flash', color: '#F59E0B', bg: '#FFFBEB', count: '38 pros' },
-  { id: '3', name: 'Cleaning', icon: 'sparkles', color: '#10B981', bg: '#ECFDF5', count: '62 pros' },
+  { id: '3', name: 'Cleaning', icon: 'star', color: '#10B981', bg: '#ECFDF5', count: '62 pros' },
   { id: '4', name: 'HVAC', icon: 'snow', color: '#06B6D4', bg: '#ECFEFF', count: '21 pros' },
   { id: '5', name: 'Roofing', icon: 'home', color: '#8B5CF6', bg: '#F5F3FF', count: '15 pros' },
   { id: '6', name: 'Painting', icon: 'color-palette', color: '#EC4899', bg: '#FDF2F8', count: '33 pros' },

@@ -104,10 +104,14 @@ const JobOfferDetailScreen = ({ navigation, route }) => {
 
 
   const leadLocation = route.params?.lead?.location || '';
+  const leadLat = route.params?.lead?.customerLat ?? route.params?.lead?.latitude ?? null;
+  const leadLng = route.params?.lead?.customerLng ?? route.params?.lead?.longitude ?? null;
   const leadPhone = route.params?.lead?.customer?.phone || route.params?.lead?.guestPhone || '';
 
   const handleDirections = () => {
-    if (leadLocation) {
+    if (leadLat != null && leadLng != null) {
+      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${leadLat},${leadLng}`);
+    } else if (leadLocation) {
       Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(leadLocation)}`);
     } else {
       Alert.alert('Location', 'No address on file.');
@@ -184,7 +188,7 @@ const JobOfferDetailScreen = ({ navigation, route }) => {
           <View style={styles.actionHub}>
             <TouchableOpacity style={styles.directionsBtnFull} onPress={handleDirections} activeOpacity={0.9}>
               <Ionicons name="navigate" size={20} color="#fff" />
-              <Text style={styles.directionsBtnFullText}>Directions</Text>
+              <Text style={styles.directionsBtnFullText}>Get Directions</Text>
             </TouchableOpacity>
             <View style={styles.actionRowTriplet}>
               <TouchableOpacity style={styles.compactAction} onPress={handleCall} activeOpacity={0.85}>

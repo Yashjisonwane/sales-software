@@ -112,7 +112,7 @@ export default function AdminProfileScreen({ navigation }) {
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity style={styles.proBtn}>
           <LinearGradient colors={['#A855F7', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.proBtnGradient}>
-            <Ionicons name="sparkles" size={14} color={COLORS.white} />
+            <Ionicons name="star" size={14} color={COLORS.white} />
             <Text style={styles.proBtnText}>Get Pro</Text>
           </LinearGradient>
         </TouchableOpacity>

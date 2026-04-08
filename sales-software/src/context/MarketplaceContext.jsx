@@ -183,7 +183,8 @@ export const MarketplaceProvider = ({ children }) => {
             setCurrentUser(res.data.user);
             setIsAuthenticated(true);
             showToast('Login successful!', 'success');
-            await loadInitialData();
+            // Do not block navigation on large dashboard fetches.
+            loadInitialData();
             return true;
         } else {
             showToast(res.error || 'Login failed', 'error');
@@ -209,7 +210,8 @@ export const MarketplaceProvider = ({ children }) => {
                 if (res.success) {
                     setIsAuthenticated(true);
                     setCurrentUser(res.data);
-                    await loadInitialData();
+                    // Keep app responsive while data hydrates in background.
+                    loadInitialData();
                 } else {
                     localStorage.removeItem('userToken');
                     setIsAuthenticated(false);
@@ -451,9 +453,16 @@ export const MarketplaceProvider = ({ children }) => {
     };
 
     const toggleTrackingSetting = async (userId, enabled) => {
+        const previous = currentUser?.trackingEnabled ?? currentUser?.isTrackingEnabled ?? false;
+        // Optimistic UI for instant toggle response.
+        setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled, isTrackingEnabled: enabled }));
         const res = await apiService.updateProfessionalTracking(enabled);
         if (res.success) {
             setCurrentUser(prev => ({ ...prev, trackingEnabled: enabled, isTrackingEnabled: enabled }));
+        } else {
+            // Revert when backend rejects, and show reason.
+            setCurrentUser(prev => ({ ...prev, trackingEnabled: previous, isTrackingEnabled: previous }));
+            showToast(res.error || 'Unable to update tracking setting', 'error');
         }
     };
 

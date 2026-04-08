@@ -7,7 +7,24 @@ import { Search, Activity, Clock, Navigation, MoreVertical } from 'lucide-react'
 import { getSocketOrigin } from '../../services/apiClient';
 
 const DEFAULT_CENTER = [77.4126, 23.2599];
-const OPEN_FREE_MAP_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+const MAP_STYLE = {
+    version: 8,
+    sources: {
+        osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
+        }
+    },
+    layers: [
+        {
+            id: 'osm-base',
+            type: 'raster',
+            source: 'osm'
+        }
+    ]
+};
 const POLLING_INTERVAL_MS = 5000;
 const MOVE_ANIMATION_MS = 900;
 
@@ -128,7 +145,7 @@ const LiveTracking = () => {
         if (!mapContainerRef.current || mapRef.current) return;
         const map = new maplibregl.Map({
             container: mapContainerRef.current,
-            style: OPEN_FREE_MAP_STYLE,
+            style: MAP_STYLE,
             center: DEFAULT_CENTER,
             zoom: 4.5,
             attributionControl: true

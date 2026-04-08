@@ -6,6 +6,7 @@ const API_BASE_URL = 'http://localhost:4000/api/v1'; // Local Development
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
+    timeout: 12000,
     headers: {
         'Content-Type': 'application/json',
     },

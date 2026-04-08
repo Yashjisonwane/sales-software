@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { SHADOWS, COLORS } from '../../constants/theme';
 import { getJobById, getJobHistory, uploadJobPhoto } from '../../api/apiService';
 import storage from '../../api/storage';
+import { buildLeafletPinsMapHtml } from '../../utils/leafletMapHtml';
 
 const { width, height } = Dimensions.get('window');
 const JOB_DETAIL_ACTION_SIZE = 44;
@@ -43,42 +44,9 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const latitude = job.latitude ? parseFloat(job.latitude) : 21.3069;
   const longitude = job.longitude ? parseFloat(job.longitude) : -157.8583;
 
-  const mapHtml = `
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-          html,body,#map{margin:0;padding:0;height:100%;width:100%;background:#F8FAFC;}
-          .leaflet-control-zoom,.leaflet-control-attribution{display:none!important;}
-          .pulse-circle {
-            width: 16px; height: 16px; background: #0E56D0; border-radius: 50%;
-            border: 3px solid #fff; box-shadow: 0 0 12px rgba(14,86,208,0.6);
-            animation: pulse-animation 2s infinite;
-          }
-          @keyframes pulse-animation {
-            0% { transform: scale(0.9); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-            100% { transform: scale(0.9); opacity: 1; }
-          }
-        </style>
-      </head>
-      <body>
-        <div id="map"></div>
-        <script>
-          var map = L.map('map',{zoomControl:false,attributionControl:false}).setView([${latitude}, ${longitude}], 14);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-          var icon = L.divIcon({
-            html: '<div class="pulse-circle"></div>',
-            iconSize: [22, 22],
-            className: ''
-          });
-          L.marker([${latitude}, ${longitude}], {icon: icon}).addTo(map);
-        </script>
-      </body>
-    </html>
-  `;
+  const mapHtml = buildLeafletPinsMapHtml([
+    { id: job.id || job.jobNo || 'job-location', recordType: 'job', latitude, longitude, color: '#0E56D0' },
+  ]);
 
   const isBackendJob = Boolean(job.jobNo);
 
@@ -326,11 +294,12 @@ const JobDetailsScreen = ({ navigation, route }) => {
       {/* Map Background Layer */}
       <View style={StyleSheet.absoluteFill}>
         <WebView 
+          key={`${latitude.toFixed(5)}:${longitude.toFixed(5)}`}
           source={{ html: mapHtml }} 
           style={styles.mapWebView}
-          scrollEnabled={false}
+          scrollEnabled
         />
-        <View style={styles.mapOverlay} />
+        <View pointerEvents="none" style={styles.mapOverlay} />
       </View>
 
       {/* Header Container */}
