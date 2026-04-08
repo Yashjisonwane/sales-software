@@ -6,6 +6,21 @@ const generateShortId = (prefix) => {
     return `${prefix}-${Math.floor(100000 + Math.random() * 900000)}`;
 };
 
+const LOCATION_FALLBACKS = [
+    { key: 'burhanpur', lat: 21.3119, lng: 76.2304 },
+    { key: 'indore', lat: 22.7196, lng: 75.8577 },
+    { key: 'bhopal', lat: 23.2599, lng: 77.4126 },
+    { key: 'ujjain', lat: 23.1765, lng: 75.7885 },
+    { key: 'dewas', lat: 22.9676, lng: 76.0534 },
+];
+
+const inferCoordsFromLocation = (text) => {
+    const raw = String(text || '').toLowerCase();
+    if (!raw) return null;
+    const hit = LOCATION_FALLBACKS.find((c) => raw.includes(c.key));
+    return hit ? { latitude: hit.lat, longitude: hit.lng } : null;
+};
+
 // @route   POST /api/v1/leads
 // @desc    Create a new lead from the website
 const createLead = async (req, res) => {
@@ -148,18 +163,28 @@ const getLeads = async (req, res) => {
             : [];
         const preferredWorkerMap = new Map(preferredWorkers.map((w) => [w.id, w]));
 
-        const formattedLeads = leads.map(l => ({
-            ...l,
-            customerName: l.customer?.name || l.guestName || 'Valued Customer',
-            customerEmail: l.customer?.email || l.guestEmail || '—',
-            customerPhone: l.customer?.phone || l.guestPhone || '—',
-            guestEmail: l.guestEmail,
-            guestPhone: l.guestPhone,
-            preferredWorkerId: l.preferredWorkerId,
-            preferredWorkerName: preferredWorkerMap.get(l.preferredWorkerId)?.name || null,
-            categoryName: l.category?.name || 'Uncategorized',
-            displayId: l.leadNo
-        }));
+        const formattedLeads = leads.map((l) => {
+            const inferred = inferCoordsFromLocation(l.location || l.job?.location);
+            const lat = l.latitude ?? l.job?.latitude ?? inferred?.latitude ?? null;
+            const lng = l.longitude ?? l.job?.longitude ?? inferred?.longitude ?? null;
+            return {
+                ...l,
+                latitude: lat,
+                longitude: lng,
+                customerLat: lat,
+                customerLng: lng,
+                location: l.location || l.job?.location || '—',
+                customerName: l.customer?.name || l.guestName || 'Valued Customer',
+                customerEmail: l.customer?.email || l.guestEmail || '—',
+                customerPhone: l.customer?.phone || l.guestPhone || '—',
+                guestEmail: l.guestEmail,
+                guestPhone: l.guestPhone,
+                preferredWorkerId: l.preferredWorkerId,
+                preferredWorkerName: preferredWorkerMap.get(l.preferredWorkerId)?.name || null,
+                categoryName: l.category?.name || 'Uncategorized',
+                displayId: l.leadNo,
+            };
+        });
 
         res.status(200).json({ success: true, count: leads.length, data: formattedLeads });
     } catch (error) {

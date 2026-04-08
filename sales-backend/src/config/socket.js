@@ -183,6 +183,21 @@ const initSocket = (server) => {
                 };
 
                 io.to('admin_live_map').emit('update_on_map', payload);
+
+                // Also stream to each active job room for customer/guest live tracking.
+                const activeJobs = await prisma.job.findMany({
+                    where: {
+                        workerId: updated.id,
+                        status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] }
+                    },
+                    select: { id: true }
+                });
+                activeJobs.forEach((j) => {
+                    io.to(j.id).emit('professional_live_location', {
+                        ...payload,
+                        jobId: j.id
+                    });
+                });
             } catch (err) {
                 console.error('❌ Socket location update error:', err.message);
             }
