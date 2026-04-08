@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMarketplace } from '../../context/MarketplaceContext';
 import {
     Briefcase,
@@ -20,12 +20,120 @@ import LeadTable from '../../components/professional/LeadTable';
 import LeadMap from '../../components/professional/LeadMap';
 import LeadDetailModal from '../../components/professional/LeadDetailModal';
 import { useNavigate } from 'react-router-dom';
+import io from 'socket.io-client';
+import { getSocketOrigin } from '../../services/apiClient';
 
 const Dashboard = () => {
     const { leads, assignments, currentUser, respondToLead, showToast, dashboardStats, startJob, completeJob } = useMarketplace();
     const navigate = useNavigate();
     const [selectedLead, setSelectedLead] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const trackerRef = useRef({
+        socket: null,
+        watchId: null,
+        lastEmitAt: 0,
+        arrivedNotifiedForJob: null,
+        activeJobId: null
+    });
+
+    const getLeadDestination = (lead) => {
+        const lat = Number(lead?.latitude);
+        const lng = Number(lead?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+    };
+
+    const haversineKm = (lat1, lon1, lat2, lon2) => {
+        const toRad = (x) => (x * Math.PI) / 180;
+        const R = 6371;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+
+    useEffect(() => {
+        const token = localStorage.getItem('userToken');
+        if (!token || !currentUser?.id) return;
+        const socket = io(getSocketOrigin(), {
+            auth: { token },
+            transports: ['websocket', 'polling']
+        });
+        trackerRef.current.socket = socket;
+        return () => {
+            if (trackerRef.current.watchId != null) {
+                navigator.geolocation.clearWatch(trackerRef.current.watchId);
+                trackerRef.current.watchId = null;
+            }
+            if (trackerRef.current.socket) {
+                trackerRef.current.socket.disconnect();
+                trackerRef.current.socket = null;
+            }
+        };
+    }, [currentUser?.id]);
+
+    const startLiveTracking = (jobId, lead) => {
+        if (!navigator.geolocation) {
+            showToast('Geolocation not supported on this browser', 'error');
+            return;
+        }
+        const destination = getLeadDestination(lead);
+        trackerRef.current.activeJobId = jobId;
+        trackerRef.current.arrivedNotifiedForJob = null;
+
+        if (trackerRef.current.watchId != null) {
+            navigator.geolocation.clearWatch(trackerRef.current.watchId);
+            trackerRef.current.watchId = null;
+        }
+
+        trackerRef.current.watchId = navigator.geolocation.watchPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const now = Date.now();
+                if (now - trackerRef.current.lastEmitAt < 4000) return;
+                trackerRef.current.lastEmitAt = now;
+                trackerRef.current.socket?.emit('location_update', { lat, lng, jobId });
+
+                if (destination) {
+                    const distanceKm = haversineKm(lat, lng, destination.lat, destination.lng);
+                    if (distanceKm <= 0.1 && trackerRef.current.arrivedNotifiedForJob !== jobId) {
+                        trackerRef.current.arrivedNotifiedForJob = jobId;
+                        trackerRef.current.socket?.emit('professional_arrived', { jobId });
+                        showToast('Arrived at customer location', 'success');
+                    }
+                }
+            },
+            () => {
+                showToast('Unable to read your live location', 'error');
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 3000 }
+        );
+    };
+
+    const stopLiveTracking = () => {
+        if (trackerRef.current.watchId != null) {
+            navigator.geolocation.clearWatch(trackerRef.current.watchId);
+            trackerRef.current.watchId = null;
+        }
+        trackerRef.current.activeJobId = null;
+        trackerRef.current.arrivedNotifiedForJob = null;
+        showToast('Live tracking stopped to save battery', 'info');
+    };
+
+    const openNavigation = (lead) => {
+        const destination = getLeadDestination(lead);
+        if (!destination) {
+            showToast('Customer location coordinates not available', 'info');
+            return;
+        }
+        window.open(
+            `https://www.google.com/maps/dir/?api=1&destination=${destination.lat},${destination.lng}`,
+            '_blank',
+            'noopener,noreferrer'
+        );
+    };
 
     // Filter assignments once for internal logic (map, leads etc)
     const proAssignments = assignments.filter(a => a.professionalId === currentUser.id);
@@ -116,18 +224,38 @@ const Dashboard = () => {
 
         if (type === 'start') {
             const assignmentId = lead.assignmentId || assignment?.id;
-            if (assignmentId) startJob(assignmentId);
+            if (assignmentId) {
+                startJob(assignmentId);
+                startLiveTracking(assignmentId, lead);
+                openNavigation(lead);
+            }
+            return;
+        }
+
+        if (type === 'navigate') {
+            openNavigation(lead);
             return;
         }
 
         if (type === 'complete') {
             const assignmentId = lead.assignmentId || assignment?.id;
-            if (assignmentId) completeJob(assignmentId);
+            if (assignmentId) {
+                completeJob(assignmentId);
+                stopLiveTracking();
+            }
+            return;
+        }
+
+        if (type === 'stopTracking') {
+            stopLiveTracking();
             return;
         }
 
         if (assignment && (type === 'accept' || type === 'reject')) {
             respondToLead(assignment.id, type);
+            if (type === 'reject') {
+                stopLiveTracking();
+            }
             showToast(`Lead ${type === 'accept' ? 'Accepted' : 'Rejected'}`, type === 'accept' ? 'success' : 'info');
         }
     };

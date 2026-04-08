@@ -54,9 +54,17 @@ const getReviews = async (req, res) => {
             include: {
                 jobs: {
                     include: {
+                        lead: {
+                            include: {
+                                category: {
+                                    select: { name: true },
+                                },
+                            },
+                        },
                         customer: {
                             select: {
                                 name: true,
+                                email: true,
                             },
                         },
                         worker: {
@@ -75,14 +83,19 @@ const getReviews = async (req, res) => {
 
         const formatted = (reviews || []).map((rev) => ({
             id: rev.id,
-            author: rev.jobs?.customer?.name || 'Customer',
+            customerName: resolveCustomerDisplayName(rev.jobs),
+            author: resolveCustomerDisplayName(rev.jobs),
             workerName: rev.jobs?.worker?.name || 'Worker',
             role: 'Customer',
             rating: rev.rating,
             comment: rev.comment,
-            date: rev.created_at ? rev.created_at.toLocaleDateString() : 'N/A',
+            serviceName: resolveServiceName(rev.jobs),
+            serviceCategory: resolveServiceName(rev.jobs),
+            locationName: resolveLocationName(rev.jobs),
+            location: resolveLocationName(rev.jobs),
+            date: rev.created_at || null,
             verified: true,
-            jobNo: rev.jobs?.jobNo || 'N/A',
+            jobNo: rev.jobs?.jobNo || '—',
         }));
 
         const distribution = [5, 4, 3, 2, 1].map((stars) => {

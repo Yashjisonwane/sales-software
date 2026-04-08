@@ -23,6 +23,8 @@ const Messages = () => {
     const [activeChat, setActiveChat] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const socketRef = useRef(null);
+    const connectedJobRef = useRef(null);
+    const autoOpenDoneRef = useRef(false);
 
     const assignedLeads = leads.filter((lead) => {
         const assignment = assignments.find((a) => a.leadId === lead.id && a.professionalId === currentUser?.id);
@@ -60,6 +62,7 @@ const Messages = () => {
     const selectChat = useCallback(
         async (chat) => {
             if (!chat) return;
+            if (activeChat?.jobId && chat.jobId && activeChat.jobId === chat.jobId) return;
             if (chat.isVirtual && chat.jobId) {
                 const thread = await fetchChatThreadByJobId(chat.jobId);
                 if (thread?.chatId) {
@@ -79,16 +82,16 @@ const Messages = () => {
                 await fetchChatMessages(chat.id);
             }
         },
-        [fetchChatMessages, fetchChatThreadByJobId]
+        [fetchChatMessages, fetchChatThreadByJobId, activeChat?.jobId]
     );
 
     useEffect(() => {
-        if (location.state?.jobId && allConversations.length > 0) {
-            const foundChat = allConversations.find((c) => c.jobId === location.state.jobId);
-            if (foundChat) {
-                selectChat(foundChat);
-            }
-        }
+        if (autoOpenDoneRef.current) return;
+        if (!location.state?.jobId || allConversations.length === 0) return;
+        const foundChat = allConversations.find((c) => c.jobId === location.state.jobId);
+        if (!foundChat) return;
+        autoOpenDoneRef.current = true;
+        selectChat(foundChat);
     }, [location.state?.jobId, allConversations, selectChat]);
 
     useEffect(() => {
@@ -107,7 +110,18 @@ const Messages = () => {
                 socketRef.current.disconnect();
                 socketRef.current = null;
             }
+            connectedJobRef.current = null;
             return;
+        }
+
+        if (socketRef.current && connectedJobRef.current === activeChat.jobId) {
+            return;
+        }
+
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+            socketRef.current = null;
+            connectedJobRef.current = null;
         }
 
         const token = localStorage.getItem('userToken');
@@ -118,6 +132,7 @@ const Messages = () => {
             transports: ['websocket', 'polling'],
         });
         socketRef.current = socket;
+        connectedJobRef.current = activeChat.jobId;
 
         const onConnect = () => {
             socket.emit('join_room', activeChat.jobId);
@@ -144,8 +159,19 @@ const Messages = () => {
             socket.off('receive_message', onMsg);
             socket.disconnect();
             socketRef.current = null;
+            connectedJobRef.current = null;
         };
     }, [activeChat?.jobId, currentUser?.role, appendIncomingChatMessage]);
+
+    useEffect(() => {
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+            connectedJobRef.current = null;
+        };
+    }, []);
 
     const handleSendMessage = async (text) => {
         if (!activeChat) return;
@@ -162,9 +188,7 @@ const Messages = () => {
         if (!chatId || String(chatId).startsWith('virtual-')) return;
 
         const success = await sendChatMessage(chatId, text);
-        if (success) {
-            refreshData();
-        }
+        if (!success) return;
     };
 
     const filteredChats = allConversations
@@ -190,7 +214,7 @@ const Messages = () => {
     });
 
     return (
-        <div className="h-[calc(100dvh-64px)] md:h-[calc(100vh-140px)] flex md:gap-6 overflow-hidden animate-in fade-in duration-500 -m-4 sm:-m-6 md:m-0">
+        <div className="h-full min-h-0 flex md:gap-6 overflow-hidden animate-in fade-in duration-500">
             <div
                 className={`w-full md:w-80 lg:w-96 shrink-0 bg-white md:rounded-[2.5rem] shadow-sm md:border border-gray-100 flex flex-col overflow-hidden ${activeChat ? 'hidden md:flex' : 'flex'}`}
             >

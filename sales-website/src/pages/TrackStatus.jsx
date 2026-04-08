@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { 
   CheckCircle2, Clock, MapPin, Phone, MessageSquare, 
   ChevronRight, Star, Send, ShieldCheck, Zap, X, User,
@@ -10,6 +12,56 @@ import io from 'socket.io-client';
 import { API_BASE_URL } from '../apiConfig';
 
 const socketUrl = API_BASE_URL.replace('/api/v1', '');
+const TRACK_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+const RASTER_FALLBACK_STYLE = {
+    version: 8,
+    sources: {
+        osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '&copy; OpenStreetMap contributors'
+        }
+    },
+    layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
+};
+const POLL_INTERVAL_MS = 7000;
+const MARKER_MOVE_MS = 900;
+const ROUTE_REFRESH_MS = 8000;
+
+const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+const toNum = (v) => {
+    if (v === null || v === undefined || v === '') return null;
+    const parsed = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
+const animateMarker = (marker, from, to) => {
+    const [fromLng, fromLat] = from;
+    const [toLng, toLat] = to;
+    if (![fromLng, fromLat, toLng, toLat].every(Number.isFinite)) {
+        marker.setLngLat([toLng, toLat]);
+        return;
+    }
+    const start = performance.now();
+    const step = (now) => {
+        const raw = Math.min((now - start) / MARKER_MOVE_MS, 1);
+        const t = easeOutCubic(raw);
+        marker.setLngLat([fromLng + (toLng - fromLng) * t, fromLat + (toLat - fromLat) * t]);
+        if (raw < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+};
+
+const haversineKm = (lat1, lon1, lat2, lon2) => {
+    const toRad = (x) => (x * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
 
 const TrackStatus = () => {
     const { token } = useParams();
@@ -25,6 +77,17 @@ const TrackStatus = () => {
     const [error, setError] = useState('');
     const socketRef = useRef();
     const messagesEndRef = useRef();
+    const trackSocketRef = useRef();
+    const mapContainerRef = useRef(null);
+    const mapRef = useRef(null);
+    const markerRef = useRef(null);
+    const popupRef = useRef(null);
+    const lastMoveAtRef = useRef(0);
+    const [liveLocation, setLiveLocation] = useState(null);
+    const [customerLocation, setCustomerLocation] = useState(null);
+    const [routeInfo, setRouteInfo] = useState(null);
+    const [isArrived, setIsArrived] = useState(false);
+    const [mapLoadError, setMapLoadError] = useState('');
 
     useEffect(() => {
         if (data?.isReviewed) setIsReviewed(true);
@@ -55,6 +118,22 @@ const TrackStatus = () => {
             try {
                 const res = await axios.get(`${API_BASE_URL}/guest/track/${token}`);
                 setData(res.data.data);
+                const nextLat = toNum(res.data?.data?.worker?.liveLat);
+                const nextLng = toNum(res.data?.data?.worker?.liveLng);
+                if (Number.isFinite(nextLat) && Number.isFinite(nextLng)) {
+                    setLiveLocation((prev) => {
+                        if (prev && prev.lat === nextLat && prev.lng === nextLng) return prev;
+                        return { lat: nextLat, lng: nextLng };
+                    });
+                }
+                const customerLat = toNum(res.data?.data?.customerLat);
+                const customerLng = toNum(res.data?.data?.customerLng);
+                if (Number.isFinite(customerLat) && Number.isFinite(customerLng)) {
+                    setCustomerLocation((prev) => {
+                        if (prev && prev.lat === customerLat && prev.lng === customerLng) return prev;
+                        return { lat: customerLat, lng: customerLng };
+                    });
+                }
                 setLoading(false);
             } catch (err) {
                 console.error("Track Error:", err);
@@ -63,9 +142,182 @@ const TrackStatus = () => {
             }
         };
         fetchData();
-        const interval = setInterval(fetchData, 15000); 
+        const interval = setInterval(fetchData, POLL_INTERVAL_MS);
         return () => clearInterval(interval);
     }, [token]);
+
+    useEffect(() => {
+        if (!token) return undefined;
+        trackSocketRef.current = io(socketUrl, { query: { sessionToken: token } });
+        trackSocketRef.current.on('connect', () => {
+            if (data?.jobId) {
+                trackSocketRef.current.emit('join_room', data.jobId);
+            }
+        });
+        const onLiveLocation = (payload) => {
+            const p = payload?.professional || payload;
+            const lat = toNum(p?.liveLat);
+            const lng = toNum(p?.liveLng);
+            const workerId = p?.id || p?.professionalId;
+            const activeWorkerId = data?.worker?.id;
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            if (activeWorkerId && workerId && String(activeWorkerId) !== String(workerId)) return;
+            setLiveLocation((prev) => {
+                if (prev && prev.lat === lat && prev.lng === lng) return prev;
+                return { lat, lng };
+            });
+        };
+        const onArrived = () => {
+            setIsArrived(true);
+        };
+        trackSocketRef.current.on('update_on_map', onLiveLocation);
+        trackSocketRef.current.on('professional_location_update', onLiveLocation);
+        trackSocketRef.current.on('professional_arrived', onArrived);
+        return () => {
+            if (trackSocketRef.current) {
+                trackSocketRef.current.off('update_on_map', onLiveLocation);
+                trackSocketRef.current.off('professional_location_update', onLiveLocation);
+                trackSocketRef.current.off('professional_arrived', onArrived);
+                trackSocketRef.current.disconnect();
+                trackSocketRef.current = null;
+            }
+        };
+    }, [token, data?.worker?.id, data?.jobId]);
+
+    useEffect(() => {
+        if (trackSocketRef.current && data?.jobId) {
+            trackSocketRef.current.emit('join_room', data.jobId);
+        }
+    }, [data?.jobId]);
+
+    useEffect(() => {
+        if (!mapContainerRef.current || mapRef.current || !liveLocation) return;
+        const map = new maplibregl.Map({
+            container: mapContainerRef.current,
+            style: TRACK_STYLE_URL,
+            center: [liveLocation.lng, liveLocation.lat],
+            zoom: 14
+        });
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+        map.on('error', () => {
+            if (!mapLoadError) {
+                setMapLoadError('Primary map style unavailable, using fallback map.');
+                map.setStyle(RASTER_FALLBACK_STYLE);
+            }
+        });
+        mapRef.current = map;
+
+        const el = document.createElement('div');
+        el.innerHTML = `
+            <div style="
+                width:30px;height:30px;border-radius:9999px;background:#7C3AED;border:2px solid #fff;
+                display:flex;align-items:center;justify-content:center;color:#fff;
+                box-shadow:0 6px 14px rgba(0,0,0,0.25);
+                overflow:hidden;
+            ">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3.25" fill="#ffffff"></circle>
+                    <path d="M6.5 19c0-3 2.35-5 5.5-5s5.5 2 5.5 5" stroke="#ffffff" stroke-width="2" stroke-linecap="round"></path>
+                </svg>
+            </div>
+        `;
+        markerRef.current = new maplibregl.Marker({ element: el })
+            .setLngLat([liveLocation.lng, liveLocation.lat])
+            .addTo(map);
+        popupRef.current = new maplibregl.Popup({ offset: 12 });
+
+        return () => {
+            markerRef.current?.remove();
+            markerRef.current = null;
+            popupRef.current?.remove();
+            popupRef.current = null;
+            map.remove();
+            mapRef.current = null;
+        };
+    }, [liveLocation]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        const marker = markerRef.current;
+        if (!map || !marker || !liveLocation) return;
+        const current = marker.getLngLat();
+        const next = [liveLocation.lng, liveLocation.lat];
+        animateMarker(marker, [current.lng, current.lat], next);
+        const now = Date.now();
+        if (now - lastMoveAtRef.current > POLL_INTERVAL_MS) {
+            map.easeTo({ center: next, duration: 800, essential: true });
+            lastMoveAtRef.current = now;
+        }
+        const workerName = data?.worker?.name || 'Professional';
+        marker.setPopup(
+            popupRef.current.setHTML(
+                `<div style="font-size:12px"><b>${workerName}</b><br/>${liveLocation.lat.toFixed(5)}, ${liveLocation.lng.toFixed(5)}</div>`
+            )
+        );
+    }, [liveLocation, data?.worker?.name]);
+
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || !liveLocation || !customerLocation) return;
+        let cancelled = false;
+
+        const drawRoute = async () => {
+            try {
+                const routeRes = await fetch(
+                    `https://router.project-osrm.org/route/v1/driving/${liveLocation.lng},${liveLocation.lat};${customerLocation.lng},${customerLocation.lat}?overview=full&geometries=geojson`
+                );
+                const routeJson = await routeRes.json();
+                const route = routeJson?.routes?.[0];
+                if (!route || cancelled) return;
+
+                const geojson = {
+                    type: 'Feature',
+                    geometry: route.geometry
+                };
+                if (map.getSource('pro-to-customer-route')) {
+                    map.getSource('pro-to-customer-route').setData(geojson);
+                } else {
+                    map.addSource('pro-to-customer-route', { type: 'geojson', data: geojson });
+                    map.addLayer({
+                        id: 'pro-to-customer-route',
+                        type: 'line',
+                        source: 'pro-to-customer-route',
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: {
+                            'line-color': '#7C3AED',
+                            'line-width': 4,
+                            'line-opacity': 0.85
+                        }
+                    });
+                }
+
+                const distanceKm = (route.distance || 0) / 1000;
+                const etaMins = Math.max(1, Math.round((route.duration || 0) / 60));
+                setRouteInfo({
+                    distanceKm: distanceKm.toFixed(2),
+                    etaMins
+                });
+
+                if (haversineKm(liveLocation.lat, liveLocation.lng, customerLocation.lat, customerLocation.lng) <= 0.1) {
+                    setIsArrived(true);
+                }
+            } catch {
+                const fallbackKm = haversineKm(liveLocation.lat, liveLocation.lng, customerLocation.lat, customerLocation.lng);
+                setRouteInfo({
+                    distanceKm: fallbackKm.toFixed(2),
+                    etaMins: Math.max(1, Math.round((fallbackKm / 25) * 60))
+                });
+                if (fallbackKm <= 0.1) setIsArrived(true);
+            }
+        };
+
+        drawRoute();
+        const routeTimer = setInterval(drawRoute, ROUTE_REFRESH_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(routeTimer);
+        };
+    }, [liveLocation, customerLocation]);
 
     useEffect(() => {
         if (data?.chatId && isChatOpen) {
@@ -218,6 +470,43 @@ const TrackStatus = () => {
                                 <MessageSquare size={18} />
                                 Chat with {data.worker.name.split(' ')[0]}
                             </button>
+
+                            {liveLocation && (
+                                <div className="mt-4 pt-4 border-t border-gray-100">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <MapPin size={14} className="text-[#7C3AED]" />
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-[#111827]">Track Professional</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mb-3">
+                                        <div className="bg-[#F9FAFB] border border-gray-100 rounded-xl px-3 py-2">
+                                            <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Distance</p>
+                                            <p className="text-xs font-black text-[#111827]">{routeInfo?.distanceKm || '--'} km</p>
+                                        </div>
+                                        <div className="bg-[#F9FAFB] border border-gray-100 rounded-xl px-3 py-2">
+                                            <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">ETA</p>
+                                            <p className="text-xs font-black text-[#111827]">{routeInfo?.etaMins || '--'} min</p>
+                                        </div>
+                                    </div>
+                                    {!customerLocation && (
+                                        <div className="mb-3 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                                            Customer coordinates unavailable for this request
+                                        </div>
+                                    )}
+                                    {isArrived && (
+                                        <div className="mb-3 rounded-xl bg-green-50 border border-green-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-green-700">
+                                            Professional has arrived
+                                        </div>
+                                    )}
+                                    {mapLoadError && (
+                                        <div className="mb-3 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                                            {mapLoadError}
+                                        </div>
+                                    )}
+                                    <div className="w-full h-[200px] rounded-2xl overflow-hidden border border-gray-100">
+                                        <div ref={mapContainerRef} className="w-full h-full" />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm text-center">

@@ -45,6 +45,14 @@ const ProfessionalLayout = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    useEffect(() => {
+        // Prevent stale overlays/dropdowns from blocking clicks after route changes.
+        setNotifMenuOpen(false);
+        if (window.innerWidth < 1024) {
+            setSidebarOpen(false);
+        }
+    }, [location.pathname]);
+
     if (isAuthenticated === null) return null; // Wait for checkAuth
     if (isAuthenticated === false) return <Navigate to="/professional/login" replace />;
 
@@ -180,7 +188,7 @@ const ProfessionalLayout = () => {
                 {/* Page Content */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50 custom-scrollbar">
                     <div className="max-w-screen-2xl mx-auto w-full">
-                        <Outlet />
+                        <Outlet key={location.pathname} />
                     </div>
                 </div>
             </main>

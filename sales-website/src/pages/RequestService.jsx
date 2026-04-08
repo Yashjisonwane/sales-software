@@ -40,6 +40,24 @@ const RequestService = () => {
     const [error, setError] = useState('');
     const [isFormVisible, setIsFormVisible] = useState(false);
 
+    const getBrowserLocation = () =>
+        new Promise((resolve) => {
+            if (!navigator.geolocation) {
+                resolve({ latitude: null, longitude: null });
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    resolve({
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude
+                    });
+                },
+                () => resolve({ latitude: null, longitude: null }),
+                { enableHighAccuracy: true, timeout: 7000, maximumAge: 60000 }
+            );
+        });
+
     useEffect(() => {
         const fetchCats = async () => {
             try {
@@ -126,6 +144,7 @@ const RequestService = () => {
         setIsSubmitting(true);
 
         try {
+            const { latitude, longitude } = await getBrowserLocation();
             const res = await axios.post(`${API_BASE_URL}/guest/request`, {
                 name: formData.name,
                 email: formData.email,
@@ -133,7 +152,9 @@ const RequestService = () => {
                 categoryName: formData.categoryName,
                 location: `${formData.address}, ${formData.city}, ${formData.state} - ZIP: ${formData.zipCode}`,
                 description: formData.description,
-                preferredDate: formData.preferredDate
+                preferredDate: formData.preferredDate,
+                latitude,
+                longitude
             });
 
             if (res.data.success) {
