@@ -14,6 +14,7 @@ import {
   assignLeadNearest,
   assignJob,
 } from '../../api/apiService';
+import storage from '../../api/storage';
 import { Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +31,7 @@ function resolveAssignmentTarget(item) {
 const AssignJobScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const job = route.params?.job;
+  const [viewerRole, setViewerRole] = useState('WORKER');
   const [method, setMethod] = useState('manual');
   const [isTimerEnabled, setIsTimerEnabled] = useState(false);
   const [workers, setWorkers] = useState([]);
@@ -37,14 +39,29 @@ const AssignJobScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
 
   React.useEffect(() => {
-    const fetchWorkers = async () => {
+    const checkRoleAndLoad = async () => {
+      try {
+        const raw = await storage.getItem('userData');
+        const role = raw ? String(JSON.parse(raw)?.role || '').toUpperCase() : '';
+        if (role) setViewerRole(role);
+        if (role !== 'ADMIN') {
+          Alert.alert('Not allowed', 'Only admin can assign jobs.');
+          navigation.goBack();
+          return;
+        }
+      } catch (_) {}
       const res = await getProfessionals();
       if (res.success) setWorkers(res.data);
     };
-    fetchWorkers();
-  }, []);
+    checkRoleAndLoad();
+  }, [navigation]);
 
   const handleAssign = async () => {
+    if (viewerRole !== 'ADMIN') {
+      Alert.alert('Not allowed', 'Only admin can assign jobs.');
+      navigation.goBack();
+      return;
+    }
     if (!job) return;
     const target = resolveAssignmentTarget(job);
     if (!target) {

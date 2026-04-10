@@ -25,7 +25,7 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import { COLORS, SHADOWS, SIZES, FONTS } from '../../constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, interpolate, Extrapolate } from 'react-native-reanimated';
-import { getAvailableLeads, acceptLead, getWorkerJobs, getProfile, getProfessionalsLocations } from '../../api/apiService';
+import { getAvailableLeads, getWorkerJobs, getProfile, getProfessionalsLocations } from '../../api/apiService';
 import { pickLatLng, buildLeafletPinsMapHtml } from '../../utils/leafletMapHtml';
 import { getLeadPricingLines, getJobPricingLines } from '../../utils/workerPricingDisplay';
 
@@ -309,6 +309,16 @@ export default function WorkerExploreScreen({ navigation, route }) {
         if (can) Linking.openURL(url);
         else Alert.alert('Unable to open maps', 'Please install Google Maps or enable browser links.');
     }, [jobs, leads, resolveCoords]);
+    const openMyLocationInMaps = useCallback(async () => {
+        if (!myLocation?.latitude || !myLocation?.longitude) {
+            Alert.alert('Location unavailable', 'Your live location is not available right now.');
+            return;
+        }
+        const url = `https://www.google.com/maps/search/?api=1&query=${myLocation.latitude},${myLocation.longitude}`;
+        const can = await Linking.canOpenURL(url);
+        if (can) Linking.openURL(url);
+        else Alert.alert('Unable to open maps', 'Please install Google Maps or enable browser links.');
+    }, [myLocation]);
     const openDirectionsForEntity = useCallback(async (entity) => {
         const coord = resolveCoords(entity);
         let url = '';
@@ -339,18 +349,18 @@ export default function WorkerExploreScreen({ navigation, route }) {
         const passMapFilter = (status) => mapStatusFilter === 'ALL' || normalizeStatus(status) === mapStatusFilter;
         const out = [];
 
-        // Show all leads (OPEN + ASSIGNED) on map; color by state.
+        // Worker map should show only admin-assigned work locations (not OPEN leads).
         leads
+            .filter((l) => String(l.status || '').toUpperCase() !== 'OPEN')
             .filter((l) => passMapFilter(l.job?.status || l.status))
             .forEach((l) => {
                 const c = resolveCoords(l);
                 if (!c) return;
-                const isOpen = String(l.status || '').toUpperCase() === 'OPEN';
                 out.push({
                     ...c,
-                    color: isOpen ? '#8B5CF6' : '#7C3AED',
+                    color: '#7C3AED',
                     id: `lead-${l.id}`,
-                    recordType: isOpen ? 'lead' : 'lead-assigned',
+                    recordType: 'lead-assigned',
                 });
             });
 
@@ -390,16 +400,21 @@ export default function WorkerExploreScreen({ navigation, route }) {
         return out;
     }, [jobs, leads, myLocation, mapStatusFilter, resolveCoords, teamLocations]);
 
+    const assignedLeads = useMemo(
+        () => leads.filter((lead) => String(lead.status || '').toUpperCase() !== 'OPEN'),
+        [leads]
+    );
+
     const filteredLeads = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
-        if (!q) return leads;
-        return leads.filter((lead) => {
+        if (!q) return assignedLeads;
+        return assignedLeads.filter((lead) => {
             const name = String(lead.customerName || lead.customer?.name || '').toLowerCase();
             const loc = String(lead.location || '').toLowerCase();
             const cat = String(lead.categoryName || lead.category?.name || '').toLowerCase();
             return name.includes(q) || loc.includes(q) || cat.includes(q);
         });
-    }, [leads, searchQuery]);
+    }, [assignedLeads, searchQuery]);
 
     const leafletMapHtml = useMemo(() => buildLeafletPinsMapHtml(leafletPins), [leafletPins]);
     const leafletMapKey = useMemo(
@@ -476,20 +491,6 @@ export default function WorkerExploreScreen({ navigation, route }) {
         [leads, jobs, navigation]
     );
 
-    const handleAcceptLead = async (leadId) => {
-        const res = await acceptLead(leadId);
-        if (res.success) {
-            Alert.alert('Success', 'Lead accepted. A new job has been linked.');
-            setLeads((prev) => prev.filter((lead) => String(lead.id) !== String(leadId)));
-            fetchLeads();
-            fetchJobs();
-        } else {
-            fetchLeads();
-            fetchJobs();
-            Alert.alert('Failed', res.message || 'Failed to accept lead');
-        }
-    };
-
     const getLinkedJobForLead = useCallback(
         (lead) => {
             if (!lead) return null;
@@ -521,9 +522,9 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     />
                     <StatCard 
                         icon="people" 
-                        label="New Leads" 
-                        value={leads.length.toString()} 
-                        change="Action required" 
+                        label="Assigned Work" 
+                        value={assignedLeads.length.toString()} 
+                        change="By admin" 
                         color="#F59E0B" 
                     />
                     <StatCard 
@@ -550,17 +551,12 @@ export default function WorkerExploreScreen({ navigation, route }) {
             <View style={{ height: 20 }} />
             <Text style={styles.sectionTitle}>Recent Activities</Text>
             <View style={styles.updatesList}>
-                {leads.slice(0, 2).map((lead, idx) => (
+                {assignedLeads.slice(0, 2).map((lead, idx) => (
                     <TouchableOpacity
                         key={idx}
                         style={styles.updateItem}
                         activeOpacity={0.8}
                         onPress={() => {
-                            const status = String(lead.status || '').toUpperCase();
-                            if (status === 'OPEN') {
-                                navigation.navigate('JobOfferDetail', { lead, state: 'pending' });
-                                return;
-                            }
                             const linkedJob = getLinkedJobForLead(lead);
                             if (linkedJob) {
                                 navigation.navigate('JobDetails', { job: linkedJob });
@@ -571,7 +567,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                             <Ionicons name="flash" size={20} color="#D97706" />
                         </View>
                         <View style={styles.updateContent}>
-                            <Text style={styles.updateText}>New Lead: {lead.customer?.name || 'Customer'}</Text>
+                            <Text style={styles.updateText}>Assigned Job: {lead.customer?.name || 'Customer'}</Text>
                             <Text style={styles.updateMeta}>Just now • {lead.location}</Text>
                         </View>
                     </TouchableOpacity>
@@ -641,12 +637,14 @@ export default function WorkerExploreScreen({ navigation, route }) {
                         </View>
 
                         <View style={styles.cardActions}>
-                            <TouchableOpacity 
-                                style={[styles.loginBtn, { height: 40, marginTop: 10, backgroundColor: '#10B981' }]}
-                                onPress={() => handleAcceptLead(selectedPin.id)}
+                            <View
+                                style={[
+                                    styles.loginBtn,
+                                    { height: 40, marginTop: 10, backgroundColor: '#E2E8F0' },
+                                ]}
                             >
-                                <Text style={styles.loginBtnText}>Accept Lead</Text>
-                            </TouchableOpacity>
+                                <Text style={[styles.loginBtnText, { color: '#475569' }]}>Assigned By Admin</Text>
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -660,7 +658,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
             <View style={styles.detailedSearchRow}>
                 <View style={styles.detailedSearchBox}>
                     <BottomSheetTextInput
-                        placeholder="Search leads, customer, location"
+                        placeholder="Search assigned jobs, customer, location"
                         style={styles.detailedSearchInput}
                         placeholderTextColor="#94A3B8"
                         value={searchQuery}
@@ -672,11 +670,11 @@ export default function WorkerExploreScreen({ navigation, route }) {
             </View>
 
             {isLoading ? (
-                <Text style={{ textAlign: 'center', padding: 20 }}>Loading leads...</Text>
+                <Text style={{ textAlign: 'center', padding: 20 }}>Loading assigned jobs...</Text>
             ) : filteredLeads.length === 0 ? (
                 <View style={{ padding: 40, alignItems: 'center' }}>
                     <Ionicons name="document-text-outline" size={60} color="#CBD5E0" />
-                    <Text style={{ color: '#718096', marginTop: 10 }}>No leads match your search.</Text>
+                    <Text style={{ color: '#718096', marginTop: 10 }}>No assigned jobs match your search.</Text>
                 </View>
             ) : (
                 <View style={{ gap: 20 }}>
@@ -687,11 +685,6 @@ export default function WorkerExploreScreen({ navigation, route }) {
                             key={lead.id}
                             style={styles.detailedVerticalCard}
                             onPress={() => {
-                                const status = String(lead.status || '').toUpperCase();
-                                if (status === 'OPEN') {
-                                    navigation.navigate('JobOfferDetail', { lead, state: 'pending' });
-                                    return;
-                                }
                                 const linkedJob = getLinkedJobForLead(lead);
                                 if (linkedJob) {
                                     navigation.navigate('JobDetails', { job: linkedJob });
@@ -742,18 +735,11 @@ export default function WorkerExploreScreen({ navigation, route }) {
                                                 <Text style={{ color: '#0E56D0', fontWeight: '700', marginTop: 6 }}>Get Directions</Text>
                                             </TouchableOpacity>
                                     </View>
-                                    {String(lead.status || '').toUpperCase() === 'OPEN' ? (
-                                        <TouchableOpacity 
-                                            style={[styles.actionBtn, { maxWidth: 120 }]}
-                                            onPress={() => handleAcceptLead(lead.id)}
-                                        >
-                                            <Text style={styles.actionText}>Accept Now</Text>
-                                        </TouchableOpacity>
-                                    ) : (
-                                        <View style={[styles.actionBtn, { maxWidth: 120, backgroundColor: '#E2E8F0' }]}>
-                                            <Text style={[styles.actionText, { color: '#475569' }]}>Assigned</Text>
-                                        </View>
-                                    )}
+                                    <View style={[styles.actionBtn, { maxWidth: 140, backgroundColor: '#E2E8F0' }]}>
+                                        <Text style={[styles.actionText, { color: '#475569' }]}>
+                                            Assigned
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -829,7 +815,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     style={styles.newInvoiceBtn}
                     onPress={() => {
                         if (jobs.length === 0) {
-                            Alert.alert('No jobs yet', 'Accept a lead or wait for an assigned job before invoicing.');
+                            Alert.alert('No jobs yet', 'Wait for an admin-assigned job before invoicing.');
                             return;
                         }
                         if (jobsReadyToInvoice.length === 0) {
@@ -962,7 +948,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                 onPress={() => {
                     const list = jobs.filter((j) => j.jobNo);
                     if (list.length === 0) {
-                        Alert.alert('No jobs', 'Accept a lead or get assigned a job before creating a quote.');
+                        Alert.alert('No jobs', 'Wait for an admin-assigned job before creating a quote.');
                         return;
                     }
                     navigation.navigate('QuoteScope', { job: list[0], role: 'worker' });
@@ -1159,7 +1145,7 @@ export default function WorkerExploreScreen({ navigation, route }) {
                     {/* Map Interaction Buttons Right - Premium Admin Style */}
                     {!selectedPin && (
                         <Animated.View style={[styles.mapButtonsRight, buttonsAnimatedStyle]}>
-                            <TouchableOpacity style={styles.navCircleBtn} onPress={() => { setSearchQuery(''); setMapStatusFilter('ALL'); }}>
+                            <TouchableOpacity style={styles.navCircleBtn} onPress={openMyLocationInMaps}>
                                 <Ionicons name="navigate" size={28} color="#0062E1" />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.dirSquareBtn} onPress={openDirectionsToWork}>

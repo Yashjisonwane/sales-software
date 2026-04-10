@@ -170,8 +170,7 @@ const initSocket = (server) => {
                     where: { id: socket.user.id },
                     data: {
                         lat,
-                        lng,
-                        isTrackingEnabled: true
+                        lng
                     }
                 });
 
@@ -180,7 +179,8 @@ const initSocket = (server) => {
                     lat: updated.lat,
                     lng: updated.lng,
                     updatedAt: updated.updatedAt,
-                    trackingEnabled: !!updated.isTrackingEnabled,
+                    // Tracking flag is derived from valid live coordinates in this schema.
+                    trackingEnabled: Number.isFinite(Number(updated.lat)) && Number.isFinite(Number(updated.lng)),
                     jobId: jobId || null
                 };
 

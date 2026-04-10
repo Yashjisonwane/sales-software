@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../constants/theme';
 import { rootNavigationRef, resetToWelcome } from './navigationRef';
 import { setUnauthorizedHandler } from '../api/apiClient';
+import storage from '../api/storage';
 
 // Shared & Auth
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
@@ -244,6 +245,39 @@ function AdminTabs() {
   );
 }
 
+function AdminOnlyAssignJobScreen(props) {
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const raw = await storage.getItem('userData');
+        const role = raw ? String(JSON.parse(raw)?.role || '').toUpperCase() : '';
+        if (!isMounted) return;
+        const allow = role === 'ADMIN';
+        setIsAdmin(allow);
+        if (!allow) {
+          props.navigation.goBack();
+        }
+      } catch (_) {
+        if (!isMounted) return;
+        setIsAdmin(false);
+        props.navigation.goBack();
+      } finally {
+        if (isMounted) setIsCheckingRole(false);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, [props.navigation]);
+
+  if (isCheckingRole || !isAdmin) return null;
+  return <AssignJobScreen {...props} />;
+}
+
 export default function AppNavigation() {
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -337,7 +371,7 @@ export default function AppNavigation() {
 
         {/* New Job/Quote Flow */}
         <Stack.Screen name="JobDetails" component={JobDetailsScreen} />
-        <Stack.Screen name="AssignJob" component={AssignJobScreen} />
+        <Stack.Screen name="AssignJob" component={AdminOnlyAssignJobScreen} />
         <Stack.Screen name="JobSuccess" component={JobSuccessScreen} />
         <Stack.Screen name="QuoteScope" component={QuoteScopeScreen} />
         <Stack.Screen name="QuotePricing" component={QuotePricingScreen} />

@@ -35,7 +35,7 @@ const JobDetailsScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('Updates'); // Set to Updates as frequently requested
   const [history, setHistory] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [viewerRole, setViewerRole] = useState('ADMIN');
+  const [viewerRole, setViewerRole] = useState('WORKER');
 
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['45%', '92%'], []);
@@ -172,15 +172,17 @@ const JobDetailsScreen = ({ navigation, route }) => {
       <BottomSheetFooter {...props} bottomInset={Math.max(insets.bottom, 12)}>
         <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
           <View style={styles.footerRow}>
-            <TouchableOpacity
-              style={styles.assignBtn}
-              onPress={() => navigation.navigate('AssignJob', { job })}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.btnText} numberOfLines={1}>
-                Assign
-              </Text>
-            </TouchableOpacity>
+            {viewerRole === 'ADMIN' ? (
+              <TouchableOpacity
+                style={styles.assignBtn}
+                onPress={() => navigation.navigate('AssignJob', { job })}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnText} numberOfLines={1}>
+                  Assign
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity
               style={styles.quoteBtn}
               onPress={() => navigation.navigate('QuoteScope', { job })}

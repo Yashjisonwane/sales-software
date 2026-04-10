@@ -617,6 +617,44 @@ export default function ExploreScreen({ navigation, route }) {
     [leafletPins]
   );
 
+  const resolveCoords = useCallback(
+    (x) =>
+      pickLatLng({
+        latitude: x?.customerLat ?? x?.latitude ?? x?.customer?.latitude ?? x?.job?.customerLat,
+        longitude: x?.customerLng ?? x?.longitude ?? x?.customer?.longitude ?? x?.job?.customerLng,
+        lat: x?.lat ?? x?.customer?.lat ?? x?.job?.lat,
+        lng: x?.lng ?? x?.customer?.lng ?? x?.job?.lng,
+        lon: x?.lon ?? x?.customer?.lon ?? x?.job?.lon,
+      }) || pickLatLng(x?.customer) || pickLatLng(x?.job) || pickLatLng(x),
+    []
+  );
+
+  const openAdminLocationInMaps = useCallback(async () => {
+    if (!adminLocation || typeof adminLocation.lat !== 'number' || typeof adminLocation.lng !== 'number') {
+      Alert.alert('Location unavailable', 'Admin live location is not available right now.');
+      return;
+    }
+    const url = `https://www.google.com/maps/search/?api=1&query=${adminLocation.lat},${adminLocation.lng}`;
+    const canOpen = await Linking.canOpenURL(url);
+    if (canOpen) Linking.openURL(url);
+    else Alert.alert('Unable to open maps', 'Please install Google Maps or enable browser links.');
+  }, [adminLocation]);
+
+  const openDirectionsToNextWork = useCallback(async () => {
+    const targetLead = leads.find((l) => resolveCoords(l));
+    const targetJob = allJobs.find((j) => resolveCoords(j));
+    const target = targetJob || targetLead;
+    const coord = target ? resolveCoords(target) : null;
+    if (!coord) {
+      Alert.alert('Location missing', 'No valid customer location found for directions.');
+      return;
+    }
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${coord.latitude},${coord.longitude}`;
+    const canOpen = await Linking.canOpenURL(url);
+    if (canOpen) Linking.openURL(url);
+    else Alert.alert('Unable to open maps', 'Please install Google Maps or enable browser links.');
+  }, [allJobs, leads, resolveCoords]);
+
   const handleMapMessage = useCallback(
     (event) => {
       try {
@@ -934,10 +972,10 @@ export default function ExploreScreen({ navigation, route }) {
           {/* Map Interaction Buttons Right */}
           {!selectedJob && (
             <Animated.View style={[styles.mapButtonsRight, buttonsAnimatedStyle]}>
-              <TouchableOpacity style={styles.navCircleBtn}>
+              <TouchableOpacity style={styles.navCircleBtn} onPress={openAdminLocationInMaps}>
                 <Ionicons name="navigate" size={28} color="#0062E1" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.dirSquareBtn}>
+              <TouchableOpacity style={styles.dirSquareBtn} onPress={openDirectionsToNextWork}>
                 <MaterialCommunityIcons name="directions" size={30} color="#FFFFFF" />
               </TouchableOpacity>
             </Animated.View>
